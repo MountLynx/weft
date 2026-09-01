@@ -48,6 +48,7 @@ def load_project(root: Path) -> tuple[Project, list[Diagnostic]]:
     seen_ids: dict[str, str] = {}  # id -> 首次出现的文件（实体共用命名空间）
 
     _load_cards(root, project, seen_ids, diagnostics)
+    _load_narrative(root, project, diagnostics)
     return project, diagnostics
 
 
@@ -115,3 +116,47 @@ def _load_card(root: Path, project: Project, seen_ids: dict[str, str],
 
     getattr(project, attr)[card.id] = card
     project.card_paths[card.id] = path.relative_to(root)
+
+
+def _load_narrative(root: Path, project: Project, diagnostics: list[Diagnostic]) -> None:
+    directory = root / "narrative"
+    if not directory.is_dir():
+        return
+    seen_sections: dict[str, str] = {}
+    seen_nodes: dict[str, str] = {}
+    sections: list[NarrativeSection] = []
+
+    for path in sorted(directory.glob("*.md")):
+        rel = _rel(root, path)
+        metadata, error = _load_frontmatter(path)
+        if error is not None:
+            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None, error))
+            continue
+        try:
+            section = NarrativeSection.model_validate(metadata)
+        except ValidationError as exc:
+            first = exc.errors()[0]
+            field = ".".join(str(p) for p in first["loc"])
+            diagnostics.append(Diagnostic(
+                Level.ERROR, "E-PARSE", rel, field or None,
+                f"frontmatter 解析失败：{first['msg']}"))
+            continue
+
+        if section.id in seen_sections:
+            diagnostics.append(Diagnostic(
+                Level.ERROR, "E-DUPLICATE-ID", rel, "id",
+                f"叙事节 id {section.id} 重复，首次出现于 {seen_sections[section.id]}"))
+            continue
+        seen_sections[section.id] = rel
+        project.section_paths[section.id] = path.relative_to(root)
+        sections.append(section)
+
+        for node in section.nodes:
+            if node.id in seen_nodes:
+                diagnostics.append(Diagnostic(
+                    Level.ERROR, "E-DUPLICATE-ID", rel, f"nodes[{node.id}]",
+                    f"叙事节点 id {node.id} 重复，首次出现于 {seen_nodes[node.id]}"))
+                continue
+            seen_nodes[node.id] = rel
+
+    project.sections = sorted(sections, key=lambda s: (s.order, s.id))
