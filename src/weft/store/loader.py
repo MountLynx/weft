@@ -49,6 +49,8 @@ def load_project(root: Path) -> tuple[Project, list[Diagnostic]]:
 
     _load_cards(root, project, seen_ids, diagnostics)
     _load_narrative(root, project, diagnostics)
+    _load_figures(root, project, diagnostics)
+    _load_config(root, project, diagnostics)
     return project, diagnostics
 
 
@@ -160,3 +162,66 @@ def _load_narrative(root: Path, project: Project, diagnostics: list[Diagnostic])
             seen_nodes[node.id] = rel
 
     project.sections = sorted(sections, key=lambda s: (s.order, s.id))
+
+
+def _load_figures(root: Path, project: Project, diagnostics: list[Diagnostic]) -> None:
+    path = root / "metadata" / "figures.yaml"
+    if not path.exists():
+        return
+    rel = _rel(root, path)
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None,
+                                      f"YAML 语法错误：{exc}"))
+        return
+    if not isinstance(raw, dict):
+        diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None,
+                                      "figures.yaml 顶层必须是映射"))
+        return
+    for key, value in raw.items():
+        try:
+            project.figures[str(key)] = FigureEntry.model_validate(value or {})
+        except ValidationError as exc:
+            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, str(key),
+                                          f"图注条目解析失败：{exc.errors()[0]['msg']}"))
+
+
+def _load_config(root: Path, project: Project, diagnostics: list[Diagnostic]) -> None:
+    quarto: dict = {}
+    quarto_path = root / "_quarto.yml"
+    if quarto_path.exists():
+        try:
+            loaded = yaml.safe_load(quarto_path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", "_quarto.yml", None,
+                                          f"YAML 语法错误：{exc}"))
+            loaded = None
+        quarto = loaded if isinstance(loaded, dict) else {}
+
+    weft_cfg: dict = {}
+    weft_path = root / "weft.yaml"
+    if weft_path.exists():
+        try:
+            loaded = yaml.safe_load(weft_path.read_text(encoding="utf-8"))
+        except yaml.YAMLError as exc:
+            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", "weft.yaml", None,
+                                          f"YAML 语法错误：{exc}"))
+            loaded = None
+        weft_cfg = loaded if isinstance(loaded, dict) else {}
+
+    project.figures_dir = str(weft_cfg.get("figures_dir", "figures"))
+
+    bib_field = quarto.get("bibliography")
+    bib_files = [bib_field] if isinstance(bib_field, str) else (bib_field or [])
+    for rel_bib in bib_files:
+        bib_path = root / rel_bib
+        if not bib_path.exists():
+            diagnostics.append(Diagnostic(
+                Level.ERROR, "E-BIB-MISSING", str(rel_bib), "bibliography",
+                f"bibliography 文件不存在：{rel_bib}"))
+            continue
+        text = bib_path.read_text(encoding="utf-8", errors="replace")
+        for match in _BIB_ENTRY.finditer(text):
+            if match.group("etype").lower() not in _BIB_IGNORED:
+                project.bib_keys.add(match.group("key"))
