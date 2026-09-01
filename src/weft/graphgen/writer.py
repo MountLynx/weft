@@ -1,6 +1,7 @@
 """把索引与可达集写入 generated/：graph.json、used-metadata.json、orphans.md。
 
-JSON 统一 ensure_ascii=False + sort_keys=True + 尾部换行，保证输出确定（可黄金比对）。
+JSON 统一 ensure_ascii=False + sort_keys=True + 尾部换行 + LF（newline="\n"，
+平台无关），保证输出字节级确定（可黄金比对）。
 """
 from __future__ import annotations
 
@@ -21,9 +22,10 @@ def write_outputs(project: Project, out_dir: Path) -> list[Path]:
     used_path = out_dir / "used-metadata.json"
     orphans_path = out_dir / "orphans.md"
 
-    graph_path.write_text(_to_json(graph), encoding="utf-8")
-    used_path.write_text(_to_json(used), encoding="utf-8")
-    orphans_path.write_text(_orphans_md(project, orphans), encoding="utf-8")
+    graph_path.write_text(_to_json(graph), encoding="utf-8", newline="\n")
+    used_path.write_text(_to_json(used), encoding="utf-8", newline="\n")
+    orphans_path.write_text(_orphans_md(project, orphans), encoding="utf-8",
+                            newline="\n")
     return [graph_path, used_path, orphans_path]
 
 

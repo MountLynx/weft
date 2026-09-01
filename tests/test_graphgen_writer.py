@@ -43,3 +43,5 @@ def test_orphans_md_lists_paths(tmp_path):
     text = (tmp_path / "generated" / "orphans.md").read_text(encoding="utf-8")
     assert "data-02（data）— metadata/data-02.md" in text
     assert "data-01（data）" not in text
+    raw = (tmp_path / "generated" / "orphans.md").read_bytes()
+    assert b"\r" not in raw and raw.endswith(b"\n")
