@@ -41,3 +41,25 @@ def test_validate_not_a_project(tmp_path):
     assert result.exit_code == 1
     assert "E-NOT-A-PROJECT" in result.output
     assert "1 个错误，0 个提醒" in result.output
+
+
+def test_graph_blocked_by_errors(tmp_path):
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "metadata" / "notes", "ghostkey",
+               {"id": "ghostkey", "summary": "s", "status": "draft"})
+    result = runner.invoke(app, ["graph", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "E-NOTE-NOT-IN-BIB" in result.output
+    assert "拒绝生成" in result.output
+    assert not (tmp_path / "generated" / "graph.json").exists()
+
+
+def test_graph_writes_outputs(tmp_path):
+    make_minimal_project(tmp_path)
+    result = runner.invoke(app, ["graph", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    for name in ("graph.json", "used-metadata.json", "orphans.md"):
+        assert (tmp_path / "generated" / name).exists()
+    assert "generated/graph.json" in result.output
+    assert "generated/used-metadata.json" in result.output
+    assert "generated/orphans.md" in result.output

@@ -7,6 +7,7 @@ from pathlib import Path
 import typer
 
 from weft.diagnostics import Diagnostic
+from weft.graphgen.writer import write_outputs
 from weft.store.loader import load_project
 from weft.validation import validate_project
 
@@ -51,9 +52,19 @@ def validate(project_dir: Path = typer.Argument(Path("."), help="weft 项目根�
 
 @app.command()
 def graph(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
-    """生成 generated/graph.json、used-metadata.json、orphans.md。"""
-    typer.echo("尚未实现（M1 Task 13）")
-    raise typer.Exit(code=2)
+    """生成 generated/graph.json、used-metadata.json、orphans.md；校验有错误时拒绝。"""
+    project, load_diags = load_project(project_dir)
+    diagnostics = load_diags + validate_project(project)
+    if any(d.is_error for d in diagnostics):
+        _print_diagnostics(diagnostics)
+        typer.echo("—— 校验存在错误，拒绝生成反向索引")
+        raise typer.Exit(code=1)
+    written = write_outputs(project, project.root / "generated")
+    for path in written:
+        typer.echo(f"已写入 {path.relative_to(project.root).as_posix()}")
+    warnings = [d for d in diagnostics if not d.is_error]
+    if warnings:
+        _print_diagnostics(warnings)
 
 
 @app.command()
