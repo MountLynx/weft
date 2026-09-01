@@ -1,8 +1,9 @@
-# paperflow 设计文档（工作名，可改）
+# weft 设计文档（定名）
 
 - 日期：2026-09-01
 - 状态：设计 v1 定案；数据结构 v1 冻结
-- 位置：`C:\Users\xingy\Desktop\开发\paperflow`（独立 Python 包）
+- 位置：`C:\Users\xingy\Desktop\开发\weft`（独立 Python 包）
+- 命名：weft（纬线）——元数据卡片为经线（预先架好、承重的结构），叙事流为纬线（穿行其间、决定选用与顺序），终稿为织成的布，程序为织机。
 
 ## 1. 背景与目标
 
@@ -136,7 +137,7 @@ tbl-01:
 
 ### 3.7 bib 与项目配置
 
-bib 路径直接读 `_quarto.yml` 的 `bibliography` 字段（单一事实源，Quarto 项目本就有）；图表编号的显示形式同样全部由 `_quarto.yml` crossref 配置决定（`fig-prefix`、`tbl-prefix`、子图样式等）——投 Elsevier 风格期刊即设 `fig-prefix: "Fig."`、`tbl-prefix: "Table"`，换目标期刊只改这里，卡片与 figures.yaml 不动。可选 `paperflow.yaml` 覆盖（如 `figures_dir`）。无需独立配置文件。
+bib 路径直接读 `_quarto.yml` 的 `bibliography` 字段（单一事实源，Quarto 项目本就有）；图表编号的显示形式同样全部由 `_quarto.yml` crossref 配置决定（`fig-prefix`、`tbl-prefix`、子图样式等）——投 Elsevier 风格期刊即设 `fig-prefix: "Fig."`、`tbl-prefix: "Table"`，换目标期刊只改这里，卡片与 figures.yaml 不动。可选 `weft.yaml` 覆盖（如 `figures_dir`）。无需独立配置文件。
 
 ### 3.8 目录结构
 
@@ -186,7 +187,7 @@ project/
 ## 5. 架构分层
 
 ```text
-src/paperflow/
+src/weft/
 ├── models/        # pydantic 模型:Data/Fact/Claim/Note/NarrativeSection/Node/Use
 ├── store/         # 卡片与叙事文件的加载/查询/保存、ID 唯一性、frontmatter 解析
 ├── validation/    # §4 全部规则
@@ -216,25 +217,25 @@ src/paperflow/
 
 ## 7. 组装与渲染
 
-`assemble` 按 nodes 顺序拼接该节已批准的草稿段落；节点无已批准草稿时 strict 报错 / lenient 跳过（经 `paperflow.yaml` 配置，默认 strict）。图表按 fact→data→refs 首次出现处插入，图注取自 figures.yaml，crossref 使用 Quarto 语法（`@fig-01a` / `@tbl-01`，子图级）；编号显示形式（如 Elsevier 的 `Fig. 1a`、`Table 1`）由 `_quarto.yml` crossref 配置决定，组装只产出 label 引用。引文 `[@key]` 交由 Quarto citeproc 依 `.bib` 渲染。输出 `generated/<section>.qmd` → `quarto render` 出 HTML/PDF/DOCX。
+`assemble` 按 nodes 顺序拼接该节已批准的草稿段落；节点无已批准草稿时 strict 报错 / lenient 跳过（经 `weft.yaml` 配置，默认 strict）。图表按 fact→data→refs 首次出现处插入，图注取自 figures.yaml，crossref 使用 Quarto 语法（`@fig-01a` / `@tbl-01`，子图级）；编号显示形式（如 Elsevier 的 `Fig. 1a`、`Table 1`）由 `_quarto.yml` crossref 配置决定，组装只产出 label 引用。引文 `[@key]` 交由 Quarto citeproc 依 `.bib` 渲染。输出 `generated/<section>.qmd` → `quarto render` 出 HTML/PDF/DOCX。
 
 ## 8. CLI 命令面
 
 | 命令 | 作用 |
 |---|---|
-| `paperflow validate` | §4 全部校验,报告错误与提醒 |
-| `paperflow graph` | 生成 graph.json / used-metadata.json / 孤儿报告 |
-| `paperflow review` | 按类型列出未审阅实体与叙事节点清单 |
-| `paperflow draft <section>` | 对指定叙事节执行生成(SpecModule run) |
-| `paperflow assemble <section>` | 拼装已批准草稿 → generated/*.qmd |
-| `paperflow render [section]` | quarto render |
+| `weft validate` | §4 全部校验,报告错误与提醒 |
+| `weft graph` | 生成 graph.json / used-metadata.json / 孤儿报告 |
+| `weft review` | 按类型列出未审阅实体与叙事节点清单 |
+| `weft draft <section>` | 对指定叙事节执行生成(SpecModule run) |
+| `weft assemble <section>` | 拼装已批准草稿 → generated/*.qmd |
+| `weft render [section]` | quarto render |
 
 ## 9. 里程碑
 
 - **M1 数据层**：models + store + validation + graphgen + `validate`/`graph`/`review` 命令。纯数据层，不碰 LLM；以"结果与讨论"的真实样例数据验收。
 - **M2 生成层**：engine 适配器 + 单章节（03-results + 04-discussion）端到端生成到 `drafts/`；先 MockLLMClient 后真实 LLM。
 - **M3 渲染层**：assemble + `render`，打通 卡片→叙事→生成→组装→Quarto 全闭环。
-- **M4 打磨**：断点续跑/回滚接入 CLI、溯源注释完善、文档与示例项目模板（`paperflow init`）。
+- **M4 打磨**：断点续跑/回滚接入 CLI、溯源注释完善、文档与示例项目模板（`weft init`）。
 
 ## 10. 扩展场景（roadmap，架构已预留）
 
