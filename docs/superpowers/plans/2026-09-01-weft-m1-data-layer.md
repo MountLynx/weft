@@ -33,7 +33,9 @@
 9. **`weft graph` 先校验**：存在错误则拒绝生成（只打印诊断并 exit 1）；提醒不阻断。
 10. **项目根守卫**：`_quarto.yml` 与 `metadata/` 都缺失 → `E-NOT-A-PROJECT` 单条错误，跳过其余加载。
 11. **M1 只读**：不实现保存/回写（M2 引擎与 M4 `weft init` 才需要）；叙事节正文区（frontmatter 之外）M1 忽略不解析。
-12. **加载不中断**：单卡解析失败 / 文件名不符 / id 重复 / 目录不符 → 记诊断后继续加载其余卡片（宁可一次看全所有问题，接受少量级联悬空误报）。
+12. **加载不中断（强化于 Task 7 评审）**：单卡解析失败 / 文件名不符 / id 重复 / 目录不符 → 记诊断后继续加载其余卡片（宁可一次看全所有问题，接受少量级联悬空误报）；所有文件读取（frontmatter、figures.yaml、_quarto.yml、weft.yaml、bib）的语法/编码/IO 失败一律转 E-PARSE 诊断；`bibliography` 空串按 Quarto 语义视为未设置，类型错误（非字符串标量/含非字符串的列表）→ E-PARSE。已知接受的限制：figures.yaml 重复键 last-wins 静默合并（PyYAML 需自定义 Loader 才能检测，M1 不做）。
+
+13. **used-metadata.json 含 rejected-but-reachable**：`used_ids` 只按"是否被叙事可达"判定，不过滤 rejected（orphan 报告才排除 rejected）。graph.json 同理收录全部实体——两者都是全量索引/全集，筛选留给消费方（M2 spec_build 会按 approved 过滤）。
 
 ### 诊断码总表（稳定标识，测试与 CLI 输出均用）
 
@@ -599,12 +601,12 @@ __all__ = [
 - [ ] **Step 6: 跑测试确认通过**
 
 Run: `.venv/Scripts/python -m pytest tests/test_models_narrative.py -v`
-Expected: `9 passed`
+Expected: `8 passed`
 
 - [ ] **Step 7: 全量回归**
 
 Run: `.venv/Scripts/python -m pytest tests -v`
-Expected: 全部通过（此前任务 22 个 + 本任务 9 个）
+Expected: 全部通过（此前任务 13 个 + 本任务 8 个 = 21 个）
 
 - [ ] **Step 8: Commit**
 
@@ -725,8 +727,7 @@ def test_minimal_project_loads_clean(tmp_path):
     assert set(project.facts) == {"fact-01"}
     assert set(project.claims) == {"claim-01"}
     assert set(project.notes) == {"key2020"}
-    assert set(project.figures) == {"fig-01"}
-    assert project.bib_keys == {"key2020"}
+    # figures/bib 断言在 Task 7（加载器到那时才读它们；本任务只装实体卡）
     assert project.card_paths["data-01"].as_posix() == "metadata/data/data-01.md"
 
 
@@ -753,6 +754,31 @@ def test_duplicate_id_across_types(tmp_path):
     dup = [d for d in diagnostics if d.code == "E-DUPLICATE-ID"]
     assert len(dup) == 1
     assert "data-01" in dup[0].message
+    project, _ = load_project(tmp_path)
+    # 合法 note key2020 保留，后出现的重复 data-01 卡被跳过（first-wins）
+    assert set(project.notes) == {"key2020"}
+    assert project.card_paths["data-01"].as_posix() == "metadata/data/data-01.md"
+
+
+def test_yaml_syntax_error_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    (tmp_path / "metadata" / "data" / "data-98.md").write_text(
+        "---\nid: [unclosed\n---\n", encoding="utf-8")
+    _, diagnostics = load_project(tmp_path)
+    parse = [d for d in diagnostics if d.code == "E-PARSE"]
+    assert len(parse) == 1
+    assert parse[0].path == "metadata/data/data-98.md"
+    assert parse[0].field is None
+
+
+def test_non_utf8_card_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    (tmp_path / "metadata" / "data" / "data-97.md").write_bytes(
+        b"---\nid: data-97\nstatus: approved\ndescription: \xb0\xc2\n---\n")
+    _, diagnostics = load_project(tmp_path)
+    parse = [d for d in diagnostics if d.code == "E-PARSE"]
+    assert len(parse) == 1
+    assert parse[0].path == "metadata/data/data-97.md"
 
 
 def test_claim_directory_mismatch(tmp_path):
@@ -883,10 +909,13 @@ def load_project(root: Path) -> tuple[Project, list[Diagnostic]]:
 
 
 def _load_frontmatter(path: Path) -> tuple[dict | None, str | None]:
-    """返回 (metadata, 错误消息)。错误消息非 None 表示 YAML/编码层失败。"""
+    """返回 (metadata, 错误消息)。错误消息非 None 表示 YAML/编码层失败。
+
+    OSError（文件被占用/是目录等）也在内：加载永不中断是冻结设计决策。
+    """
     try:
         post = frontmatter.load(path)
-    except (yaml.YAMLError, UnicodeDecodeError) as exc:
+    except (yaml.YAMLError, UnicodeDecodeError, OSError) as exc:
         return None, f"frontmatter 解析失败：{exc}"
     return post.metadata, None
 
@@ -958,12 +987,12 @@ __all__ = ["Project", "load_project"]
 - [ ] **Step 7: 跑测试确认通过**
 
 Run: `.venv/Scripts/python -m pytest tests/test_store_cards.py -v`
-Expected: `7 passed`
+Expected: `9 passed`
 
 - [ ] **Step 8: 全量回归**
 
 Run: `.venv/Scripts/python -m pytest tests -v`
-Expected: 全部通过
+Expected: 全部通过（21 + 9 = 30 个）
 
 - [ ] **Step 9: Commit**
 
@@ -993,9 +1022,17 @@ def test_sections_sorted_by_order(tmp_path):
                {"id": "sec-02", "section": "Discussion", "order": 2,
                 "nodes": [{"id": "para-02-01", "purpose": "interpret", "uses": [],
                            "status": "approved"}]})
+    # order 与文件名顺序相反 + 同 order 用 id 决胜：防止用文件名顺序冒充排序
+    write_card(tmp_path / "narrative", "00-zzz",
+               {"id": "sec-00", "section": "Intro", "order": 0, "nodes": []})
+    write_card(tmp_path / "narrative", "05-aaa",
+               {"id": "sec-05b", "section": "B", "order": 5, "nodes": []})
+    write_card(tmp_path / "narrative", "05-bbb",
+               {"id": "sec-05a", "section": "A", "order": 5, "nodes": []})
     project, diagnostics = load_project(tmp_path)
     assert diagnostics == []
-    assert [s.id for s in project.sections] == ["sec-01", "sec-02"]
+    assert [s.id for s in project.sections] == ["sec-00", "sec-01", "sec-02",
+                                                "sec-05a", "sec-05b"]
     assert project.section_paths["sec-02"].as_posix() == "narrative/02-discussion.md"
 
 
@@ -1023,13 +1060,27 @@ def test_duplicate_node_id_across_sections(tmp_path):
 
 def test_broken_section_frontmatter(tmp_path):
     make_minimal_project(tmp_path)
+    # 其余必填字段齐全，只让 order 非法——确保第一个报错就是 order 的 int_parsing
     (tmp_path / "narrative" / "09-bad.md").write_text(
-        "---\nid: sec-09\norder: not-a-number\n---\n", encoding="utf-8")
+        "---\nid: sec-09\nsection: Bad\norder: not-a-number\n---\n", encoding="utf-8")
     _, diagnostics = load_project(tmp_path)
     parse = [d for d in diagnostics if d.code == "E-PARSE"]
     assert len(parse) == 1
     assert parse[0].path == "narrative/09-bad.md"
     assert parse[0].field == "order"
+
+
+def test_duplicate_section_id_first_wins(tmp_path):
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "narrative", "09-dup",
+               {"id": "sec-01", "section": "Dup", "order": 9, "nodes": []})
+    _, diagnostics = load_project(tmp_path)
+    dup = [d for d in diagnostics if d.code == "E-DUPLICATE-ID"]
+    assert len(dup) == 1
+    project, _ = load_project(tmp_path)
+    # first-wins：保留首个 sec-01，后出现的整文件跳过
+    assert len([s for s in project.sections if s.id == "sec-01"]) == 1
+    assert project.section_paths["sec-01"].as_posix() == "narrative/01-results.md"
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -1104,12 +1155,12 @@ def _load_narrative(root: Path, project: Project, diagnostics: list[Diagnostic])
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python -m pytest tests/test_store_narrative.py -v`
-Expected: `4 passed`
+Expected: `5 passed`
 
 - [ ] **Step 5: 全量回归 + Commit**
 
 Run: `.venv/Scripts/python -m pytest tests -v`
-Expected: 全部通过
+Expected: 全部通过（30 + 5 = 35 个）
 
 ```bash
 git add src/weft/store/loader.py tests/test_store_narrative.py
@@ -1179,6 +1230,55 @@ def test_no_bibliography_field_is_fine(tmp_path):
     project, diagnostics = load_project(tmp_path)
     assert diagnostics == []
     assert project.bib_keys == set()
+
+
+def test_empty_bibliography_string_is_unset(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "_quarto.yml", {"bibliography": ""})
+    project, diagnostics = load_project(tmp_path)
+    assert diagnostics == []
+    assert project.bib_keys == set()
+
+
+def test_bibliography_list_with_non_string_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "_quarto.yml", {"bibliography": [123]})
+    project, diagnostics = load_project(tmp_path)
+    assert [d.code for d in diagnostics] == ["E-PARSE"]
+    assert diagnostics[0].field == "bibliography"
+
+
+def test_bibliography_scalar_int_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "_quarto.yml", {"bibliography": 123})
+    project, diagnostics = load_project(tmp_path)
+    assert [d.code for d in diagnostics] == ["E-PARSE"]
+    assert diagnostics[0].field == "bibliography"
+
+
+def test_bib_path_is_directory_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    (tmp_path / "bibdir").mkdir()
+    write_yaml(tmp_path / "_quarto.yml", {"bibliography": "bibdir"})
+    project, diagnostics = load_project(tmp_path)
+    assert [d.code for d in diagnostics] == ["E-PARSE"]
+    assert project.bib_keys == set()
+
+
+def test_quarto_yml_as_directory_no_crash(tmp_path):
+    # _quarto.yml 是目录：读取失败必须转诊断，不得抛异常
+    make_minimal_project(tmp_path)
+    (tmp_path / "_quarto.yml").unlink()
+    (tmp_path / "_quarto.yml").mkdir()
+    project, diagnostics = load_project(tmp_path)
+    assert "E-PARSE" in [d.code for d in diagnostics]
+
+
+def test_figures_yaml_non_utf8_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    (tmp_path / "metadata" / "figures.yaml").write_bytes(b"fig-01: \xb0\xc2\n")
+    project, diagnostics = load_project(tmp_path)
+    assert [d.code for d in diagnostics] == ["E-PARSE"]
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -1188,19 +1288,26 @@ Expected: FAIL（`figures_dir` 恒为默认值、bib 缺失无诊断等断言失
 
 - [ ] **Step 3: 实现 `_load_figures` 与 `_load_config`**
 
-在 `loader.py` 的 `_load_narrative` 之后追加：
+在 `loader.py` 的 `_load_narrative` 之后追加（`_read_yaml` 是共享的容错读取 helper，放在 `_load_frontmatter` 旁）：
 
 ```python
+def _read_yaml(path: Path, rel: str, diagnostics: list[Diagnostic]):
+    """读 YAML 文件；语法/编码/IO 失败一律转 E-PARSE 诊断，返回 None。"""
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, UnicodeDecodeError, OSError) as exc:
+        diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None,
+                                      f"YAML 语法错误：{exc}"))
+        return None
+
+
 def _load_figures(root: Path, project: Project, diagnostics: list[Diagnostic]) -> None:
     path = root / "metadata" / "figures.yaml"
     if not path.exists():
         return
     rel = _rel(root, path)
-    try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError as exc:
-        diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None,
-                                      f"YAML 语法错误：{exc}"))
+    raw = _read_yaml(path, rel, diagnostics)
+    if raw is None:
         return
     if not isinstance(raw, dict):
         diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None,
@@ -1218,37 +1325,43 @@ def _load_config(root: Path, project: Project, diagnostics: list[Diagnostic]) ->
     quarto: dict = {}
     quarto_path = root / "_quarto.yml"
     if quarto_path.exists():
-        try:
-            loaded = yaml.safe_load(quarto_path.read_text(encoding="utf-8"))
-        except yaml.YAMLError as exc:
-            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", "_quarto.yml", None,
-                                          f"YAML 语法错误：{exc}"))
-            loaded = None
+        loaded = _read_yaml(quarto_path, "_quarto.yml", diagnostics)
         quarto = loaded if isinstance(loaded, dict) else {}
 
     weft_cfg: dict = {}
     weft_path = root / "weft.yaml"
     if weft_path.exists():
-        try:
-            loaded = yaml.safe_load(weft_path.read_text(encoding="utf-8"))
-        except yaml.YAMLError as exc:
-            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", "weft.yaml", None,
-                                          f"YAML 语法错误：{exc}"))
-            loaded = None
+        loaded = _read_yaml(weft_path, "weft.yaml", diagnostics)
         weft_cfg = loaded if isinstance(loaded, dict) else {}
 
     project.figures_dir = str(weft_cfg.get("figures_dir", "figures"))
 
     bib_field = quarto.get("bibliography")
-    bib_files = [bib_field] if isinstance(bib_field, str) else (bib_field or [])
+    if isinstance(bib_field, str):
+        bib_files = [bib_field]
+    elif isinstance(bib_field, list) and all(isinstance(x, str) for x in bib_field):
+        bib_files = bib_field
+    else:
+        if bib_field is not None:  # 字段缺失(None)不算错
+            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", "_quarto.yml",
+                                          "bibliography",
+                                          "bibliography 必须是字符串或字符串列表"))
+        bib_files = []
     for rel_bib in bib_files:
+        if not rel_bib.strip():
+            continue  # 空串按 Quarto 语义视为未设置
         bib_path = root / rel_bib
         if not bib_path.exists():
             diagnostics.append(Diagnostic(
                 Level.ERROR, "E-BIB-MISSING", str(rel_bib), "bibliography",
                 f"bibliography 文件不存在：{rel_bib}"))
             continue
-        text = bib_path.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = bib_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", str(rel_bib),
+                                          "bibliography", f"bib 文件读取失败：{exc}"))
+            continue
         for match in _BIB_ENTRY.finditer(text):
             if match.group("etype").lower() not in _BIB_IGNORED:
                 project.bib_keys.add(match.group("key"))
@@ -1267,12 +1380,12 @@ def _load_config(root: Path, project: Project, diagnostics: list[Diagnostic]) ->
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python -m pytest tests/test_store_config.py -v`
-Expected: `5 passed`
+Expected: `11 passed`
 
 - [ ] **Step 5: 全量回归 + Commit**
 
 Run: `.venv/Scripts/python -m pytest tests -v`
-Expected: 全部通过
+Expected: 全部通过（35 + 11 = 46 个）
 
 ```bash
 git add src/weft/store/loader.py tests/test_store_config.py
@@ -1551,7 +1664,7 @@ git commit -m "feat: validation 错误规则（悬空引用/bib/figures.yaml）"
 
 ```python
 from weft.graphgen.index import build_index, orphan_ids, used_ids
-from weft.models.cards import ClaimCard, DataCard, FactCard
+from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
 from weft.models.narrative import NarrativeSection, Node, Use
 from tests.helpers import build_project
 
@@ -1609,6 +1722,78 @@ def test_index_includes_rejected_entities():
     # 反向索引是全量索引，rejected 也收录；筛选取决于消费方
     project = _project(data=[DataCard(id="data-02", status="rejected")])
     assert build_index(project)["entities"]["data-02"]["status"] == "rejected"
+
+
+def test_index_tolerates_dangling_refs():
+    # 悬空引用是 validation 的职责；build_index 必须静默跳过（Task 10 会在带错项目上调用它）
+    project = _project(
+        facts=[FactCard(id="fact-01", data=["data-01", "ghost-data"], statement="s",
+                        supports=["claim-01", "claim-ghost"], status="approved")],
+        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+            Node(id="para-01-01", purpose="describe",
+                 uses=[Use(id="fact-01", role="evidence"),
+                       Use(id="ghost-use", role="evidence")], status="approved")]),
+        ],
+        claims=[ClaimCard(id="claim-01", claim_type="cited", statement="s",
+                          cites=["ghost-note"], status="approved")],
+    )
+    index = build_index(project)  # 不得抛异常
+    assert "ghost-data" not in index["entities"]
+    assert "claim-ghost" not in index["entities"]
+    for entry in index["entities"].values():
+        for ids in entry["referenced_by"].values():
+            assert not any(str(i).startswith("ghost") for i in ids)
+
+
+def test_direct_claim_seed_reachable():
+    # 种子规则：node.uses 直接引用的 claim 也算可达（无需 fact 支撑）
+    project = _project(
+        facts=[],
+        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+            Node(id="para-01-01", purpose="interpret",
+                 uses=[Use(id="claim-01", role="conclusion")], status="approved")]),
+        ],
+    )
+    entities = build_index(project)["entities"]
+    assert entities["claim-01"]["referenced_by"]["nodes"] == ["para-01-01"]
+    assert used_ids(project)["claims"] == ["claim-01"]
+    assert orphan_ids(project)["claims"] == []
+
+
+def test_multi_fact_partial_inheritance():
+    # fact-A 被用、fact-B 未被用，都 support claim-C → claim-C 只继承 fact-A 的节点
+    project = _project(
+        facts=[FactCard(id="fact-01", data=["data-01"], statement="s",
+                        supports=["claim-01"], status="approved"),
+               FactCard(id="fact-02", data=["ghost-d"], statement="t",
+                        supports=["claim-01"], status="approved")],
+        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+            Node(id="para-01-01", purpose="describe",
+                 uses=[Use(id="fact-01", role="evidence")], status="approved")]),
+        ],
+    )
+    entities = build_index(project)["entities"]
+    assert entities["claim-01"]["referenced_by"]["nodes"] == ["para-01-01"]
+    assert entities["data-01"]["referenced_by"]["nodes"] == ["para-01-01"]
+    assert used_ids(project)["facts"] == ["fact-01"]  # fact-02 未被叙事使用
+
+
+def test_note_reverse_edge_and_exclusion():
+    project = _project(
+        claims=[ClaimCard(id="claim-01", claim_type="cited", statement="s",
+                          cites=["smith2020"], status="approved")],
+        notes=[NoteCard(id="smith2020", summary="s", status="approved")],
+    )
+    entities = build_index(project)["entities"]
+    assert entities["smith2020"]["referenced_by"]["claims"] == ["claim-01"]
+    assert used_ids(project)["claims"] == ["claim-01"]  # note 不进 used/orphan
+    # claim-01 经 fact-01.supports 继承叙事节点：可达，故不是孤儿（used/orphan 互为反集）
+    assert orphan_ids(project)["claims"] == []
+    # note 既不在 used 也不在 orphan：输出无 notes 类别，任何列表都不含 note id
+    assert set(used_ids(project)) == {"data", "facts", "claims"}
+    assert set(orphan_ids(project)) == {"data", "facts", "claims"}
+    assert all("smith2020" not in ids for ids in used_ids(project).values())
+    assert all("smith2020" not in ids for ids in orphan_ids(project).values())
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -1728,7 +1913,7 @@ __all__ = ["build_index", "orphan_ids", "used_ids"]
 - [ ] **Step 5: 跑测试确认通过**
 
 Run: `.venv/Scripts/python -m pytest tests/test_graphgen.py -v`
-Expected: `5 passed`
+Expected: `9 passed`
 
 - [ ] **Step 6: Commit**
 
@@ -1906,6 +2091,48 @@ def test_purpose_and_role_vocab_warnings():
     codes = _codes(validate_project(project))
     assert "W-PURPOSE-VOCAB" in codes
     assert "W-ROLE-VOCAB" in codes
+
+
+def test_rejected_suppression_scoped_to_card_across_rules(tmp_path):
+    # 设计决策 2 的另一半：rejected 卡对图注/词表/summary 规则同样豁免，
+    # 但 W-FIGURE-UNUSED（figures.yaml 视角）与 approved 侧提醒不受影响。
+    data = [DataCard(id="data-01", status="rejected", refs=["fig-01a"])]
+    facts = [FactCard(id="fact-01", data=["data-01"], statement="s", status="approved")]
+    claims = [ClaimCard(id="claim-01", claim_type="uncited", statement="s",
+                        status="approved")]
+    notes = [NoteCard(id="k2020", status="rejected")]  # rejected 且无 summary
+    figures = {"fig-01": FigureEntry(caption="c", subfigs={"a": "s"})}
+    sections = [NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        # uses 让 approved 的 fact/claim 可达（否则 W-ORPHAN 会照报它们）；
+        # claim-01 经直接 use 可达但仍无 fact 支持 → W-CLAIM-UNSUPPORTED 保留
+        Node(id="para-01-01", purpose="speculate", status="approved",
+             uses=[Use(id="fact-01", role="evidence"),
+                   Use(id="claim-01", role="evidence")]),  # approved 故意用错词，应报
+    ])]
+    project = build_project(root=tmp_path, data=data, facts=facts, claims=claims,
+                            notes=notes, figures=figures, bib_keys={"k2020"},
+                            sections=sections)
+    codes = _codes(validate_project(project))
+    assert "W-FIGURE-FILE-MISSING" not in codes      # rejected data 卡豁免
+    assert "W-NOTE-NO-SUMMARY" not in codes          # rejected note 豁免
+    assert "W-ORPHAN" not in codes                   # rejected data 不进孤儿报告
+    assert "W-FIGURE-UNUSED" in codes                # figures.yaml 视角：fig-01 无有效引用
+    assert "W-PURPOSE-VOCAB" in codes                # approved 节点错词照报
+    assert "W-CLAIM-UNSUPPORTED" in codes            # approved 侧提醒不受影响
+
+
+def test_diagnostics_sorted_errors_first_by_path():
+    # 排序契约：错误在前（Task 12 CLI 输出依赖），错误内按 path 排序
+    from weft.diagnostics import Level
+    data = [DataCard(id="data-02", status="approved", refs=["fig-99z"])]
+    facts = [FactCard(id="fact-01", data=["data-99"], statement="s", status="approved")]
+    project = build_project(data=data, facts=facts)
+    diagnostics = validate_project(project)
+    assert any(not d.is_error for d in diagnostics)  # 确有提醒参与排序
+    levels = [d.level for d in diagnostics]
+    assert levels == sorted(levels, key=lambda lv: 0 if lv is Level.ERROR else 1)
+    error_paths = [d.path for d in diagnostics if d.is_error]
+    assert error_paths == sorted(error_paths)
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -2043,7 +2270,7 @@ def _check_vocab(project: Project) -> list[Diagnostic]:
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python -m pytest tests/test_validation_warnings.py -v`
-Expected: `14 passed`
+Expected: `16 passed`
 
 - [ ] **Step 5: 全量回归 + Commit**
 
@@ -2112,6 +2339,8 @@ def test_orphans_md_lists_paths(tmp_path):
     text = (tmp_path / "generated" / "orphans.md").read_text(encoding="utf-8")
     assert "data-02（data）— metadata/data-02.md" in text
     assert "data-01（data）" not in text
+    raw = (tmp_path / "generated" / "orphans.md").read_bytes()
+    assert b"\r" not in raw and raw.endswith(b"\n")
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -2124,7 +2353,8 @@ Expected: FAIL，`ModuleNotFoundError: No module named 'weft.graphgen.writer'`
 ```python
 """把索引与可达集写入 generated/：graph.json、used-metadata.json、orphans.md。
 
-JSON 统一 ensure_ascii=False + sort_keys=True + 尾部换行，保证输出确定（可黄金比对）。
+JSON 统一 ensure_ascii=False + sort_keys=True + 尾部换行 + LF（newline="\n"，
+平台无关），保证输出字节级确定（可黄金比对）。
 """
 from __future__ import annotations
 
@@ -2145,9 +2375,9 @@ def write_outputs(project: Project, out_dir: Path) -> list[Path]:
     used_path = out_dir / "used-metadata.json"
     orphans_path = out_dir / "orphans.md"
 
-    graph_path.write_text(_to_json(graph), encoding="utf-8")
-    used_path.write_text(_to_json(used), encoding="utf-8")
-    orphans_path.write_text(_orphans_md(project, orphans), encoding="utf-8")
+    graph_path.write_text(_to_json(graph), encoding="utf-8", newline="\n")
+    used_path.write_text(_to_json(used), encoding="utf-8", newline="\n")
+    orphans_path.write_text(_orphans_md(project, orphans), encoding="utf-8", newline="\n")
     return [graph_path, used_path, orphans_path]
 
 
@@ -2276,13 +2506,19 @@ app = typer.Typer(add_completion=False,
 
 
 def _ensure_utf8_stdout() -> None:
-    """Windows 重定向输出默认 GBK，中文诊断会 UnicodeEncodeError；统一切 UTF-8。"""
+    """Windows 重定向输出默认 GBK，中文诊断会 UnicodeEncodeError；统一切 UTF-8。
+
+    在模块导入时执行一次：除命令输出外，--help 与 typer 的用法错误提示也一并覆盖。
+    """
     for stream in (sys.stdout, sys.stderr):
         try:
             if stream.encoding and stream.encoding.lower() not in ("utf-8", "utf8"):
                 stream.reconfigure(encoding="utf-8")
         except (AttributeError, OSError):
             pass
+
+
+_ensure_utf8_stdout()
 
 
 def _print_diagnostics(diagnostics: list[Diagnostic]) -> None:
@@ -2295,7 +2531,6 @@ def _print_diagnostics(diagnostics: list[Diagnostic]) -> None:
 @app.command()
 def validate(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
     """运行 §4 全部校验，报告错误与提醒；有错误时退出码 1。"""
-    _ensure_utf8_stdout()
     project, load_diags = load_project(project_dir)
     diagnostics = load_diags + validate_project(project)
     _print_diagnostics(diagnostics)
@@ -2308,7 +2543,6 @@ def validate(project_dir: Path = typer.Argument(Path("."), help="weft 项目根�
 @app.command()
 def graph(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
     """生成 generated/graph.json、used-metadata.json、orphans.md。"""
-    _ensure_utf8_stdout()
     typer.echo("尚未实现（M1 Task 13）")
     raise typer.Exit(code=2)
 
@@ -2316,7 +2550,6 @@ def graph(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目�
 @app.command()
 def review(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
     """按类型列出未审阅（status: draft）的实体与叙事节点。"""
-    _ensure_utf8_stdout()
     typer.echo("尚未实现（M1 Task 14）")
     raise typer.Exit(code=2)
 ```
@@ -2365,7 +2598,7 @@ def test_graph_blocked_by_errors(tmp_path):
     assert result.exit_code == 1
     assert "E-NOTE-NOT-IN-BIB" in result.output
     assert "拒绝生成" in result.output
-    assert not (tmp_path / "generated" / "graph.json").exists()
+    assert not (tmp_path / "generated").exists()  # 错误路径连目录都不该建
 
 
 def test_graph_writes_outputs(tmp_path):
@@ -2377,12 +2610,32 @@ def test_graph_writes_outputs(tmp_path):
     assert "generated/graph.json" in result.output
     assert "generated/used-metadata.json" in result.output
     assert "generated/orphans.md" in result.output
+
+
+def test_graph_prints_warnings_after_writes(tmp_path):
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "metadata" / "claims" / "cited", "claim-02",
+               {"id": "claim-02", "claim_type": "cited", "statement": "s",
+                "status": "draft"})
+    result = runner.invoke(app, ["graph", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    warn_pos = result.output.index("W-CLAIM-CITED-NO-CITES")
+    write_pos = result.output.index("已写入 generated/orphans.md")
+    assert write_pos < warn_pos
+
+
+def test_graph_generated_occupied_by_file(tmp_path):
+    make_minimal_project(tmp_path)
+    (tmp_path / "generated").write_text("占位", encoding="utf-8")
+    result = runner.invoke(app, ["graph", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "无法写入" in result.output
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python -m pytest tests/test_cli.py -v`
-Expected: 新增 2 个用例 FAIL（当前 graph 是占位实现）
+Expected: 新增用例 FAIL（当前 graph 是占位实现）
 
 - [ ] **Step 3: 实现 `graph` 命令**
 
@@ -2398,14 +2651,18 @@ from weft.graphgen.writer import write_outputs
 @app.command()
 def graph(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
     """生成 generated/graph.json、used-metadata.json、orphans.md；校验有错误时拒绝。"""
-    _ensure_utf8_stdout()
     project, load_diags = load_project(project_dir)
     diagnostics = load_diags + validate_project(project)
     if any(d.is_error for d in diagnostics):
         _print_diagnostics(diagnostics)
         typer.echo("—— 校验存在错误，拒绝生成反向索引")
         raise typer.Exit(code=1)
-    written = write_outputs(project, project.root / "generated")
+    written = None
+    try:
+        written = write_outputs(project, project.root / "generated")
+    except OSError as exc:
+        typer.echo(f"ERROR 无法写入 generated/：{exc}")
+        raise typer.Exit(code=1) from exc
     for path in written:
         typer.echo(f"已写入 {path.relative_to(project.root).as_posix()}")
     warnings = [d for d in diagnostics if not d.is_error]
@@ -2416,12 +2673,12 @@ def graph(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目�
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python -m pytest tests/test_cli.py -v`
-Expected: `6 passed`
+Expected: `8 passed`
 
 - [ ] **Step 5: 全量回归 + Commit**
 
 Run: `.venv/Scripts/python -m pytest tests -v`
-Expected: 全部通过
+Expected: 全部通过（86 + 4 = 90 个）
 
 ```bash
 git add src/weft/cli.py tests/test_cli.py
@@ -2465,6 +2722,25 @@ def test_review_reports_load_errors(tmp_path):
     result = runner.invoke(app, ["review", str(tmp_path)])
     assert result.exit_code == 1
     assert "E-NOT-A-PROJECT" in result.output
+
+
+def test_review_lists_draft_nodes(tmp_path):
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "narrative", "02-discussion",
+               {"id": "sec-02", "section": "Discussion", "order": 2,
+                "nodes": [{"id": "para-02-01", "purpose": "interpret", "uses": [],
+                           "status": "draft"},
+                          {"id": "para-02-02", "purpose": "compare", "uses": [],
+                           "status": "approved"}]})
+    result = runner.invoke(app, ["review", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    # draft 节点以 节id/段id 复合形式列出，路径为叙事文件
+    assert "sec-02/para-02-01" in result.output
+    assert "narrative/02-discussion.md" in result.output
+    # 同节的 approved 兄弟节点不出现
+    assert "para-02-02" not in result.output
+    # approved 的 sec-01/para-01-01 也不出现
+    assert "para-01-01" not in result.output
 ```
 
 - [ ] **Step 2: 跑测试确认失败**
@@ -2514,7 +2790,6 @@ def _print_review(project: Project) -> None:
 @app.command()
 def review(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
     """按类型列出未审阅（status: draft）的实体与叙事节点。"""
-    _ensure_utf8_stdout()
     project, load_diags = load_project(project_dir)
     if any(d.is_error for d in load_diags):
         _print_diagnostics(load_diags)
@@ -2525,12 +2800,12 @@ def review(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python -m pytest tests/test_cli.py -v`
-Expected: `9 passed`
+Expected: `11 passed`
 
 - [ ] **Step 5: 全量回归 + Commit**
 
 Run: `.venv/Scripts/python -m pytest tests -v`
-Expected: 全部通过
+Expected: 全部通过（94 个）
 
 ```bash
 git add src/weft/cli.py tests/test_cli.py
@@ -3001,7 +3276,7 @@ Expected: `3 passed`
 - [ ] **Step 16: 全量回归（M1 完整验收）**
 
 Run: `.venv/Scripts/python -m pytest tests -v`
-Expected: 全部通过（90 个用例）。再跑一次 Task 15 Step 11 的三条命令确认人工视角无异常。
+Expected: 全部通过（97 个用例）。再跑一次 Task 15 Step 11 的三条命令确认人工视角无异常。
 
 - [ ] **Step 17: Commit**
 
