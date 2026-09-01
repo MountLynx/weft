@@ -59,7 +59,11 @@ def graph(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目�
         _print_diagnostics(diagnostics)
         typer.echo("—— 校验存在错误，拒绝生成反向索引")
         raise typer.Exit(code=1)
-    written = write_outputs(project, project.root / "generated")
+    try:
+        written = write_outputs(project, project.root / "generated")
+    except OSError as exc:
+        typer.echo(f"ERROR 无法写入 generated/：{exc}")
+        raise typer.Exit(code=1) from exc
     for path in written:
         typer.echo(f"已写入 {path.relative_to(project.root).as_posix()}")
     warnings = [d for d in diagnostics if not d.is_error]
