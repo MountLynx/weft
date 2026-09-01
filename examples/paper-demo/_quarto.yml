@@ -1,0 +1,9 @@
+project:
+  type: default
+
+bibliography: references.bib
+
+crossref:
+  fig-prefix: "Fig."
+  tbl-prefix: "Table"
+  subref-prefix: "Fig."

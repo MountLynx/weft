@@ -1,0 +1,5 @@
+{
+  "claims": ["claim-01", "claim-02", "claim-03"],
+  "data": ["data-01", "data-02", "data-03"],
+  "facts": ["fact-01", "fact-02"]
+}
