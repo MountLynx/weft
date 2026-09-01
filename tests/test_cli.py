@@ -109,3 +109,22 @@ def test_review_reports_load_errors(tmp_path):
     result = runner.invoke(app, ["review", str(tmp_path)])
     assert result.exit_code == 1
     assert "E-NOT-A-PROJECT" in result.output
+
+
+def test_review_lists_draft_nodes(tmp_path):
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "narrative", "02-discussion",
+               {"id": "sec-02", "section": "Discussion", "order": 2,
+                "nodes": [{"id": "para-02-01", "purpose": "interpret", "uses": [],
+                           "status": "draft"},
+                          {"id": "para-02-02", "purpose": "compare", "uses": [],
+                           "status": "approved"}]})
+    result = runner.invoke(app, ["review", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    # draft 节点以 节id/段id 复合形式列出，路径为叙事文件
+    assert "sec-02/para-02-01" in result.output
+    assert "narrative/02-discussion.md" in result.output
+    # 同节的 approved 兄弟节点不出现
+    assert "para-02-02" not in result.output
+    # approved 的 sec-01/para-01-01 也不出现
+    assert "para-01-01" not in result.output
