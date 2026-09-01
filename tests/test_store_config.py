@@ -50,3 +50,52 @@ def test_no_bibliography_field_is_fine(tmp_path):
     project, diagnostics = load_project(tmp_path)
     assert diagnostics == []
     assert project.bib_keys == set()
+
+
+def test_empty_bibliography_string_is_unset(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "_quarto.yml", {"bibliography": ""})
+    project, diagnostics = load_project(tmp_path)
+    assert diagnostics == []
+    assert project.bib_keys == set()
+
+
+def test_bibliography_list_with_non_string_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "_quarto.yml", {"bibliography": [123]})
+    project, diagnostics = load_project(tmp_path)
+    assert [d.code for d in diagnostics] == ["E-PARSE"]
+    assert diagnostics[0].field == "bibliography"
+
+
+def test_bibliography_scalar_int_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "_quarto.yml", {"bibliography": 123})
+    project, diagnostics = load_project(tmp_path)
+    assert [d.code for d in diagnostics] == ["E-PARSE"]
+    assert diagnostics[0].field == "bibliography"
+
+
+def test_bib_path_is_directory_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    (tmp_path / "bibdir").mkdir()
+    write_yaml(tmp_path / "_quarto.yml", {"bibliography": "bibdir"})
+    project, diagnostics = load_project(tmp_path)
+    assert [d.code for d in diagnostics] == ["E-PARSE"]
+    assert project.bib_keys == set()
+
+
+def test_quarto_yml_as_directory_no_crash(tmp_path):
+    # _quarto.yml 是目录：读取失败必须转诊断，不得抛异常
+    make_minimal_project(tmp_path)
+    (tmp_path / "_quarto.yml").unlink()
+    (tmp_path / "_quarto.yml").mkdir()
+    project, diagnostics = load_project(tmp_path)
+    assert "E-PARSE" in [d.code for d in diagnostics]
+
+
+def test_figures_yaml_non_utf8_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    (tmp_path / "metadata" / "figures.yaml").write_bytes(b"fig-01: \xb0\xc2\n")
+    project, diagnostics = load_project(tmp_path)
+    assert [d.code for d in diagnostics] == ["E-PARSE"]

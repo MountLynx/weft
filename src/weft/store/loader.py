@@ -65,6 +65,16 @@ def _load_frontmatter(path: Path) -> tuple[dict | None, str | None]:
     return post.metadata, None
 
 
+def _read_yaml(path: Path, rel: str, diagnostics: list[Diagnostic]):
+    """读 YAML 文件；语法/编码/IO 失败一律转 E-PARSE 诊断，返回 None。"""
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (yaml.YAMLError, UnicodeDecodeError, OSError) as exc:
+        diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None,
+                                      f"YAML 语法错误：{exc}"))
+        return None
+
+
 def _load_cards(root: Path, project: Project, seen_ids: dict[str, str],
                 diagnostics: list[Diagnostic]) -> None:
     for attr, rel_dir, model in _CARD_TYPES:
@@ -169,11 +179,8 @@ def _load_figures(root: Path, project: Project, diagnostics: list[Diagnostic]) -
     if not path.exists():
         return
     rel = _rel(root, path)
-    try:
-        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError as exc:
-        diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None,
-                                      f"YAML 语法错误：{exc}"))
+    raw = _read_yaml(path, rel, diagnostics)
+    if raw is None:
         return
     if not isinstance(raw, dict):
         diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None,
@@ -191,37 +198,43 @@ def _load_config(root: Path, project: Project, diagnostics: list[Diagnostic]) ->
     quarto: dict = {}
     quarto_path = root / "_quarto.yml"
     if quarto_path.exists():
-        try:
-            loaded = yaml.safe_load(quarto_path.read_text(encoding="utf-8"))
-        except yaml.YAMLError as exc:
-            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", "_quarto.yml", None,
-                                          f"YAML 语法错误：{exc}"))
-            loaded = None
+        loaded = _read_yaml(quarto_path, "_quarto.yml", diagnostics)
         quarto = loaded if isinstance(loaded, dict) else {}
 
     weft_cfg: dict = {}
     weft_path = root / "weft.yaml"
     if weft_path.exists():
-        try:
-            loaded = yaml.safe_load(weft_path.read_text(encoding="utf-8"))
-        except yaml.YAMLError as exc:
-            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", "weft.yaml", None,
-                                          f"YAML 语法错误：{exc}"))
-            loaded = None
+        loaded = _read_yaml(weft_path, "weft.yaml", diagnostics)
         weft_cfg = loaded if isinstance(loaded, dict) else {}
 
     project.figures_dir = str(weft_cfg.get("figures_dir", "figures"))
 
     bib_field = quarto.get("bibliography")
-    bib_files = [bib_field] if isinstance(bib_field, str) else (bib_field or [])
+    if isinstance(bib_field, str):
+        bib_files = [bib_field]
+    elif isinstance(bib_field, list) and all(isinstance(x, str) for x in bib_field):
+        bib_files = bib_field
+    else:
+        if bib_field is not None:  # 字段缺失(None)不算错
+            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", "_quarto.yml",
+                                          "bibliography",
+                                          "bibliography 必须是字符串或字符串列表"))
+        bib_files = []
     for rel_bib in bib_files:
+        if not rel_bib.strip():
+            continue  # 空串按 Quarto 语义视为未设置
         bib_path = root / rel_bib
         if not bib_path.exists():
             diagnostics.append(Diagnostic(
                 Level.ERROR, "E-BIB-MISSING", str(rel_bib), "bibliography",
                 f"bibliography 文件不存在：{rel_bib}"))
             continue
-        text = bib_path.read_text(encoding="utf-8", errors="replace")
+        try:
+            text = bib_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", str(rel_bib),
+                                          "bibliography", f"bib 文件读取失败：{exc}"))
+            continue
         for match in _BIB_ENTRY.finditer(text):
             if match.group("etype").lower() not in _BIB_IGNORED:
                 project.bib_keys.add(match.group("key"))
