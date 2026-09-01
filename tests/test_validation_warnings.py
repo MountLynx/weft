@@ -36,6 +36,34 @@ def test_rejected_claim_skips_warnings_but_not_errors():
     assert "E-CITES-NOT-IN-BIB" in _codes(diagnostics)
 
 
+def test_rejected_suppression_scoped_to_card_across_rules(tmp_path):
+    # 设计决策 2 的另一半：rejected 卡对图注/词表/summary 规则同样豁免，
+    # 但 W-FIGURE-UNUSED（figures.yaml 视角）与 approved 侧提醒不受影响。
+    data = [DataCard(id="data-01", status="rejected", refs=["fig-01a"])]
+    facts = [FactCard(id="fact-01", data=["data-01"], statement="s", status="approved")]
+    claims = [ClaimCard(id="claim-01", claim_type="uncited", statement="s",
+                        status="approved")]
+    notes = [NoteCard(id="k2020", status="rejected")]  # rejected 且无 summary
+    figures = {"fig-01": FigureEntry(caption="c", subfigs={"a": "s"})}
+    sections = [NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        # uses 让 approved 的 fact/claim 可达（否则 W-ORPHAN 会照报它们）；
+        # claim-01 经直接 use 可达但仍无 fact 支持 → W-CLAIM-UNSUPPORTED 保留
+        Node(id="para-01-01", purpose="speculate", status="approved",
+             uses=[Use(id="fact-01", role="evidence"),
+                   Use(id="claim-01", role="evidence")]),  # approved 故意用错词，应报
+    ])]
+    project = build_project(root=tmp_path, data=data, facts=facts, claims=claims,
+                            notes=notes, figures=figures, bib_keys={"k2020"},
+                            sections=sections)
+    codes = _codes(validate_project(project))
+    assert "W-FIGURE-FILE-MISSING" not in codes      # rejected data 卡豁免
+    assert "W-NOTE-NO-SUMMARY" not in codes          # rejected note 豁免
+    assert "W-ORPHAN" not in codes                   # rejected data 不进孤儿报告
+    assert "W-FIGURE-UNUSED" in codes                # figures.yaml 视角：fig-01 无有效引用
+    assert "W-PURPOSE-VOCAB" in codes                # approved 节点错词照报
+    assert "W-CLAIM-UNSUPPORTED" in codes            # approved 侧提醒不受影响
+
+
 def test_uncited_claim_without_fact_support_warns():
     claims = [ClaimCard(id="claim-01", claim_type="uncited", statement="s",
                         status="approved")]
