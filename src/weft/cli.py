@@ -15,13 +15,19 @@ app = typer.Typer(add_completion=False,
 
 
 def _ensure_utf8_stdout() -> None:
-    """Windows 重定向输出默认 GBK，中文诊断会 UnicodeEncodeError；统一切 UTF-8。"""
+    """Windows 重定向输出默认 GBK，中文诊断会 UnicodeEncodeError；统一切 UTF-8。
+
+    在模块导入时执行一次：除命令输出外，--help 与 typer 的用法错误提示也一并覆盖。
+    """
     for stream in (sys.stdout, sys.stderr):
         try:
             if stream.encoding and stream.encoding.lower() not in ("utf-8", "utf8"):
                 stream.reconfigure(encoding="utf-8")
         except (AttributeError, OSError):
             pass
+
+
+_ensure_utf8_stdout()
 
 
 def _print_diagnostics(diagnostics: list[Diagnostic]) -> None:
@@ -34,7 +40,6 @@ def _print_diagnostics(diagnostics: list[Diagnostic]) -> None:
 @app.command()
 def validate(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
     """运行 §4 全部校验，报告错误与提醒；有错误时退出码 1。"""
-    _ensure_utf8_stdout()
     project, load_diags = load_project(project_dir)
     diagnostics = load_diags + validate_project(project)
     _print_diagnostics(diagnostics)
@@ -47,7 +52,6 @@ def validate(project_dir: Path = typer.Argument(Path("."), help="weft 项目根�
 @app.command()
 def graph(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
     """生成 generated/graph.json、used-metadata.json、orphans.md。"""
-    _ensure_utf8_stdout()
     typer.echo("尚未实现（M1 Task 13）")
     raise typer.Exit(code=2)
 
@@ -55,6 +59,5 @@ def graph(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目�
 @app.command()
 def review(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
     """按类型列出未审阅（status: draft）的实体与叙事节点。"""
-    _ensure_utf8_stdout()
     typer.echo("尚未实现（M1 Task 14）")
     raise typer.Exit(code=2)

@@ -40,3 +40,4 @@ def test_validate_not_a_project(tmp_path):
     result = runner.invoke(app, ["validate", str(tmp_path)])
     assert result.exit_code == 1
     assert "E-NOT-A-PROJECT" in result.output
+    assert "1 个错误，0 个提醒" in result.output
