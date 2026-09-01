@@ -55,7 +55,9 @@ def _load_frontmatter(path: Path) -> tuple[dict | None, str | None]:
     """返回 (metadata, 错误消息)。错误消息非 None 表示 YAML/编码层失败。"""
     try:
         post = frontmatter.load(path)
-    except (yaml.YAMLError, UnicodeDecodeError) as exc:
+    except (yaml.YAMLError, UnicodeDecodeError, OSError) as exc:
+        # OSError：frontmatter.load 自行开文件，目录/锁文件等 IO 异常也要兜住，
+        # 保证单卡失败不中断整体加载。
         return None, f"frontmatter 解析失败：{exc}"
     return post.metadata, None
 

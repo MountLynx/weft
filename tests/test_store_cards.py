@@ -18,13 +18,12 @@ def test_filename_mismatch_is_error(tmp_path):
     make_minimal_project(tmp_path)
     write_card(tmp_path / "metadata" / "data", "wrong-name",
                {"id": "data-02", "status": "draft"})
-    _, diagnostics = load_project(tmp_path)
+    project, diagnostics = load_project(tmp_path)
     hits = [d for d in diagnostics if d.code == "E-FILENAME-MISMATCH"]
     assert len(hits) == 1
     assert hits[0].path == "metadata/data/wrong-name.md"
     assert hits[0].level is Level.ERROR
     # 卡片仍被装入（不中断加载）
-    project, _ = load_project(tmp_path)
     assert "data-02" in project.data_cards
 
 
@@ -33,10 +32,13 @@ def test_duplicate_id_across_types(tmp_path):
     make_minimal_project(tmp_path)
     write_card(tmp_path / "metadata" / "notes", "data-01",
                {"id": "data-01", "status": "draft"})
-    _, diagnostics = load_project(tmp_path)
+    project, diagnostics = load_project(tmp_path)
     dup = [d for d in diagnostics if d.code == "E-DUPLICATE-ID"]
     assert len(dup) == 1
     assert "data-01" in dup[0].message
+    # 后出现的重复卡被跳过（first-wins）：notes 里只有合法的 key2020，没有 data-01
+    assert set(project.notes) == {"key2020"}
+    assert project.card_paths["data-01"].as_posix() == "metadata/data/data-01.md"
 
 
 def test_claim_directory_mismatch(tmp_path):
@@ -70,6 +72,27 @@ def test_empty_fact_data_is_parse_error(tmp_path):
     parse = [d for d in diagnostics if d.code == "E-PARSE"]
     assert len(parse) == 1
     assert parse[0].path == "metadata/facts/fact-02.md"
+
+
+def test_yaml_syntax_error_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    (tmp_path / "metadata" / "data" / "data-98.md").write_text(
+        "---\nid: [unclosed\n---\n", encoding="utf-8")
+    _, diagnostics = load_project(tmp_path)
+    parse = [d for d in diagnostics if d.code == "E-PARSE"]
+    assert len(parse) == 1
+    assert parse[0].path == "metadata/data/data-98.md"
+    assert parse[0].field is None
+
+
+def test_non_utf8_card_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    (tmp_path / "metadata" / "data" / "data-97.md").write_bytes(
+        b"---\nid: data-97\nstatus: approved\ndescription: \xb0\xc2\n---\n")
+    _, diagnostics = load_project(tmp_path)
+    parse = [d for d in diagnostics if d.code == "E-PARSE"]
+    assert len(parse) == 1
+    assert parse[0].path == "metadata/data/data-97.md"
 
 
 def test_not_a_project_guard(tmp_path):
