@@ -63,6 +63,8 @@ status: draft
 comment: ""            # 可选审阅备注
 ```
 
+- `refs` 是内部标识（Quarto label 形式 `fig-01a`），与 Elsevier 编号 `Fig. 1a` 一一对应；论文中的显示形式（`Fig. 1a` / `Table 1` / `图1a`）由 `_quarto.yml` 的 crossref 配置决定，卡片不存显示文本。
+
 ### 3.2 fact 卡（`metadata/facts/fact-01.md`）
 
 ```yaml
@@ -134,7 +136,7 @@ tbl-01:
 
 ### 3.7 bib 与项目配置
 
-bib 路径直接读 `_quarto.yml` 的 `bibliography` 字段（单一事实源，Quarto 项目本就有）；可选 `paperflow.yaml` 覆盖（如 `figures_dir`）。无需独立配置文件。
+bib 路径直接读 `_quarto.yml` 的 `bibliography` 字段（单一事实源，Quarto 项目本就有）；图表编号的显示形式同样全部由 `_quarto.yml` crossref 配置决定（`fig-prefix`、`tbl-prefix`、子图样式等）——投 Elsevier 风格期刊即设 `fig-prefix: "Fig."`、`tbl-prefix: "Table"`，换目标期刊只改这里，卡片与 figures.yaml 不动。可选 `paperflow.yaml` 覆盖（如 `figures_dir`）。无需独立配置文件。
 
 ### 3.8 目录结构
 
@@ -214,7 +216,7 @@ src/paperflow/
 
 ## 7. 组装与渲染
 
-`assemble` 按 nodes 顺序拼接该节已批准的草稿段落；节点无已批准草稿时 strict 报错 / lenient 跳过（经 `paperflow.yaml` 配置，默认 strict）。图表按 fact→data→refs 首次出现处插入，图注取自 figures.yaml，crossref 使用 Quarto 语法（`@fig-01a` / `@tbl-01`，子图级）。引文 `[@key]` 交由 Quarto citeproc 依 `.bib` 渲染。输出 `generated/<section>.qmd` → `quarto render` 出 HTML/PDF/DOCX。
+`assemble` 按 nodes 顺序拼接该节已批准的草稿段落；节点无已批准草稿时 strict 报错 / lenient 跳过（经 `paperflow.yaml` 配置，默认 strict）。图表按 fact→data→refs 首次出现处插入，图注取自 figures.yaml，crossref 使用 Quarto 语法（`@fig-01a` / `@tbl-01`，子图级）；编号显示形式（如 Elsevier 的 `Fig. 1a`、`Table 1`）由 `_quarto.yml` crossref 配置决定，组装只产出 label 引用。引文 `[@key]` 交由 Quarto citeproc 依 `.bib` 渲染。输出 `generated/<section>.qmd` → `quarto render` 出 HTML/PDF/DOCX。
 
 ## 8. CLI 命令面
 
