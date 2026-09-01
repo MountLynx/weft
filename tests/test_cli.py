@@ -83,3 +83,29 @@ def test_graph_generated_occupied_by_file(tmp_path):
     result = runner.invoke(app, ["graph", str(tmp_path)])
     assert result.exit_code == 1
     assert "无法写入" in result.output
+
+
+def test_review_lists_draft_items(tmp_path):
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "metadata" / "data", "data-02",
+               {"id": "data-02", "refs": [], "status": "draft"})
+    result = runner.invoke(app, ["review", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "data-02" in result.output
+    assert "metadata/data/data-02.md" in result.output
+    # approved 的叙事节点不出现
+    assert "para-01-01" not in result.output
+
+
+def test_review_empty_when_all_approved(tmp_path):
+    make_minimal_project(tmp_path)
+    result = runner.invoke(app, ["review", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "（无）" in result.output
+
+
+def test_review_reports_load_errors(tmp_path):
+    # 非项目目录：加载失败直接报错退出
+    result = runner.invoke(app, ["review", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "E-NOT-A-PROJECT" in result.output

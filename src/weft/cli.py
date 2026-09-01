@@ -9,6 +9,7 @@ import typer
 from weft.diagnostics import Diagnostic
 from weft.graphgen.writer import write_outputs
 from weft.store.loader import load_project
+from weft.store.project import Project
 from weft.validation import validate_project
 
 app = typer.Typer(add_completion=False,
@@ -36,6 +37,31 @@ def _print_diagnostics(diagnostics: list[Diagnostic]) -> None:
         prefix = "ERROR" if d.is_error else "WARN "
         field = f" 字段 {d.field}:" if d.field else ""
         typer.echo(f"{prefix} {d.path} [{d.code}]{field} {d.message}")
+
+
+def _print_review(project: Project) -> None:
+    typer.echo("待审阅实体（status: draft）：")
+    groups = (("data", project.data_cards), ("fact", project.facts),
+              ("claim", project.claims), ("note", project.notes))
+    entity_found = False
+    for label, cards in groups:
+        for cid, card in cards.items():
+            if card.status == "draft":
+                entity_found = True
+                rel = project.card_paths[cid].as_posix()
+                typer.echo(f"  {label}  {cid}  {rel}")
+    if not entity_found:
+        typer.echo("  （无）")
+    typer.echo("待审阅叙事节点：")
+    node_found = False
+    for section in project.sections:
+        for node in section.nodes:
+            if node.status == "draft":
+                node_found = True
+                rel = project.section_paths[section.id].as_posix()
+                typer.echo(f"  {section.id}/{node.id}  {rel}")
+    if not node_found:
+        typer.echo("  （无）")
 
 
 @app.command()
@@ -74,5 +100,8 @@ def graph(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目�
 @app.command()
 def review(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
     """按类型列出未审阅（status: draft）的实体与叙事节点。"""
-    typer.echo("尚未实现（M1 Task 14）")
-    raise typer.Exit(code=2)
+    project, load_diags = load_project(project_dir)
+    if any(d.is_error for d in load_diags):
+        _print_diagnostics(load_diags)
+        raise typer.Exit(code=1)
+    _print_review(project)
