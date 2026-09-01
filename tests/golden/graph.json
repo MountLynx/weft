@@ -1,0 +1,95 @@
+{
+  "entities": {
+    "claim-01": {
+      "kind": "claim",
+      "referenced_by": {
+        "claims": [],
+        "facts": ["fact-01", "fact-02"],
+        "nodes": ["para-03-01", "para-03-02", "para-04-01"]
+      },
+      "status": "approved"
+    },
+    "claim-02": {
+      "kind": "claim",
+      "referenced_by": {
+        "claims": [],
+        "facts": ["fact-02"],
+        "nodes": ["para-03-02", "para-04-01"]
+      },
+      "status": "approved"
+    },
+    "claim-03": {
+      "kind": "claim",
+      "referenced_by": {
+        "claims": [],
+        "facts": [],
+        "nodes": ["para-04-02"]
+      },
+      "status": "draft"
+    },
+    "data-01": {
+      "kind": "data",
+      "referenced_by": {
+        "claims": [],
+        "facts": ["fact-01"],
+        "nodes": ["para-03-01", "para-04-01"]
+      },
+      "status": "approved"
+    },
+    "data-02": {
+      "kind": "data",
+      "referenced_by": {
+        "claims": [],
+        "facts": ["fact-01"],
+        "nodes": ["para-03-01", "para-04-01"]
+      },
+      "status": "approved"
+    },
+    "data-03": {
+      "kind": "data",
+      "referenced_by": {
+        "claims": [],
+        "facts": ["fact-02"],
+        "nodes": ["para-03-02"]
+      },
+      "status": "approved"
+    },
+    "doe2021": {
+      "kind": "note",
+      "referenced_by": {
+        "claims": ["claim-03"],
+        "facts": [],
+        "nodes": []
+      },
+      "status": "approved"
+    },
+    "fact-01": {
+      "kind": "fact",
+      "referenced_by": {
+        "claims": [],
+        "facts": [],
+        "nodes": ["para-03-01", "para-04-01"]
+      },
+      "status": "approved"
+    },
+    "fact-02": {
+      "kind": "fact",
+      "referenced_by": {
+        "claims": [],
+        "facts": [],
+        "nodes": ["para-03-02"]
+      },
+      "status": "approved"
+    },
+    "smith2020": {
+      "kind": "note",
+      "referenced_by": {
+        "claims": ["claim-02"],
+        "facts": [],
+        "nodes": []
+      },
+      "status": "approved"
+    }
+  },
+  "version": 1
+}
