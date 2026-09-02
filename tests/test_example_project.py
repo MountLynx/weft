@@ -66,3 +66,24 @@ def test_sample_draft_then_assemble_full_chain(tmp_path):
     assert part_qmd.exists()
     merged = (work / "generated" / "03-results.qmd").read_text(encoding="utf-8")
     assert "# results" in merged and "## Results" in merged
+    paper = (work / "paper.qmd").read_text(encoding="utf-8")
+    assert "# References {.unnumbered}" in paper and "# Figures {.unnumbered}" in paper
+
+
+def test_sample_assemble_paper_qmd_matches_golden(tmp_path):
+    # M3 验收：正文 + References + Figures/Tables 三部分、字节确定（黄金比对；
+    # golden 侧做 CRLF→LF 归一，防 Windows autocrlf 检出差异）
+    work = _copy_sample(tmp_path)
+    (work / "drafts").mkdir()
+    (work / "drafts" / "sec-03.md").write_text(
+        "<!-- weft:node=para-03-01 uses=fact-01 -->\n"
+        "60 °C 的初始反应速率比 25 °C 高 42%（[@smith2020]）。\n", encoding="utf-8")
+    (work / "drafts" / "sec-04.md").write_text(
+        "<!-- weft:node=para-04-01 -->\n结果与热激活催化机制的解释一致。\n",
+        encoding="utf-8")
+    result = runner.invoke(app, ["assemble", str(work)])
+    assert result.exit_code == 0, result.output
+    raw = (work / "paper.qmd").read_bytes()
+    assert b"\r" not in raw and raw.endswith(b"\n")
+    golden = (GOLDEN / "paper.qmd").read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert raw.decode("utf-8") == golden

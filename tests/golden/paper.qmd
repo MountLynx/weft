@@ -1,0 +1,26 @@
+# results
+
+## Results
+
+60 °C 的初始反应速率比 25 °C 高 42%（[@smith2020]）。
+
+# discussion
+
+## Discussion
+
+结果与热激活催化机制的解释一致。
+
+# References {.unnumbered}
+
+::: {#refs}
+:::
+
+# Figures {.unnumbered}
+
+![](figures/fig-01.png)
+
+**Fig. 1** 不同温度下的反应速率随时间变化。误差线表示三次重复的标准差。
+
+# Tables {.unnumbered}
+
+**Table 1** 各温度条件下的反应条件与初始速率汇总。

@@ -1,9 +1,10 @@
 project:
   type: default
 
-bibliography: references.bib
+bibliography: assets/references.bib
 
-crossref:
-  fig-prefix: "Fig."
-  tbl-prefix: "Table"
-  subref-prefix: "Fig."
+csl: assets/style.csl
+
+format:
+  docx:
+    reference-doc: assets/template.docx
