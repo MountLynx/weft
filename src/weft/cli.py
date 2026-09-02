@@ -184,7 +184,7 @@ def assemble(project_dir: Path = typer.Argument(Path("."), help="weft 项目根�
     try:
         written, asm_diags = assemble_project(project, mode=project.assemble_mode)
     except OSError as exc:
-        typer.echo(f"ERROR 无法写入 generated/：{exc}")
+        typer.echo(f"ERROR 无法写入拼装产物：{exc}")
         raise typer.Exit(code=1) from exc
     for path in written:
         typer.echo(f"已写入 {path.relative_to(project.root).as_posix()}")
@@ -193,3 +193,27 @@ def assemble(project_dir: Path = typer.Argument(Path("."), help="weft 项目根�
         _print_diagnostics(errors)
         typer.echo(f"—— {len(errors)} 个 part 拼装失败（strict 模式）")
         raise typer.Exit(code=1)
+
+
+@app.command()
+def render(
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+    to: str = typer.Option("docx", "--to", help="目标格式（quarto --to，默认 docx）"),
+) -> None:
+    """渲染拼装产物（weft.yaml paper_file，默认 paper.qmd）→ 目标格式。
+
+    需先 weft assemble；不重复校验闸门（assemble 已闸），仅要求项目可加载。
+    """
+    from weft import render as render_mod
+
+    project, load_diags = load_project(project_dir)
+    if any(d.is_error for d in load_diags):
+        _print_diagnostics(load_diags)
+        raise typer.Exit(code=1)
+    try:
+        out_path = render_mod.render_paper(project.root,
+                                           paper_file=project.paper_file, to=to)
+    except (render_mod.QuartoNotFoundError, render_mod.QuartoRenderError) as exc:
+        typer.echo(f"ERROR {exc}")
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"已生成 {out_path.relative_to(project.root).as_posix()}")

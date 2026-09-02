@@ -13,6 +13,7 @@ def test_render_paper_invokes_quarto_with_defaults(monkeypatch, tmp_path):
     def fake_run(cmd, **kwargs):
         seen["cmd"] = cmd
         seen["cwd"] = kwargs["cwd"]
+        seen["kw"] = kwargs
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr("weft.render.shutil.which", lambda name: "quarto.exe")
@@ -20,6 +21,9 @@ def test_render_paper_invokes_quarto_with_defaults(monkeypatch, tmp_path):
     out = render_paper(tmp_path)
     assert seen["cmd"] == ["quarto.exe", "render", "paper.qmd", "--to", "docx"]
     assert seen["cwd"] == tmp_path
+    assert seen["kw"]["capture_output"] is True
+    assert seen["kw"]["encoding"] == "utf-8"
+    assert seen["kw"]["errors"] == "replace"
     assert out == tmp_path / "paper.docx"
 
 
