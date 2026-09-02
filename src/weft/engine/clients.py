@@ -15,7 +15,7 @@ from weft.engine.draft_rules import DraftError
 class ScriptedLLMClient:
     """按 prompt 关键词分流的假客户端（与 embed_minimal 的 mock 同一模式）：
 
-    - prompt 含"对齐检查器"（align_check 内置 prompt_core 标识）→ aligned=true
+    - prompt 以"你是对齐检查器"开头（align_check 内置 prompt_core 标识）→ aligned=true
     - 否则视为 draft_para → {"paragraph", "uses", "cites"}
     broken=True 时 draft 通道返回非 JSON（测 E-DRAFT-SHAPE 路径）。
     """

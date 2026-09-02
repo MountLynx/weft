@@ -106,7 +106,10 @@ def build_tasklist(spec: dict, *, align: bool) -> Tasklist:
             inputs={"spec": "{spec}", "tasklist": "{tasklist}", "node": "{node}",
                     **aliases},
         )
-    tasks["V"] = TaskDefinition(type="script", script="weft_validate_draft")
+    # V 的 view 键来自 TaskDefinition.inputs（flow 只定触发边，不注入 view）；
+    # 逐 tick 声明为自引用输入，V 脚本才能 view[tick].value 读各段输出。
+    tasks["V"] = TaskDefinition(type="script", script="weft_validate_draft",
+                                inputs={tick: tick for tick in ticks})
     chain = ticks + (["AL"] if align else []) + ["V"]
     lines = [f"[{chain[0]}] --> {chain[1]}"]
     lines += [f"{chain[i]} --> {chain[i + 1]}" for i in range(1, len(chain) - 1)]
