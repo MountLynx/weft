@@ -26,6 +26,7 @@
 10. **失败语义**：harness 节点输出不合法 → SpecModule 记 `Failure` 继续流动 → V 脚本读该节点输出时形状校验失败 → 抛 `DraftRuleError` → `module.run()` 原样上抛 → CLI 打印诊断并 exit 1，**不写 drafts 文件**（拒绝生成语义）。硬规则（规则 1/3）在 V 脚本内抛 `DraftRuleError`；软提醒（规则 2）经 V 输出 `{"reminders": [...]}` 带回。
 11. **生成前强校验**：`weft draft` 先跑 `validate_project`，任何 error 即拒绝（spec §4"校验不过 → 拒绝生成"）。
 12. **执行期修订（Task 3 评审发现，2026-09-02）**：(a) flow 必须**多行**——tickflow 起始标记行只允许一条边，`"p01 --> AL --> V"` 单行串会被真实解析器拒绝；正确形状 `[p01] --> AL\nAL --> V`。(b) `build_spec` 对每个 approved 节点的 uses 按**实体 status == approved** 过滤（§3.10"生成器只读 approved"），draft/rejected 实体不进 prompt。(c) AL 任务 inputs 需注入常量占位符 `{"spec": "{spec}", "tasklist": "{tasklist}", "node": "{node}", **别名}`，否则对齐 prompt 里 {spec} 等保持字面量。 Task 2 修订：测试夹具 `_node` 默认同时 use fact+claim（规则 2 允许集才非空）；`check_node_draft` 对缺失 uses/cites 键用 `.get(…, [])` 容错。
+13. **执行期修订（Task 4/5 评审发现）**：`write_draft` 写盘前把 `\r\n`/`\r` 归一化为 `\n`（`newline="\n"` 只抑制翻译，不清除已有 CR；LLM 输出可含 CRLF）。`make_client` 增加 `project_root` 参数转发 `LLMConfig.from_env(project_root=…)`——否则按 CWD 解析 config.json/.env，CLI 与冒烟场景都会落空；Task 7 CLI 传 `project.root`。Task 8 真实 LLM 冒烟按用户指示使用 `C:/Users/xingy/Desktop/开发/SpecModule/` 下的 config.json 与 .env（复制进 tmp 项目；.env 已进 .gitignore）。
 
 ## 新增诊断码（稳定标识，接 M1 总表）
 
