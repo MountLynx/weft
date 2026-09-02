@@ -8,7 +8,14 @@
 
 **Tech Stack:** Python 3.11+，pydantic 2，typer，pytest；外部依赖 Quarto CLI（本机已装 1.9.38，仅 render 与冒烟触达）。
 
-**基线：** main @ 6cccac7，`219 passed, 1 deselected`。测试命令统一 `.venv/Scripts/python.exe -m pytest tests -q`（Windows Git Bash）。执行按 AGENTS.md 工作流约定走 worktree（`.worktrees/m3-render`），完成后合回 main 并删除 worktree/分支；提交只到本地 main，**不要 push**。
+**基线：** main @ 6cccac7，`219 passed, 1 deselected`。测试命令统一（**worktree 内执行时必须加 `PYTHONPATH=src` 前缀**——worktree 无 `.venv`，用主仓库 venv，PYTHONPATH 使 import 解析到 worktree 的 src，先于 site-packages 的 editable 指回 main；已实测）：
+
+```bash
+cd "C:/Users/xingy/Desktop/开发/weft/.worktrees/m3-render"
+PYTHONPATH=src "C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -m pytest tests -q
+```
+
+下文各任务 `Run:` 里的 `.venv/Scripts/python.exe -m pytest tests -q` 均指此形式（在 worktree 根目录执行）。执行按 AGENTS.md 工作流约定走 worktree（`.worktrees/m3-render`，Task 1 已建），完成后合回 main 并删除 worktree/分支；提交只到本地 main，**不要 push**。
 
 **测试计数台账（精确登记）：**
 
@@ -234,7 +241,7 @@ def test_back_matter_figures_tables_literal_numbering():
         "# References {.unnumbered}\n\n::: {#refs}\n:::\n\n"
         "# Figures {.unnumbered}\n\n"
         "![](figures/fig-02.png)\n\n**Fig. 1** 第二图\n\n"
-        "![](figures/fig-01.png)\n\n**Fig. 1** 第一图\n\n"
+        "![](figures/fig-01.png)\n\n**Fig. 2** 第一图\n\n"
         "# Tables {.unnumbered}\n\n**Table 1** 第一表\n"
     )
 
@@ -474,14 +481,34 @@ from weft.assemble.paper import assemble_paper
     """
 ```
 
-chapter 合并 for 循环结束后、`diags.sort(...)` 之前插入：
+chapter 合并 for 循环**整体替换**为（原循环的 `chapter_texts.values()` 是 `(子节路径, qmd)` 元组列表，不能直接传给 assemble_paper；改为同时积累 chapter 正文 `chapter_bodies`，循环后写 paper.qmd）：
 
 ```python
+    chapter_bodies: dict[str, str] = {}
+    for chapter, entries in chapter_texts.items():
+        lines = [f"# {heading_text(chapter)}", ""]
+        seen_dirs: set[tuple[str, ...]] = set()
+        for sub_path, qmd in entries:
+            for depth in range(1, len(sub_path) + 1):
+                prefix = sub_path[:depth]
+                if prefix not in seen_dirs:
+                    seen_dirs.add(prefix)
+                    lines += [f"{'#' * (depth + 1)} {heading_text(prefix[-1])}", ""]
+            lines.append(qmd.rstrip("\n"))
+            lines.append("")
+        chapter_text = "\n".join(lines) + "\n"
+        chapter_path = gen_root / f"{chapter}.qmd"
+        chapter_path.write_text(chapter_text, encoding="utf-8", newline="\n")
+        written.append(chapter_path)
+        chapter_bodies[chapter] = chapter_text
+
     paper_path = project.root / project.paper_file
-    paper_path.write_text(assemble_paper(project, list(chapter_texts.values())),
+    paper_path.write_text(assemble_paper(project, list(chapter_bodies.values())),
                           encoding="utf-8", newline="\n")
     written.append(paper_path)
 ```
+
+（与原循环逐行对照：仅把 `"\n".join(lines) + "\n"` 提为 `chapter_text` 变量复用，循环逻辑不变；paper 用的必须是新积累的 `chapter_bodies.values()`。）
 
 `src/weft/cli.py` —— `assemble` 命令 docstring 改为：
 
@@ -779,7 +806,7 @@ def render(
 - [ ] **Step 4: 跑测试确认通过 + 全量回归**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_cli_render.py -q` → `6 passed`
-Run: `.venv/Scripts/python.exe -m pytest tests -q` → `230 passed, 1 deselected`
+Run: `.venv/Scripts/python.exe -m pytest tests -q` → `236 passed, 1 deselected`
 
 - [ ] **Step 5: 提交**
 
@@ -802,7 +829,7 @@ git commit -m "feat: CLI weft render 命令（docx 默认目标）"
 - [ ] **Step 1: 迁移 assets 三件套**
 
 ```bash
-cd "C:/Users/xingy/Desktop/开发/weft"
+cd "C:/Users/xingy/Desktop/开发/weft/.worktrees/m3-render"   # 全程在 worktree 内执行
 mkdir -p examples/paper-demo/assets
 git mv examples/paper-demo/references.bib examples/paper-demo/assets/references.bib
 curl -sL -o examples/paper-demo/assets/style.csl \
@@ -902,8 +929,8 @@ Expected: 1 failed（`FileNotFoundError: ... golden\\paper.qmd`）
 - [ ] **Step 5: 生成并核对黄金文件（先落盘实际产物，人工逐行核对后入库）**
 
 ```bash
-.venv/Scripts/python.exe -c "
-import shutil, subprocess, sys, tempfile
+PYTHONPATH=src "C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -c "
+import shutil, tempfile
 from pathlib import Path
 tmp = Path(tempfile.mkdtemp())
 work = tmp / 'proj'
@@ -914,8 +941,6 @@ shutil.copytree('examples/paper-demo', work)
     '60 °C 的初始反应速率比 25 °C 高 42%（[@smith2020]）。\n', encoding='utf-8')
 (work / 'drafts' / 'sec-04.md').write_text(
     '<!-- weft:node=para-04-01 -->\n结果与热激活催化机制的解释一致。\n', encoding='utf-8')
-r = subprocess.run([sys.executable, '-m', 'pytest', '--version'], capture_output=True)
-sys.path.insert(0, '.')
 from weft.store.loader import load_project
 from weft.assemble import assemble_project
 project, diags = load_project(work)
@@ -959,10 +984,22 @@ print((work / 'paper.qmd').read_text(encoding='utf-8'))
 
 （依据：03-results/04-discussion 均为 chapter 直下 part → 标题级别 ##；figures.yaml 键序 fig-01 → Fig. 1、tbl-01 → Table 1；caption 取自 `examples/paper-demo/metadata/figures.yaml`。）
 
+编辑器保存后把黄金文件统一为 LF、单尾换行（核对打印的尾部应为 `汇总。\n'`）：
+
+```bash
+.venv/Scripts/python.exe -c "
+from pathlib import Path
+p = Path('tests/golden/paper.qmd')
+text = p.read_text(encoding='utf-8').replace('\r\n', '\n')
+p.write_text(text, encoding='utf-8', newline='\n')
+print(repr(text[-30:]))
+"
+```
+
 - [ ] **Step 6: 跑样例全套 + 全量回归**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_example_project.py -q` → `6 passed`（5 既有 + 1 新增；validate 仍 0 错误 0 提醒）
-Run: `.venv/Scripts/python.exe -m pytest tests -q` → `231 passed, 1 deselected`
+Run: `.venv/Scripts/python.exe -m pytest tests -q` → `237 passed, 1 deselected`
 
 - [ ] **Step 7: 人工渲染冒烟（验收路径，非测试）**
 
@@ -971,17 +1008,24 @@ SMOKE=$(mktemp -d) && cp -r examples/paper-demo "$SMOKE/proj" && cd "$SMOKE/proj
 mkdir -p drafts
 printf '<!-- weft:node=para-03-01 uses=fact-01 -->\n样例段落一。\n' > drafts/sec-03.md
 printf '<!-- weft:node=para-04-01 -->\n样例段落二。\n' > drafts/sec-04.md
-"C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/weft.exe" assemble .
-"C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/weft.exe" render .
+WT="C:/Users/xingy/Desktop/开发/weft/.worktrees/m3-render"
+PYTHONPATH="$WT/src" "C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -c "
+import sys; sys.argv = ['weft', 'assemble', '.']
+from weft.cli import app; app()"
+PYTHONPATH="$WT/src" "C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -c "
+import sys; sys.argv = ['weft', 'render', '.']
+from weft.cli import app; app()"
 ls -la paper.docx
 ```
+
+（worktree 无 `.venv`，不能直接用主仓库 `weft.exe`——其 editable 安装指回 main 的 src，不含本分支新功能；用 `PYTHONPATH=<worktree>/src` 的 python shim 调 CLI。）
 
 Expected: `weft assemble` 退出码 0 并列出 paper.qmd；`weft render` 打印 `已生成 paper.docx`。打开 docx 目检：References 下有 smith2020/doe2021 条目、Figures 里有图与 `Fig. 1` 图注、Tables 有 `Table 1` 图注。冒烟产生的 `drafts/` 在临时目录，不入库。
 
 - [ ] **Step 8: 提交**
 
 ```bash
-cd "C:/Users/xingy/Desktop/开发/weft"   # worktree 内则省略
+cd "C:/Users/xingy/Desktop/开发/weft/.worktrees/m3-render"
 git add examples/paper-demo tests/golden/paper.qmd tests/test_example_project.py
 git commit -m "chore: 样例项目迁移 assets/ 投稿资源约定并登记 paper.qmd 黄金文件"
 ```
