@@ -152,3 +152,8 @@ def test_unknown_explicit_workflow_is_error():
     diagnostics = validate_project(project)
     assert _one_error_code(diagnostics) == "E-WORKFLOW-UNKNOWN"
     assert _errors(diagnostics)[0].field == "workflow"
+    # 不误伤合法词表值（fail-closed 只针对超词表）
+    legal = build_project(
+        parts=[NarrativePart(id="sec-02", section="T", workflow="methods", nodes=[])])
+    diagnostics = validate_project(legal)
+    assert all(d.code != "E-WORKFLOW-UNKNOWN" for d in diagnostics)

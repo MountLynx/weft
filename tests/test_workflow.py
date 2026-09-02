@@ -37,3 +37,8 @@ def test_specs_cover_vocab_with_all_fields():
     assert WORKFLOW_SPECS["methods"]["citation_rules"] is False
     assert all(WORKFLOW_SPECS[w]["citation_rules"]
                for w in WORKFLOW_VOCAB if w != "methods")
+    # results prompt/温度回归钉：M2 实测调过的 prompt 与温度是契约，防静默漂移
+    results = WORKFLOW_SPECS["results"]
+    assert results["prompt_core"].startswith("你是学术写作引擎 weft 的行文器。")
+    assert "不得引入任何未给出的数据、观点或结论" in results["prompt_core"]
+    assert results["temperature"] == 0.3
