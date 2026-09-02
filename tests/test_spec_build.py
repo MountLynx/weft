@@ -1,6 +1,8 @@
 """叙事节 → spec + tasklist（通道②）的确定性构造。"""
 import pytest
 
+from module_harness import HarnessConfig, HarnessRegistry, OutputFormat, TasklistValidator
+
 from tests.helpers import build_project
 from weft.engine.spec_build import build_spec, build_tasklist, entity_bundle
 from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
@@ -62,17 +64,18 @@ def test_entity_bundle_rejects_note_and_unknown():
 
 def test_build_tasklist_flow_with_align():
     tasklist = build_tasklist(build_spec(_project(), _section()), align=True)
-    assert tasklist.flow == "p01 --> AL --> V"
+    assert tasklist.flow == "[p01] --> AL\nAL --> V"   # 多行：tickflow 起始标记行只允许一条边
     assert tasklist.tasks["p01"].harness == "draft_para"
     assert tasklist.tasks["p01"].outputformat == {"type": "json_object"}
     assert tasklist.tasks["AL"].harness == "align_check"
-    assert tasklist.tasks["AL"].inputs == {"d1": "p01"}
+    assert tasklist.tasks["AL"].inputs == {"spec": "{spec}", "tasklist": "{tasklist}",
+                                           "node": "{node}", "d1": "p01"}
     assert tasklist.tasks["V"].script == "weft_validate_draft"
 
 
 def test_build_tasklist_flow_without_align():
     tasklist = build_tasklist(build_spec(_project(), _section()), align=False)
-    assert tasklist.flow == "p01 --> V"
+    assert tasklist.flow == "[p01] --> V"
     assert "AL" not in tasklist.tasks
 
 
@@ -83,3 +86,54 @@ def test_para_prompt_embeds_entity_json():
     assert "先主结果" in prompt
     assert "温度提高速率。" in prompt       # 实体全文进 prompt
     assert "文献概括。" in prompt           # claim 所引 note 的 summary 进 prompt
+
+
+def test_build_spec_filters_draft_entities():
+    project = _project()
+    project.facts["fact-draft"] = FactCard(id="fact-draft", status="draft",
+                                           data=["data-01"], statement="草稿事实。")
+    section = NarrativeSection(
+        id="sec-01", section="Results", order=1,
+        nodes=[Node(id="para-01-01", purpose="describe",
+                    uses=[Use(id="fact-draft", role="evidence"),
+                          Use(id="fact-01", role="evidence")],
+                    status="approved")])
+    spec = build_spec(project, section)
+    node = spec["nodes"]["para-01-01"]
+    assert node["uses"] == [{"id": "fact-01", "role": "evidence"}]   # draft 实体被过滤
+    assert [e["id"] for e in node["entities"]] == ["fact-01"]
+
+
+def test_approved_node_empty_uses():
+    section = NarrativeSection(
+        id="sec-01", section="Results", order=1,
+        nodes=[Node(id="para-01-01", purpose="describe", uses=[], status="approved")])
+    spec = build_spec(_project(), section)
+    node = spec["nodes"]["para-01-01"]
+    assert node["uses"] == []
+    assert node["entities"] == []
+    tasklist = build_tasklist(spec, align=False)
+    assert tasklist.flow == "[p01] --> V"
+
+
+def test_tasklist_passes_real_validator():
+    """Task 3 → Task 6 契约：构造出的 tasklist 通过真实 SpecModule validator。"""
+    def _stub_registry() -> HarnessRegistry:
+        reg = HarnessRegistry(llm_client=None)
+        reg.harness("draft_para", HarnessConfig(
+            prompt_core="写段落。{spec}", output_format=OutputFormat(type="json_object")))
+        reg.harness("align_check", HarnessConfig(
+            prompt_core="对齐检查。{spec}", output_format=OutputFormat(type="json_object")))
+
+        @reg.script("weft_validate_draft")
+        def _validate(view) -> dict:
+            return {}
+        return reg
+
+    section = NarrativeSection(
+        id="sec-01", section="Results", order=1,
+        nodes=[Node(id="para-01-01", purpose="describe", uses=[], status="approved"),
+               Node(id="para-01-02", purpose="interpret", uses=[], status="approved")])
+    tasklist = build_tasklist(build_spec(_project(), section), align=True)
+    errors = TasklistValidator.validate(tasklist, _stub_registry())
+    assert errors == []

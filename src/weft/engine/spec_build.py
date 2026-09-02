@@ -48,14 +48,22 @@ def entity_bundle(project: Project, entity_id: str) -> dict:
 
 
 def build_spec(project: Project, section: NarrativeSection) -> dict:
+    def _approved(eid: str) -> bool:
+        for cards in (project.facts, project.claims):
+            card = cards.get(eid)
+            if card is not None:
+                return card.status == "approved"
+        return False
+
     approved = [n for n in section.nodes if n.status == "approved"]
     nodes = {}
     for n in approved:
+        usable = [u for u in n.uses if _approved(u.id)]
         nodes[n.id] = {
             "purpose": n.purpose,
             "logic": n.logic,
-            "uses": [{"id": u.id, "role": u.role} for u in n.uses],
-            "entities": [entity_bundle(project, u.id) for u in n.uses],
+            "uses": [{"id": u.id, "role": u.role} for u in usable],
+            "entities": [entity_bundle(project, u.id) for u in usable],
         }
     return {
         "section": {"id": section.id, "title": section.section, "order": section.order},
@@ -75,7 +83,7 @@ def _para_prompt(node_spec: dict) -> str:
 
 
 def build_tasklist(spec: dict, *, align: bool) -> Tasklist:
-    """p01..pNN 顺序链 --> [AL -->] V。
+    """p01..pNN 顺序链 --> [AL -->] V，flow 多行化（tickflow 每行只允许一条边）。
 
     harness 层配置（prompt_core 等）在 run.py 注册；这里只给任务级覆盖。
     """
@@ -95,8 +103,11 @@ def build_tasklist(spec: dict, *, align: bool) -> Tasklist:
             type="harness", harness="align_check",
             prompt="已生成的全部段落（逐段 JSON）：\n"
                    + "\n".join(f"{{{k}}}" for k in aliases),
-            inputs=aliases,
+            inputs={"spec": "{spec}", "tasklist": "{tasklist}", "node": "{node}",
+                    **aliases},
         )
     tasks["V"] = TaskDefinition(type="script", script="weft_validate_draft")
-    flow_ticks = ticks + (["AL"] if align else []) + ["V"]
-    return Tasklist(tasks=tasks, flow=" --> ".join(flow_ticks))
+    chain = ticks + (["AL"] if align else []) + ["V"]
+    lines = [f"[{chain[0]}] --> {chain[1]}"]
+    lines += [f"{chain[i]} --> {chain[i + 1]}" for i in range(1, len(chain) - 1)]
+    return Tasklist(tasks=tasks, flow="\n".join(lines))
