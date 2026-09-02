@@ -40,7 +40,8 @@ def _orphans_md(project: Project, orphans: dict[str, list[str]]) -> str:
         lines.append("无孤儿实体。")
         return "\n".join(lines) + "\n"
     lines += ["未被任何叙事节点引用（含间接可达）的实体：", ""]
-    titles = {"data": "data", "facts": "fact", "claims": "claim"}
+    titles = {"data": "data", "facts": "fact", "claims": "claim",
+              "methods": "method", "params": "param"}
     for group, ids in orphans.items():
         for eid in ids:
             path = project.card_paths.get(eid, Path("?")).as_posix()

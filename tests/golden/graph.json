@@ -4,8 +4,17 @@
       "kind": "claim",
       "referenced_by": {
         "claims": [],
-        "facts": ["fact-01", "fact-02"],
-        "nodes": ["para-03-01", "para-03-02", "para-04-01"]
+        "facts": [
+          "fact-01",
+          "fact-02"
+        ],
+        "methods": [],
+        "nodes": [
+          "para-03-01",
+          "para-03-02",
+          "para-04-01"
+        ],
+        "params": []
       },
       "status": "approved"
     },
@@ -13,8 +22,15 @@
       "kind": "claim",
       "referenced_by": {
         "claims": [],
-        "facts": ["fact-02"],
-        "nodes": ["para-03-02", "para-04-01"]
+        "facts": [
+          "fact-02"
+        ],
+        "methods": [],
+        "nodes": [
+          "para-03-02",
+          "para-04-01"
+        ],
+        "params": []
       },
       "status": "approved"
     },
@@ -23,7 +39,11 @@
       "referenced_by": {
         "claims": [],
         "facts": [],
-        "nodes": ["para-04-02"]
+        "methods": [],
+        "nodes": [
+          "para-04-02"
+        ],
+        "params": []
       },
       "status": "draft"
     },
@@ -31,8 +51,15 @@
       "kind": "data",
       "referenced_by": {
         "claims": [],
-        "facts": ["fact-01"],
-        "nodes": ["para-03-01", "para-04-01"]
+        "facts": [
+          "fact-01"
+        ],
+        "methods": [],
+        "nodes": [
+          "para-03-01",
+          "para-04-01"
+        ],
+        "params": []
       },
       "status": "approved"
     },
@@ -40,8 +67,15 @@
       "kind": "data",
       "referenced_by": {
         "claims": [],
-        "facts": ["fact-01"],
-        "nodes": ["para-03-01", "para-04-01"]
+        "facts": [
+          "fact-01"
+        ],
+        "methods": [],
+        "nodes": [
+          "para-03-01",
+          "para-04-01"
+        ],
+        "params": []
       },
       "status": "approved"
     },
@@ -49,17 +83,27 @@
       "kind": "data",
       "referenced_by": {
         "claims": [],
-        "facts": ["fact-02"],
-        "nodes": ["para-03-02"]
+        "facts": [
+          "fact-02"
+        ],
+        "methods": [],
+        "nodes": [
+          "para-03-02"
+        ],
+        "params": []
       },
       "status": "approved"
     },
     "doe2021": {
       "kind": "note",
       "referenced_by": {
-        "claims": ["claim-03"],
+        "claims": [
+          "claim-03"
+        ],
         "facts": [],
-        "nodes": []
+        "methods": [],
+        "nodes": [],
+        "params": []
       },
       "status": "approved"
     },
@@ -68,7 +112,12 @@
       "referenced_by": {
         "claims": [],
         "facts": [],
-        "nodes": ["para-03-01", "para-04-01"]
+        "methods": [],
+        "nodes": [
+          "para-03-01",
+          "para-04-01"
+        ],
+        "params": []
       },
       "status": "approved"
     },
@@ -77,19 +126,27 @@
       "referenced_by": {
         "claims": [],
         "facts": [],
-        "nodes": ["para-03-02"]
+        "methods": [],
+        "nodes": [
+          "para-03-02"
+        ],
+        "params": []
       },
       "status": "approved"
     },
     "smith2020": {
       "kind": "note",
       "referenced_by": {
-        "claims": ["claim-02"],
+        "claims": [
+          "claim-02"
+        ],
         "facts": [],
-        "nodes": []
+        "methods": [],
+        "nodes": [],
+        "params": []
       },
       "status": "approved"
     }
   },
-  "version": 1
+  "version": 2
 }

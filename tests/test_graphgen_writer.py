@@ -29,7 +29,8 @@ def test_writer_outputs(tmp_path):
     assert graph == build_index(project)
     used = json.loads(
         (tmp_path / "generated" / "used-metadata.json").read_text(encoding="utf-8"))
-    assert used == {"data": ["data-01"], "facts": ["fact-01"], "claims": []}
+    assert used == {"data": ["data-01"], "facts": ["fact-01"], "claims": [],
+                    "methods": [], "params": []}
     orphans = (tmp_path / "generated" / "orphans.md").read_text(encoding="utf-8")
     assert "无孤儿实体" in orphans
 
