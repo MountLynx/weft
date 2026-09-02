@@ -2,7 +2,7 @@
 
 加载约定：
 - 单卡解析失败、文件名≠id、id 重复、claims 目录不符 → 错误诊断，不中断加载。
-- 实体 id 全局唯一（data/fact/claim/note 共用一个命名空间，spec §3.9）。
+- 实体 id 全局唯一（data/fact/claim/note/method/param 共用一个命名空间，spec §3.9）。
 - 路径统一转成相对项目根的 posix 风格（诊断展示用）。
 """
 from __future__ import annotations

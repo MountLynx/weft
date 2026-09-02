@@ -178,11 +178,13 @@ def test_derived_from_note_edges():
     project = _project(
         notes=[NoteCard(id="tang2025", summary="s", status="approved")],
         methods=[MethodCard(id="qpcr", statement="s", protocol="p",
-                            derived_from=["tang2025"], status="approved")],
+                            derived_from=["tang2025", "ghost2026"],
+                            status="approved")],
         params=[ParamCard(id="qpcr-main", method="qpcr",
                           derived_from=["tang2025"], status="approved")],
     )
-    entities = build_index(project)["entities"]
+    entities = build_index(project)["entities"]   # 悬空 derived_from 不抛异常
+    assert "ghost2026" not in entities
     assert entities["tang2025"]["referenced_by"]["methods"] == ["qpcr"]
     assert entities["tang2025"]["referenced_by"]["params"] == ["qpcr-main"]
 
@@ -190,6 +192,13 @@ def test_derived_from_note_edges():
 def test_dangling_param_method_tolerated():
     # 悬空引用是 validation 的职责；build_index 必须静默跳过
     project = _project(
-        params=[ParamCard(id="p1", method="ghost", status="approved")])
-    index = build_index(project)   # 不得抛异常
+        params=[ParamCard(id="p1", method="ghost", status="approved")],
+        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+            Node(id="para-01-01", purpose="describe",
+                 uses=[Use(id="p1", role="evidence")], status="approved")]),
+        ],
+    )
+    index = build_index(project)   # 不得抛异常（继承块须走到 _kind 守卫，不能 KeyError）
     assert "ghost" not in index["entities"]
+    # param 本体仍入索引，悬空 param→method 边静默跳过
+    assert index["entities"]["p1"]["referenced_by"]["params"] == []
