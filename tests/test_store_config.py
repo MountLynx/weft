@@ -119,7 +119,9 @@ def test_assemble_mode_lenient_loaded(tmp_path):
 def test_assemble_mode_invalid_is_parse_error(tmp_path):
     make_minimal_project(tmp_path)
     write_yaml(tmp_path / "weft.yaml", {"assemble_mode": "bogus"})
-    _, diagnostics = load_project(tmp_path)
+    project, diagnostics = load_project(tmp_path)
     parse = [d for d in diagnostics if d.code == "E-PARSE"]
     assert len(parse) == 1
     assert parse[0].field == "assemble_mode"
+    # 钉住红线 3 的"安全默认继续"：非法值报诊断后必须回退 strict
+    assert project.assemble_mode == "strict"
