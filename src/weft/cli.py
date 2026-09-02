@@ -138,6 +138,8 @@ def draft(
             f"节 {section_id} 内没有 status: approved 的叙事节点")])
         raise typer.Exit(code=1)
 
+    warnings = [d for d in diagnostics if not d.is_error]
+
     try:
         client = make_client(mock, project_root=project.root)
         result = run_draft(project, section, client=client, align=not no_align)
@@ -147,9 +149,15 @@ def draft(
 
     paragraphs = {nid: d["paragraph"] for nid, d in result.drafts_by_node.items()}
     content = render_draft_markdown(section, paragraphs, result.run_id)
-    path = write_draft(project, section.id, content)
+    try:
+        path = write_draft(project, section.id, content)
+    except OSError as exc:
+        typer.echo(f"ERROR 无法写入 drafts/：{exc}")
+        raise typer.Exit(code=1) from exc
     for reminder in result.reminders:
         typer.echo(f"WARN {reminder}")
     typer.echo(
         f"已写入 {path.relative_to(project.root).as_posix()}"
         f"（{len(paragraphs)} 段，run={result.run_id}）")
+    if warnings:
+        _print_diagnostics(warnings)

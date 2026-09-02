@@ -71,3 +71,28 @@ def test_draft_skips_non_approved_nodes(tmp_path):
     out = (tmp_path / "drafts" / "sec-01.md").read_text(encoding="utf-8")
     assert "para-01-01" in out
     assert "para-01-02" not in out
+
+
+def test_draft_run_failure_prints_error_and_writes_nothing(tmp_path, monkeypatch):
+    import weft.engine
+    from weft.engine.clients import ScriptedLLMClient
+
+    make_minimal_project(tmp_path)
+    monkeypatch.setattr(weft.engine, "make_client",
+                        lambda mock, project_root=None: ScriptedLLMClient(broken=True))
+    result = runner.invoke(app, ["draft", "sec-01", "--mock", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "E-DRAFT-SHAPE" in result.output
+    assert not (tmp_path / "drafts" / "sec-01.md").exists()
+
+
+def test_draft_prints_soft_reminders_as_warn(tmp_path, monkeypatch):
+    import weft.engine
+    from weft.engine.clients import ScriptedLLMClient
+
+    make_minimal_project(tmp_path)
+    monkeypatch.setattr(weft.engine, "make_client",
+                        lambda mock, project_root=None: ScriptedLLMClient(cites=["key2020"]))
+    result = runner.invoke(app, ["draft", "sec-01", "--mock", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "WARN W-CITE-NOT-IN-CLAIM" in result.output
