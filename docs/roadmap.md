@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-**v1.1 增补已实现并合入 main（2026-09-02）**：method/param 卡（methods/params 目录、全局 id 命名空间、derived_from 校验）、narrative 目录树（chapter/part，order 退役，迁移脚本 `python -m weft.migrations.v1_1`）、workflow 路由（introduction/methods/results/discussion 四套 prompt 与温度，methods 裁剪引文规则）、part 内前文传递、`weft assemble`（part qmd + chapter 合并 + heading 层级映射，strict/lenient）。M3 渲染层剩余：图表落点插入与 `weft render`。
+**v1.1 增补已实现并合入 main（2026-09-02）**：method/param 卡（methods/params 目录、全局 id 命名空间、derived_from 校验）、narrative 目录树（chapter/part，order 退役，迁移脚本 `python -m weft.migrations.v1_1`）、workflow 路由（introduction/methods/results/discussion 四套 prompt 与温度，methods 裁剪引文规则）、part 内前文传递、`weft assemble`（part qmd + chapter 合并 + heading 层级映射，strict/lenient）。M3 渲染层剩余：paper.qmd 拼接与 `weft render`（设计已定案，见 `docs/superpowers/specs/2026-09-02-weft-m3-render-design.md`）。
 
 ## M1 数据层 ✅（2026-09-02 合入 main）
 
@@ -27,11 +27,12 @@
 - 验收路径：单章节（03-results + 04-discussion）端到端生成；先 `MockLLMClient`（无 key 可测）后真实 LLM。
 - CLI：`weft draft <section>（v1.1 起按 part 寻址）`，`--mock` 免 key 管线冒烟、`--no-align` 跳过对齐；生成前强校验闸门（有错误即拒绝）。
 
-## M3 渲染层 🔨
+## M3 渲染层 🔨（设计定案：`docs/superpowers/specs/2026-09-02-weft-m3-render-design.md`）
 
 - `assemble/` ✅（v1.1 §4.4 提前交付）：part qmd 拼装 + chapter 目录序合并 + heading 层级映射；strict/lenient 经 weft.yaml `assemble_mode`（默认 strict）。
-- 图表落点 ⬜：fact→data→refs 首次出现处插入，图注取自 figures.yaml，crossref 用 Quarto label（`@fig-01a` / `@tbl-01`）；显示形式由 `_quarto.yml` crossref 配置决定。
-- `render.py` ⬜：quarto 子进程封装 + CLI `weft render`；打通 卡片→叙事→生成→组装→Quarto 全闭环。
+- paper.qmd 拼接 ⬜：chapter 序拼接成项目根 `paper.qmd` + `# References`（refs div 定位，citeproc 生成条目）+ `# Figures`（figures.yaml 生成字面编号图注；作废 v1"首次出现处插入"，图表链路不走 crossref——docx 投稿所见即所得）。
+- 投稿资源约定 ⬜：`assets/`（references.bib / style.csl / template.docx），`_quarto.yml` 固定路径引用；样例项目随实现迁移。
+- `render.py` ⬜：quarto 子进程封装 + CLI `weft render`（docx 默认目标）；打通 卡片→叙事→生成→组装→Quarto 全闭环。
 
 ## M4 打磨 ⬜
 
