@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元数据卡片为经线（data/fact/claim/note 原子 Markdown+YAML 卡），叙事流为纬线（`narrative/*.md` 节与节点）；人只审卡片与叙事流（`status: draft|approved|rejected`），AI 只写 `drafts/` 与 `generated/`。单人 CLI 优先，Quarto 负责最终渲染。
+weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元数据卡片为经线（data/fact/claim/note 原子 Markdown+YAML 卡），叙事流为纬线（`narrative/<chapter>/…/part-*.md`，part 为生产单位）；人只审卡片与叙事流（`status: draft|approved|rejected`），AI 只写 `drafts/` 与 `generated/`。单人 CLI 优先，Quarto 负责最终渲染。
 
 **必读文档**（改敏感区前先读）：
 - `docs/superpowers/specs/2026-09-01-weft-design.md` — 设计 v1；**§3 数据结构已冻结**（改动需迁移脚本 + 全量校验）、§4 校验规则、§9 里程碑
@@ -17,7 +17,7 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 .venv/Scripts/python.exe -m pip install -e ".[dev]"     # 安装（含 pytest）
 .venv/Scripts/python.exe -m pytest tests -q             # 全量测试（约 219 passed, 1 deselected）
 .venv/Scripts/python.exe -m pytest tests/test_xxx.py -v # 聚焦测试
-.venv/Scripts/weft.exe --help                           # CLI：validate / graph / review / draft
+.venv/Scripts/weft.exe --help                           # CLI：validate / graph / review / draft / assemble
 WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实 LLM 冒烟（默认排除，双保险门）
 ```
 

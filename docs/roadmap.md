@@ -22,10 +22,10 @@
 
 - `engine/` SpecModule 适配器：全项目唯一 import specmodule 的模块，隔离 API 漂移。
   - `spec_build.py`：叙事节 → Spec/Tasklist（每个 narrative node 一个 task，结构化输出：段落文本 + 引用实体 id + `[@citekey]` 列表）。
-  - `run.py`：运行/恢复，产物归一化写入 `drafts/<section>.md`，HTML 注释溯源（node id + 实体 id + run id）；路径白名单强制 AI 只写 `drafts/` 与 `generated/`。
+  - `run.py`：运行/恢复，产物归一化写入 `drafts/<part-id>.md（时为 section id）`，HTML 注释溯源（node id + 实体 id + run id）；路径白名单强制 AI 只写 `drafts/` 与 `generated/`。
 - 生成后校验（§4 生成时三规则）：`[@key]` 必须在 bib（硬）；不属于本段 claim 的 cites（软提醒）；草稿标注实体必须属于节点 uses。
 - 验收路径：单章节（03-results + 04-discussion）端到端生成；先 `MockLLMClient`（无 key 可测）后真实 LLM。
-- CLI：`weft draft <section>`，`--mock` 免 key 管线冒烟、`--no-align` 跳过对齐；生成前强校验闸门（有错误即拒绝）。
+- CLI：`weft draft <section>（v1.1 起按 part 寻址）`，`--mock` 免 key 管线冒烟、`--no-align` 跳过对齐；生成前强校验闸门（有错误即拒绝）。
 
 ## M3 渲染层 🔨
 
