@@ -25,6 +25,7 @@
 9. **溯源注释内容**：`<!-- weft:node=<id> uses=<实体id> -->` 的 uses 取**节点声明的 uses**（weft 侧已审事实源），不是草稿自报的 uses（后者只用于三规则校验）。设计文档 §6.5"node id + 实体 id + run id"中 run id 放文件头一行。
 10. **失败语义**：harness 节点输出不合法 → SpecModule 记 `Failure` 继续流动 → V 脚本读该节点输出时形状校验失败 → 抛 `DraftRuleError` → `module.run()` 原样上抛 → CLI 打印诊断并 exit 1，**不写 drafts 文件**（拒绝生成语义）。硬规则（规则 1/3）在 V 脚本内抛 `DraftRuleError`；软提醒（规则 2）经 V 输出 `{"reminders": [...]}` 带回。
 11. **生成前强校验**：`weft draft` 先跑 `validate_project`，任何 error 即拒绝（spec §4"校验不过 → 拒绝生成"）。
+12. **执行期修订（Task 3 评审发现，2026-09-02）**：(a) flow 必须**多行**——tickflow 起始标记行只允许一条边，`"p01 --> AL --> V"` 单行串会被真实解析器拒绝；正确形状 `[p01] --> AL\nAL --> V`。(b) `build_spec` 对每个 approved 节点的 uses 按**实体 status == approved** 过滤（§3.10"生成器只读 approved"），draft/rejected 实体不进 prompt。(c) AL 任务 inputs 需注入常量占位符 `{"spec": "{spec}", "tasklist": "{tasklist}", "node": "{node}", **别名}`，否则对齐 prompt 里 {spec} 等保持字面量。 Task 2 修订：测试夹具 `_node` 默认同时 use fact+claim（规则 2 允许集才非空）；`check_node_draft` 对缺失 uses/cites 键用 `.get(…, [])` 容错。
 
 ## 新增诊断码（稳定标识，接 M1 总表）
 
