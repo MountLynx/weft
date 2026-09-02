@@ -64,3 +64,22 @@ def test_write_draft_rejects_path_escape(tmp_path):
     project = build_project(root=tmp_path)
     with pytest.raises(ValueError):
         write_draft(project, "../evil", "x")
+
+
+def test_write_draft_rejects_backslash_escape(tmp_path):
+    project = build_project(root=tmp_path)
+    with pytest.raises(ValueError):
+        write_draft(project, "..\\evil", "x")
+
+
+def test_write_draft_normalizes_crlf(tmp_path):
+    project = build_project(root=tmp_path)
+    path = write_draft(project, "sec-01", "line1\r\nline2\r\n")
+    assert b"\r" not in path.read_bytes()
+
+
+def test_render_multiline_paragraph_verbatim():
+    section = _section()
+    out = render_draft_markdown(section, {"para-01-01": "第一行。\n第二行。"}, "ab12cd34")
+    assert "第一行。\n第二行。" in out
+    assert out.endswith("第一行。\n第二行。\n")

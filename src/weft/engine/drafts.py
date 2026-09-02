@@ -33,6 +33,7 @@ def write_draft(project: Project, section_id: str, content: str) -> Path:
     path = drafts_dir / f"{section_id}.md"
     if path.resolve().parent != drafts_dir.resolve():
         raise ValueError(f"非法 section id（路径逃逸）：{section_id}")
+    content = content.replace("\r\n", "\n").replace("\r", "\n")   # 固定 LF：写入前归一化
     drafts_dir.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="\n")
     return path
