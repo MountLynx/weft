@@ -1,5 +1,5 @@
 """元数据卡片模型（数据结构 v1，冻结；spec §3.1–3.4、§3.10）。"""
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -45,3 +45,25 @@ class NoteCard(_Card):
 
     summary: str = ""
     pdf: str | None = None
+
+
+class MethodCard(_Card):
+    """method 卡（v1.1 §3.1）：无参数操作协议，库级复用载体。
+
+    derived_from 存 bib key（语义同 cites）；slug 命名，并入全局 id 命名空间。
+    """
+
+    statement: str
+    protocol: str
+    derived_from: list[str] = []
+
+
+class ParamCard(_Card):
+    """param 卡（v1.1 §3.2）：本项目的具体实验参数；method 悬空 = 校验错误。
+
+    values 是自由键值（每篇不同、需逐项核对的实验事实）。
+    """
+
+    method: str
+    values: dict[str, Any] = {}
+    derived_from: list[str] = []

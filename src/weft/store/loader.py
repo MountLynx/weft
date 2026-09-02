@@ -15,7 +15,14 @@ import yaml
 from pydantic import ValidationError
 
 from weft.diagnostics import Diagnostic, Level
-from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
+from weft.models.cards import (
+    ClaimCard,
+    DataCard,
+    FactCard,
+    MethodCard,
+    NoteCard,
+    ParamCard,
+)
 from weft.models.figures import FigureEntry
 from weft.models.narrative import NarrativeSection
 from weft.store.project import Project
@@ -27,6 +34,7 @@ _CARD_TYPES = [
     ("data_cards", "metadata/data", DataCard),
     ("facts", "metadata/facts", FactCard),
     ("notes", "metadata/notes", NoteCard),
+    ("methods", "metadata/methods", MethodCard),
 ]
 
 
@@ -89,6 +97,12 @@ def _load_cards(root: Path, project: Project, seen_ids: dict[str, str],
         for path in sorted(claims_dir.rglob("*.md")):
             _load_card(root, project, seen_ids, diagnostics, "claims", ClaimCard,
                        path, check_claim_dir=True)
+
+    params_dir = root / "metadata" / "methods" / "params"
+    if params_dir.is_dir():
+        for path in sorted(params_dir.glob("*.md")):
+            _load_card(root, project, seen_ids, diagnostics, "params", ParamCard,
+                       path)
 
 
 def _load_card(root: Path, project: Project, seen_ids: dict[str, str],

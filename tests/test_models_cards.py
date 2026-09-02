@@ -1,7 +1,14 @@
 import pytest
 from pydantic import ValidationError
 
-from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
+from weft.models.cards import (
+    ClaimCard,
+    DataCard,
+    FactCard,
+    MethodCard,
+    NoteCard,
+    ParamCard,
+)
 
 
 def test_data_card_full():
@@ -66,3 +73,44 @@ def test_note_card_defaults():
     note = NoteCard(id="smith2020", status="draft")
     assert note.summary == ""
     assert note.pdf is None
+
+
+def test_method_card_spec_example():
+    card = MethodCard.model_validate({
+        "id": "qpcr",
+        "derived_from": ["tang2025"],
+        "statement": "qPCR 定量功能微生物丰度",
+        "protocol": "1. 提取 DNA\n2. 体系配置与扩增",
+        "status": "approved",
+        "comment": "",
+    })
+    assert card.derived_from == ["tang2025"]
+    assert card.protocol.startswith("1. 提取")
+
+
+def test_method_card_defaults():
+    card = MethodCard(id="qpcr", statement="s", protocol="p", status="draft")
+    assert card.derived_from == []
+
+
+def test_param_card_spec_example():
+    card = ParamCard.model_validate({
+        "id": "qpcr-main",
+        "method": "qpcr",
+        "values": {"program": "95℃ 3 min", "instrument": "QuantStudio 5"},
+        "derived_from": ["trebuch2023"],
+        "status": "approved",
+    })
+    assert card.values["instrument"] == "QuantStudio 5"
+
+
+def test_param_card_requires_method():
+    with pytest.raises(ValidationError):
+        ParamCard(id="qpcr-main", values={}, status="draft")
+
+
+def test_param_card_unknown_key_rejected():
+    # 拼写字段名（value 而非 values）必须在解析期报错（extra=forbid）
+    with pytest.raises(ValidationError):
+        ParamCard.model_validate({"id": "p", "method": "m", "value": {"a": "b"},
+                                  "status": "draft"})

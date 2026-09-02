@@ -6,7 +6,14 @@ from pathlib import Path
 import frontmatter
 import yaml
 
-from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
+from weft.models.cards import (
+    ClaimCard,
+    DataCard,
+    FactCard,
+    MethodCard,
+    NoteCard,
+    ParamCard,
+)
 from weft.models.figures import FigureEntry
 from weft.models.narrative import NarrativeSection, Node, Use
 from weft.store.project import Project
@@ -58,8 +65,8 @@ def make_minimal_project(root: Path) -> Path:
 
 
 def build_project(root: Path | None = None, *, data=None, facts=None, claims=None,
-                  notes=None, sections=None, figures=None, bib_keys=None,
-                  figures_dir: str = "figures") -> Project:
+                  notes=None, methods=None, params=None, sections=None, figures=None,
+                  bib_keys=None, figures_dir: str = "figures") -> Project:
     """在内存中直接构造 Project（validation/graphgen 单测用，不落盘）。"""
     root = root or Path(".")
     project = Project(root=root, figures_dir=figures_dir)
@@ -67,10 +74,13 @@ def build_project(root: Path | None = None, *, data=None, facts=None, claims=Non
     project.facts = {c.id: c for c in (facts or [])}
     project.claims = {c.id: c for c in (claims or [])}
     project.notes = {c.id: c for c in (notes or [])}
+    project.methods = {c.id: c for c in (methods or [])}
+    project.params = {c.id: c for c in (params or [])}
     project.sections = list(sections or [])
     project.figures = dict(figures or {})
     project.bib_keys = set(bib_keys or set())
-    for cards in (project.data_cards, project.facts, project.claims, project.notes):
+    for cards in (project.data_cards, project.facts, project.claims, project.notes,
+                  project.methods, project.params):
         for cid in cards:
             project.card_paths.setdefault(cid, Path(f"metadata/{cid}.md"))
     for section in project.sections:

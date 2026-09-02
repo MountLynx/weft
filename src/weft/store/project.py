@@ -2,7 +2,14 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
+from weft.models.cards import (
+    ClaimCard,
+    DataCard,
+    FactCard,
+    MethodCard,
+    NoteCard,
+    ParamCard,
+)
 from weft.models.figures import FigureEntry
 from weft.models.narrative import NarrativeSection
 
@@ -14,6 +21,8 @@ class Project:
     facts: dict[str, FactCard] = field(default_factory=dict)
     claims: dict[str, ClaimCard] = field(default_factory=dict)
     notes: dict[str, NoteCard] = field(default_factory=dict)
+    methods: dict[str, MethodCard] = field(default_factory=dict)
+    params: dict[str, ParamCard] = field(default_factory=dict)
     sections: list[NarrativeSection] = field(default_factory=list)  # 按 (order, id) 排序
     figures: dict[str, FigureEntry] = field(default_factory=dict)
     bib_keys: set[str] = field(default_factory=set)
