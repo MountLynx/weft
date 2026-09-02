@@ -42,3 +42,12 @@ def test_sample_review_lists_drafts(tmp_path):
     assert "claim-03" in result.output
     assert "sec-03/para-03-02" in result.output
     assert "sec-04/para-04-02" in result.output
+
+
+def test_sample_draft_mock_end_to_end(tmp_path):
+    work = _copy_sample(tmp_path)
+    result = runner.invoke(app, ["draft", "sec-03", "--mock", str(work)])
+    assert result.exit_code == 0, result.output
+    out = (work / "drafts" / "sec-03.md").read_text(encoding="utf-8")
+    assert "<!-- weft:node=para-03-01 uses=fact-01,claim-01 -->" in out
+    assert "para-03-02" not in out        # draft 节点不生成
