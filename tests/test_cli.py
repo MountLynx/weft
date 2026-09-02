@@ -121,7 +121,7 @@ def test_review_lists_draft_nodes(tmp_path):
                            "status": "approved"}]})
     result = runner.invoke(app, ["review", str(tmp_path)])
     assert result.exit_code == 0, result.output
-    # draft 节点以 partid/段id 复合形式列出，路径为叙事文件
+    # draft 节点以 part id/段id 复合形式列出，路径为叙事文件
     assert "sec-02/para-02-01" in result.output
     assert "narrative/02-discussion/part-01.md" in result.output
     # 同节的 approved 兄弟节点不出现
