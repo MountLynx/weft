@@ -37,11 +37,19 @@ def _check_dangling_refs(project: Project) -> list[Diagnostic]:
         rel = _section_rel(project, section.id)
         for node in section.nodes:
             for use in node.uses:
-                if use.id not in project.facts and use.id not in project.claims:
+                if use.id not in project.facts and use.id not in project.claims \
+                        and use.id not in project.methods \
+                        and use.id not in project.params:
                     out.append(Diagnostic(
                         Level.ERROR, "E-DANGLING-REF", rel,
                         f"nodes[{node.id}].uses",
-                        f"uses 必须指向 fact/claim，但 {use.id} 不是已存在的 fact/claim"))
+                        f"uses 必须指向 fact/claim/method/param，"
+                        f"但 {use.id} 不是已存在的实体"))
+    for pid, param in project.params.items():
+        rel = _card_rel(project, pid)
+        if param.method not in project.methods:
+            out.append(Diagnostic(Level.ERROR, "E-DANGLING-REF", rel, "method",
+                                  f"param 引用了不存在的 method id：{param.method}"))
     return out
 
 
@@ -53,6 +61,23 @@ def _check_cites_in_bib(project: Project) -> list[Diagnostic]:
                 out.append(Diagnostic(Level.ERROR, "E-CITES-NOT-IN-BIB",
                                       _card_rel(project, clid), "cites",
                                       f"cites key 不在 bib 中：{key}"))
+    return out
+
+
+def _check_derived_from_in_bib(project: Project) -> list[Diagnostic]:
+    out: list[Diagnostic] = []
+    for mid, method in project.methods.items():
+        for key in method.derived_from:
+            if key not in project.bib_keys:
+                out.append(Diagnostic(Level.ERROR, "E-DERIVED-FROM-NOT-IN-BIB",
+                                      _card_rel(project, mid), "derived_from",
+                                      f"derived_from key 不在 bib 中：{key}"))
+    for pid, param in project.params.items():
+        for key in param.derived_from:
+            if key not in project.bib_keys:
+                out.append(Diagnostic(Level.ERROR, "E-DERIVED-FROM-NOT-IN-BIB",
+                                      _card_rel(project, pid), "derived_from",
+                                      f"derived_from key 不在 bib 中：{key}"))
     return out
 
 
@@ -162,6 +187,24 @@ def _check_note_cards_exist(project: Project) -> list[Diagnostic]:
                                       _card_rel(project, clid), "cites",
                                       f"引文 {key} 在 bib 中但没有 note 卡"
                                       "（该引文处 AI 只能凭 bib 条目行文）"))
+    for mid, method in project.methods.items():
+        if method.status == "rejected":
+            continue
+        for key in method.derived_from:
+            if key in project.bib_keys and key not in project.notes:
+                out.append(Diagnostic(Level.WARNING, "W-NOTE-MISSING",
+                                      _card_rel(project, mid), "derived_from",
+                                      f"引文 {key} 在 bib 中但没有 note 卡"
+                                      "（该引文处 AI 只能凭 bib 条目行文）"))
+    for pid, param in project.params.items():
+        if param.status == "rejected":
+            continue
+        for key in param.derived_from:
+            if key in project.bib_keys and key not in project.notes:
+                out.append(Diagnostic(Level.WARNING, "W-NOTE-MISSING",
+                                      _card_rel(project, pid), "derived_from",
+                                      f"引文 {key} 在 bib 中但没有 note 卡"
+                                      "（该引文处 AI 只能凭 bib 条目行文）"))
     return out
 
 
@@ -191,6 +234,7 @@ def validate_project(project: Project) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     diagnostics += _check_dangling_refs(project)
     diagnostics += _check_cites_in_bib(project)
+    diagnostics += _check_derived_from_in_bib(project)
     diagnostics += _check_notes_in_bib(project)
     diagnostics += _check_refs_in_figures(project)
     diagnostics += _check_claims(project)

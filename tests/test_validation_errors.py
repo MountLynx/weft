@@ -1,4 +1,4 @@
-from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
+from weft.models.cards import ClaimCard, DataCard, FactCard, MethodCard, NoteCard, ParamCard
 from weft.models.figures import FigureEntry
 from weft.models.narrative import NarrativeSection, Node, Use
 from weft.validation import validate_project
@@ -110,3 +110,37 @@ def test_parent_ref_and_subfig_ref_both_valid():
     project = build_project(data=data, figures=figures)
     errors = _errors(validate_project(project))
     assert [d.code for d in errors if d.code == "E-REFS-NOT-IN-FIGURES"] == []
+
+
+def test_uses_may_point_at_method_or_param():
+    # v1.1 §3.5：uses 目标扩展到 method/param，合法引用零诊断
+    sections = [NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        Node(id="para-01-01", purpose="describe",
+             uses=[Use(id="qpcr", role="evidence"),
+                   Use(id="qpcr-main", role="evidence")], status="approved")])]
+    project = build_project(
+        methods=[MethodCard(id="qpcr", statement="s", protocol="p",
+                            status="approved")],
+        params=[ParamCard(id="qpcr-main", method="qpcr", status="approved")],
+        sections=sections)
+    assert validate_project(project) == []
+
+
+def test_param_method_dangling_is_error():
+    project = build_project(
+        params=[ParamCard(id="qpcr-main", method="ghost", status="approved")])
+    diagnostics = validate_project(project)
+    assert _one_error_code(diagnostics) == "E-DANGLING-REF"
+    assert _errors(diagnostics)[0].field == "method"
+
+
+def test_derived_from_not_in_bib_is_error():
+    project = build_project(
+        methods=[MethodCard(id="qpcr", statement="s", protocol="p",
+                            derived_from=["ghost2025"], status="approved")],
+        params=[ParamCard(id="qpcr-main", method="qpcr",
+                          derived_from=["ghost2026"], status="approved")])
+    diagnostics = validate_project(project)
+    assert [d.code for d in _errors(diagnostics)] == \
+        ["E-DERIVED-FROM-NOT-IN-BIB", "E-DERIVED-FROM-NOT-IN-BIB"]
+    assert {d.field for d in _errors(diagnostics)} == {"derived_from"}

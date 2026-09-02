@@ -1,4 +1,4 @@
-from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
+from weft.models.cards import ClaimCard, DataCard, FactCard, MethodCard, NoteCard, ParamCard
 from weft.models.figures import FigureEntry
 from weft.models.narrative import NarrativeSection, Node, Use
 from weft.validation import validate_project
@@ -198,3 +198,33 @@ def test_diagnostics_sorted_errors_first_by_path():
     assert levels == sorted(levels, key=lambda lv: 0 if lv is Level.ERROR else 1)
     error_paths = [d.path for d in diagnostics if d.is_error]
     assert error_paths == sorted(error_paths)
+
+
+def test_derived_from_without_note_card_warns():
+    # §3.4：derived_from key 在 bib 但无 note 卡 → W-NOTE-MISSING（复用码）
+    project = build_project(
+        methods=[MethodCard(id="qpcr", statement="s", protocol="p",
+                            derived_from=["tang2025"], status="approved")],
+        params=[ParamCard(id="qpcr-main", method="qpcr", status="approved")],
+        bib_keys={"tang2025"})
+    diagnostics = validate_project(project)
+    warn = [d for d in diagnostics if d.code == "W-NOTE-MISSING"]
+    assert len(warn) == 1
+    assert warn[0].field == "derived_from"
+    assert "tang2025" in warn[0].message
+
+
+def test_method_orphan_warns_and_param_reach_saves_method():
+    # §3.4：method 无 param 引用也未被叙事使用 → W-ORPHAN；
+    # param.method 引用即可达（复用 fact→data 链路模式），param 自身被 uses 直达
+    project = build_project(
+        methods=[MethodCard(id="orphan-m", statement="s", protocol="p",
+                            status="approved"),
+                 MethodCard(id="used-m", statement="t", protocol="q",
+                            status="approved")],
+        params=[ParamCard(id="p1", method="used-m", status="approved")],
+        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+            Node(id="para-01-01", purpose="describe",
+                 uses=[Use(id="p1", role="evidence")], status="approved")])])
+    orphans = [d for d in validate_project(project) if d.code == "W-ORPHAN"]
+    assert [d.path for d in orphans] == ["metadata/orphan-m.md"]
