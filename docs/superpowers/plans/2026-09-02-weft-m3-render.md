@@ -842,7 +842,7 @@ head -c 80 examples/paper-demo/assets/style.csl   # 应见 <?xml / <style
 template.docx 用 quarto/pandoc 默认参考文档生成（python 子进程落盘，规避 Windows shell 二进制重定向风险）：
 
 ```bash
-.venv/Scripts/python.exe -c "
+"C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -c "
 import subprocess
 from pathlib import Path
 out = subprocess.run(['quarto', 'pandoc', '--print-default-data-file', 'reference.docx'],
@@ -850,7 +850,7 @@ out = subprocess.run(['quarto', 'pandoc', '--print-default-data-file', 'referenc
 Path('examples/paper-demo/assets/template.docx').write_bytes(out)
 print(len(out))
 "
-.venv/Scripts/python.exe -c "import zipfile; print(zipfile.is_zipfile('examples/paper-demo/assets/template.docx'))"
+"C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -c "import zipfile; print(zipfile.is_zipfile('examples/paper-demo/assets/template.docx'))"
 ```
 
 Expected: 打印非零字节数，随后 `True`。
@@ -987,7 +987,7 @@ print((work / 'paper.qmd').read_text(encoding='utf-8'))
 编辑器保存后把黄金文件统一为 LF、单尾换行（核对打印的尾部应为 `汇总。\n'`）：
 
 ```bash
-.venv/Scripts/python.exe -c "
+"C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -c "
 from pathlib import Path
 p = Path('tests/golden/paper.qmd')
 text = p.read_text(encoding='utf-8').replace('\r\n', '\n')
