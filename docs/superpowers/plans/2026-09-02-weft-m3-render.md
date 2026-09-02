@@ -52,6 +52,7 @@ PYTHONPATH=src "C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -m 
 9. **render 子进程语义**：`quarto render <paper_file> --to <fmt>`，`cwd=project_root`，捕获 stdout/stderr（encoding=utf-8, errors=replace），失败时随异常透传；输出路径 = `paper.with_suffix("." + to)`（paper.qmd --to docx → paper.docx）。
 10. **样例迁移零 card 改动**：只动 `assets/`（bib 移入 + 新增 style.csl/template.docx）、`_quarto.yml` 重写、新增键级图 `figures/fig-01.png`（paper.qmd 按键引用；既有子图级 refs（fig-01a/b）与文件原样保留）——graph 黄金文件与 `validate` 0 错误 0 提醒均不受扰动。
 11. **执行期修订（Task 1 渲染冒烟，2026-09-02）**：Quarto 1.9.38 实测——refs div 位置被替换为文献列表且带 `# References` 标题；`number-sections: true` 下正文节获得编号、`.unnumbered` 的 References/Figures 不编号；docx 对无名 `::: div` 无可见残留（不产生空段落）。三项均符合设计预期，无任务修订。冒烟产物在系统临时目录，未入库。
+12. **执行期修订（Task 7 渲染冒烟，2026-09-02）**：citeproc 默认只渲染**被引用**的条目（未设 `nocite`）——冒烟草稿必须含 `[@key]` 引文，References 下才有条目。已实测：草稿含 `（[@smith2020]）` 时正文渲染 `[1]`、References 下出现 elsevier-with-titles 数字条目；未引用的 doe2021 不出现（正确默认，无需 nocite）。Task 7 Step 7 的冒烟草稿与目检预期已按此修正。
 
 ## 新增诊断码
 
@@ -1006,7 +1007,7 @@ Run: `.venv/Scripts/python.exe -m pytest tests -q` → `237 passed, 1 deselected
 ```bash
 SMOKE=$(mktemp -d) && cp -r examples/paper-demo "$SMOKE/proj" && cd "$SMOKE/proj"
 mkdir -p drafts
-printf '<!-- weft:node=para-03-01 uses=fact-01 -->\n样例段落一。\n' > drafts/sec-03.md
+printf '<!-- weft:node=para-03-01 uses=fact-01 -->\n样例段落一（[@smith2020]）。\n' > drafts/sec-03.md
 printf '<!-- weft:node=para-04-01 -->\n样例段落二。\n' > drafts/sec-04.md
 WT="C:/Users/xingy/Desktop/开发/weft/.worktrees/m3-render"
 PYTHONPATH="$WT/src" "C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -c "
@@ -1020,7 +1021,7 @@ ls -la paper.docx
 
 （worktree 无 `.venv`，不能直接用主仓库 `weft.exe`——其 editable 安装指回 main 的 src，不含本分支新功能；用 `PYTHONPATH=<worktree>/src` 的 python shim 调 CLI。）
 
-Expected: `weft assemble` 退出码 0 并列出 paper.qmd；`weft render` 打印 `已生成 paper.docx`。打开 docx 目检：References 下有 smith2020/doe2021 条目、Figures 里有图与 `Fig. 1` 图注、Tables 有 `Table 1` 图注。冒烟产生的 `drafts/` 在临时目录，不入库。
+Expected: `weft assemble` 退出码 0 并列出 paper.qmd；`weft render` 打印 `已生成 paper.docx`。打开 docx 目检（citeproc 默认只渲染被引条目，见设计决策 12）：References 下有 smith2020 的数字条目（elsevier-with-titles 样式，正文 `[1]`）；未引用的 doe2021 不出现；Figures 里有图与 `Fig. 1` 图注；Tables 有 `Table 1` 图注。冒烟产生的 `drafts/` 在临时目录，不入库。
 
 - [ ] **Step 8: 提交**
 
