@@ -12,7 +12,7 @@ dependencies = [
     "python-frontmatter>=1.1",
     "typer>=0.12",
     "pyyaml>=6",
-    "specmodule==0.1.4",
+    "specmodule[openai]==0.1.4",
 ]
 
 [project.optional-dependencies]
@@ -27,3 +27,7 @@ packages = ["src/weft"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "smoke: 真实 LLM 冒烟（活 API 调用；默认排除，pytest -m smoke 显式运行）",
+]
+addopts = "-m 'not smoke'"
