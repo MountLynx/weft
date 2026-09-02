@@ -2,7 +2,8 @@
 
 规则 1 为正文级（§4「草稿中」语义）：段落 [@key]（含 [@a; @b] 多引文形式）与
 结构化 cites 双通道合并校验 bib 归属；裸 @id 交叉引用（无方括号）不在规则内。
-workflow=methods 裁剪引文规则 1/2（v1.1 §4.3）：方法章不写文献引注。
+引文规则 1/2 按 WORKFLOW_SPECS[workflow]["citation_rules"] 裁剪（当前仅 methods
+为 False；v1.1 §4.3）：方法章不写文献引注。
 纯函数、不 import specmodule：从 harness JSON dict 到诊断的映射可独立单测。
 硬规则违规由 V 脚本转成 DraftRuleError 上抛（拒绝生成）；软提醒收集带回。
 DraftError 与 DraftRuleError 集中在此定义，clients/run 复用（避免循环依赖）。
@@ -10,6 +11,7 @@ DraftError 与 DraftRuleError 集中在此定义，clients/run 复用（避免�
 import re
 
 from weft.diagnostics import Diagnostic, Level
+from weft.workflow import WORKFLOW_SPECS
 from weft.models.narrative import Node
 from weft.store.project import Project
 
@@ -73,8 +75,8 @@ def check_node_draft(draft: dict, node: Node, project: Project,
         if param is not None and not param.values:
             diags.append(_diag("E-PARAM-NO-VALUES", node.id, part_id, "uses",
                                f"使用的 param 卡 {uid} 没有任何 values"))
-    if workflow == "methods":
-        # §4.3：methods 裁剪引文规则 1/2（方法章不写文献引注）
+    if not WORKFLOW_SPECS[workflow]["citation_rules"]:
+        # §4.3：无引文规则的工作流（当前仅 methods）裁剪引文规则 1/2
         return diags
     # 本节点所用 claim 的 cites 并集（规则 2 的允许集）
     claim_cites: set[str] = set()
