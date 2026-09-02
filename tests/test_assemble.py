@@ -55,14 +55,19 @@ def test_assemble_project_writes_tree_and_chapter_merge(tmp_path):
     written, asm_diags = assemble_project(project)
     assert asm_diags == []
     # part 标题级别 = 目录深度+1（两级目录 → ###）；chapter 合并按目录序补 #/##
+    # paper.qmd 恒产出且在 written 末尾（设计决策 7）
     assert [p.relative_to(tmp_path).as_posix() for p in written] == [
         "generated/01-results/01-startup/part-01.qmd",
-        "generated/01-results.qmd"]
+        "generated/01-results.qmd",
+        "paper.qmd"]
     part_qmd = tmp_path / "generated" / "01-results" / "01-startup" / "part-01.qmd"
     assert part_qmd.read_text(encoding="utf-8") == "### SNDPR 启动性能\n\n第一段正文。\n"
     merged = (tmp_path / "generated" / "01-results.qmd").read_text(encoding="utf-8")
     assert merged == ("# results\n\n## startup\n\n"
                       "### SNDPR 启动性能\n\n第一段正文。\n\n")
+    paper = (tmp_path / "paper.qmd").read_text(encoding="utf-8")
+    assert paper == ("# results\n\n## startup\n\n### SNDPR 启动性能\n\n第一段正文。\n\n"
+                     "# References {.unnumbered}\n\n::: {#refs}\n:::\n")
     raw = part_qmd.read_bytes()
     assert b"\r" not in raw and raw.endswith(b"\n")
 
@@ -94,8 +99,10 @@ def test_strict_missing_draft_errors_and_writes_nothing(tmp_path):
     assert [d.code for d in asm_diags] == ["E-ASSEMBLE-MISSING-DRAFT"]
     assert asm_diags[0].path == "narrative/01-results/01-startup/part-01.md"
     assert asm_diags[0].field == "para-01-02"   # 首个缺段节点，而非有草稿的那个
+    # paper.qmd 恒产出（含 strict 报错时的部分 chapter），殿后于 written
     assert written == [tmp_path / "generated" / "01-results" / "part-02.qmd",
-                       tmp_path / "generated" / "01-results.qmd"]
+                       tmp_path / "generated" / "01-results.qmd",
+                       tmp_path / "paper.qmd"]
     # sec-01 整体跳过：无 part qmd、chapter 合并无其子节标题
     assert not (tmp_path / "generated" / "01-results" / "01-startup").exists()
     merged = (tmp_path / "generated" / "01-results.qmd").read_text(encoding="utf-8")
@@ -122,4 +129,4 @@ def test_lenient_missing_draft_assembles_available_paragraphs(tmp_path):
     assert asm_diags == []
     assert (tmp_path / "generated" / "01-results" / "part-01.qmd").read_text(
         encoding="utf-8") == "## 结果\n\n只有第一段。\n"
-    assert [p.name for p in written] == ["part-01.qmd", "01-results.qmd"]
+    assert [p.name for p in written] == ["part-01.qmd", "01-results.qmd", "paper.qmd"]

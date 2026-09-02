@@ -168,9 +168,10 @@ def draft(
 
 @app.command()
 def assemble(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
-    """拼装已批准草稿 → generated/…/part-NN.qmd 与 chapter 级合并 qmd。
+    """拼装已批准草稿 → generated/…/part-NN.qmd、chapter 级合并 qmd 与项目根 paper.qmd。
 
-    纯脚本无 LLM（v1.1 §4.4）；strict/lenient 经 weft.yaml assemble_mode 配置。
+    纯脚本无 LLM（v1.1 §4.4；paper.qmd 拼接见 M3 设计 §1-§3）；
+    strict/lenient 经 weft.yaml assemble_mode 配置。
     """
     from weft.assemble import assemble_project
 
