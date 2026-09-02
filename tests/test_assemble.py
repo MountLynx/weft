@@ -68,13 +68,38 @@ def test_assemble_project_writes_tree_and_chapter_merge(tmp_path):
 
 
 def test_strict_missing_draft_errors_and_writes_nothing(tmp_path):
-    _tree_project(tmp_path)   # 无 drafts/
+    # 混合夹具：sec-01 两个 approved 节点（para-01-01 有草段、para-01-02 缺），
+    # 健康 sec-02 照常拼装——钉住 strict 报首缺节点、sec-01 整体跳过、其余 part 照常
+    write_card(tmp_path / "metadata" / "data", "data-01",
+               {"id": "data-01", "refs": [], "status": "approved"})
+    write_card(tmp_path / "narrative" / "01-results" / "01-startup", "part-01",
+               {"id": "sec-01", "section": "SNDPR 启动性能",
+                "nodes": [
+                    {"id": "para-01-01", "purpose": "describe", "uses": [],
+                     "status": "approved"},
+                    {"id": "para-01-02", "purpose": "interpret", "uses": [],
+                     "status": "approved"}]})
+    write_card(tmp_path / "narrative" / "01-results", "part-02",
+               {"id": "sec-02", "section": "总览",
+                "nodes": [{"id": "para-02-01", "purpose": "describe", "uses": [],
+                           "status": "approved"}]})
+    drafts = tmp_path / "drafts"
+    drafts.mkdir()
+    (drafts / "sec-01.md").write_text(
+        "<!-- weft:node=para-01-01 -->\n第一段有草稿。\n", encoding="utf-8")
+    (drafts / "sec-02.md").write_text(
+        "<!-- weft:node=para-02-01 -->\n健康段落。\n", encoding="utf-8")
     project, _ = load_project(tmp_path)
     written, asm_diags = assemble_project(project, mode="strict")
     assert [d.code for d in asm_diags] == ["E-ASSEMBLE-MISSING-DRAFT"]
-    assert asm_diags[0].field == "para-01-01"
-    assert written == []
-    assert not (tmp_path / "generated").exists()
+    assert asm_diags[0].path == "narrative/01-results/01-startup/part-01.md"
+    assert asm_diags[0].field == "para-01-02"   # 首个缺段节点，而非有草稿的那个
+    assert written == [tmp_path / "generated" / "01-results" / "part-02.qmd",
+                       tmp_path / "generated" / "01-results.qmd"]
+    # sec-01 整体跳过：无 part qmd、chapter 合并无其子节标题
+    assert not (tmp_path / "generated" / "01-results" / "01-startup").exists()
+    merged = (tmp_path / "generated" / "01-results.qmd").read_text(encoding="utf-8")
+    assert merged == "# results\n\n## 总览\n\n健康段落。\n\n"
 
 
 def test_lenient_missing_draft_assembles_available_paragraphs(tmp_path):
