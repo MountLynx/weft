@@ -172,7 +172,9 @@ SEC = "sec-01"
 NODE_ID = "para-01-01"
 
 
-def _node(uses=("fact-01",)):
+def _node(uses=("fact-01", "claim-01")):
+    # 默认同时 use fact 与 claim：规则 2 的允许集来自“节点所用 claim 的 cites”，
+    # 只 use fact 时 claim_cites 恒为空集，通过用例无法构造
     return Node(id=NODE_ID, purpose="describe",
                 uses=[Use(id=u, role="evidence") for u in uses], status="approved")
 
