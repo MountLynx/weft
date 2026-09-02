@@ -53,6 +53,7 @@ PYTHONPATH=src "C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe" -m 
 10. **样例迁移零 card 改动**：只动 `assets/`（bib 移入 + 新增 style.csl/template.docx）、`_quarto.yml` 重写、新增键级图 `figures/fig-01.png`（paper.qmd 按键引用；既有子图级 refs（fig-01a/b）与文件原样保留）——graph 黄金文件与 `validate` 0 错误 0 提醒均不受扰动。
 11. **执行期修订（Task 1 渲染冒烟，2026-09-02）**：Quarto 1.9.38 实测——refs div 位置被替换为文献列表且带 `# References` 标题；`number-sections: true` 下正文节获得编号、`.unnumbered` 的 References/Figures 不编号；docx 对无名 `::: div` 无可见残留（不产生空段落）。三项均符合设计预期，无任务修订。冒烟产物在系统临时目录，未入库。
 12. **执行期修订（Task 7 渲染冒烟，2026-09-02）**：citeproc 默认只渲染**被引用**的条目（未设 `nocite`）——冒烟草稿必须含 `[@key]` 引文，References 下才有条目。已实测：草稿含 `（[@smith2020]）` 时正文渲染 `[1]`、References 下出现 elsevier-with-titles 数字条目；未引用的 doe2021 不出现（正确默认，无需 nocite）。Task 7 Step 7 的冒烟草稿与目检预期已按此修正。
+13. **已接受缺口（最终评审登记，合并前）**：① 零 chapter（无可拼 part）时 paper.qmd 仅含 References/Figures 尾块——行为确定但无测试钉；② 设计决策 8 的"render 不重跑 validate 闸门"无回归钉（可加载但有校验错误的项目仍可渲染，仅 load 闸门有测试）；③ `with_suffix(f".{to}")` 对奇异 `--to` 值的输出文件名可能与 Quarto 实际产物不一致，畸形 paper_file/--to 以 ValueError traceback 暴露（fail-closed，符合决策 6 宽松读取先例）。三者均为文档级接受项，不阻断合并。
 
 ## 新增诊断码
 

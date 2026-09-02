@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-**M3 渲染层已实现（2026-09-02，m3-render 分支待合入 main）**：`weft assemble` 在 part/chapter 级 qmd 之外产出项目根 `paper.qmd`（chapter 原样并入 + References refs div 定位 + Figures/Tables 字面编号，文件名经 weft.yaml `paper_file` 配置，默认 paper.qmd）；投稿资源约定 `assets/`（references.bib / style.csl / template.docx，样例项目已迁移；style.csl 为 Zotero elsevier-with-titles，CC-BY-SA 3.0，出处见文件内 rights 元素）；`weft render`（quarto 子进程封装，docx 默认目标，`--to` 透传）。卡片→叙事→生成→组装→Quarto 全闭环打通。下一步：M4 打磨。
+**M3 渲染层已实现并合入 main（2026-09-02）**：`weft assemble` 在 part/chapter 级 qmd 之外产出项目根 `paper.qmd`（chapter 原样并入 + References refs div 定位 + Figures/Tables 字面编号，文件名经 weft.yaml `paper_file` 配置，默认 paper.qmd）；投稿资源约定 `assets/`（references.bib / style.csl / template.docx，样例项目已迁移；style.csl 为 Zotero elsevier-with-titles，CC-BY-SA 3.0，出处见文件内 rights 元素）；`weft render`（quarto 子进程封装，docx 默认目标，`--to` 透传）。卡片→叙事→生成→组装→Quarto 全闭环打通。下一步：M4 打磨。
 
 ## M1 数据层 ✅（2026-09-02 合入 main）
 
@@ -27,7 +27,7 @@
 - 验收路径：单章节（03-results + 04-discussion）端到端生成；先 `MockLLMClient`（无 key 可测）后真实 LLM。
 - CLI：`weft draft <section>（v1.1 起按 part 寻址）`，`--mock` 免 key 管线冒烟、`--no-align` 跳过对齐；生成前强校验闸门（有错误即拒绝）。
 
-## M3 渲染层 ✅（2026-09-02 实现，设计定案：`docs/superpowers/specs/2026-09-02-weft-m3-render-design.md`）
+## M3 渲染层 ✅（2026-09-02 合入 main；设计定案：`docs/superpowers/specs/2026-09-02-weft-m3-render-design.md`）
 
 - `assemble/` ✅（v1.1 §4.4 提前交付）：part qmd 拼装 + chapter 目录序合并 + heading 层级映射；strict/lenient 经 weft.yaml `assemble_mode`（默认 strict）。
 - paper.qmd 拼接 ✅：chapter 序拼接成项目根 `paper.qmd` + `# References`（refs div 定位，citeproc 只渲染被引条目）+ `# Figures`/`# Tables`（figures.yaml 键序字面编号；图表链路不走 crossref——docx 投稿所见即所得）。

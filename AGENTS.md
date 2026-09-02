@@ -6,7 +6,7 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 
 **必读文档**（改敏感区前先读）：
 - `docs/superpowers/specs/2026-09-01-weft-design.md` — 设计 v1；**§3 数据结构已冻结**（改动需迁移脚本 + 全量校验）、§4 校验规则、§9 里程碑
-- `docs/roadmap.md` — 里程碑状态（M1 数据层 ✅、M2 生成层 ✅、M3 渲染层 ✅（待合入 main））
+- `docs/roadmap.md` — 里程碑状态（M1 数据层 ✅、M2 生成层 ✅、M3 渲染层 ✅（2026-09-02 合入 main））
 - `docs/superpowers/plans/2026-09-02-weft-m2-engine.md` — M2 计划，其"设计决策 1-14"含大量执行期实测修订（SpecModule 0.1.4 的真实行为语义）
 - `docs/superpowers/specs/2026-09-02-weft-v1.1-design.md` — 设计 v1.1 增补（method/param、目录树、workflow、assemble）；与 v1 冲突处以 v1.1 为准
 - `docs/superpowers/plans/2026-09-02-weft-v1.1-implementation.md` — v1.1 实现计划，其"设计决策 1-23"为执行期定案（workflow 判定、前文传递、assemble heading 映射等语义）
