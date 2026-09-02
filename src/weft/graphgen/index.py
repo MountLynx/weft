@@ -59,8 +59,8 @@ def build_index(project: Project) -> dict:
         for key in method.derived_from:
             _edge(entities, key, "methods", mid, "note")
 
-    for section in project.sections:
-        for node in section.nodes:
+    for part in project.parts:
+        for node in part.nodes:
             for use in node.uses:
                 if _kind(entities, use.id) in ("fact", "claim", "method", "param"):
                     entities[use.id]["referenced_by"]["nodes"].append(node.id)

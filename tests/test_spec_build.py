@@ -1,4 +1,4 @@
-"""叙事节 → spec + tasklist（通道②）的确定性构造。"""
+"""叙事 part → spec + tasklist（通道②）的确定性构造。"""
 import pytest
 
 from module_harness import HarnessConfig, HarnessRegistry, OutputFormat, TasklistValidator
@@ -6,7 +6,7 @@ from module_harness import HarnessConfig, HarnessRegistry, OutputFormat, Tasklis
 from tests.helpers import build_project
 from weft.engine.spec_build import build_spec, build_tasklist, entity_bundle
 from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 
 
 def _project():
@@ -28,7 +28,7 @@ def _section():
                           Use(id="claim-01", role="conclusion")],
                     logic="先主结果", status="approved")
     draft = Node(id="para-01-02", purpose="interpret", uses=[], status="draft")
-    return NarrativeSection(id="sec-01", section="Results", order=1,
+    return NarrativePart(id="sec-01", section="Results",
                             nodes=[approved, draft])
 
 
@@ -36,7 +36,7 @@ def test_build_spec_filters_non_approved():
     spec = build_spec(_project(), _section())
     assert set(spec["nodes"]) == {"para-01-01"}
     assert spec["task_nodes"] == {"p01": "para-01-01"}
-    assert spec["section"] == {"id": "sec-01", "title": "Results", "order": 1}
+    assert spec["part"] == {"id": "sec-01", "title": "Results"}
 
 
 def test_entity_bundle_fact_carries_data_description():
@@ -92,8 +92,8 @@ def test_build_spec_filters_draft_entities():
     project = _project()
     project.facts["fact-draft"] = FactCard(id="fact-draft", status="draft",
                                            data=["data-01"], statement="草稿事实。")
-    section = NarrativeSection(
-        id="sec-01", section="Results", order=1,
+    section = NarrativePart(
+        id="sec-01", section="Results",
         nodes=[Node(id="para-01-01", purpose="describe",
                     uses=[Use(id="fact-draft", role="evidence"),
                           Use(id="fact-01", role="evidence")],
@@ -105,8 +105,8 @@ def test_build_spec_filters_draft_entities():
 
 
 def test_approved_node_empty_uses():
-    section = NarrativeSection(
-        id="sec-01", section="Results", order=1,
+    section = NarrativePart(
+        id="sec-01", section="Results",
         nodes=[Node(id="para-01-01", purpose="describe", uses=[], status="approved")])
     spec = build_spec(_project(), section)
     node = spec["nodes"]["para-01-01"]
@@ -130,8 +130,8 @@ def test_tasklist_passes_real_validator():
             return {}
         return reg
 
-    section = NarrativeSection(
-        id="sec-01", section="Results", order=1,
+    section = NarrativePart(
+        id="sec-01", section="Results",
         nodes=[Node(id="para-01-01", purpose="describe", uses=[], status="approved"),
                Node(id="para-01-02", purpose="interpret", uses=[], status="approved")])
     tasklist = build_tasklist(build_spec(_project(), section), align=True)

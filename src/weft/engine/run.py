@@ -25,7 +25,7 @@ from weft.engine.draft_rules import (
     parse_node_draft,
 )
 from weft.engine.spec_build import build_spec, build_tasklist
-from weft.models.narrative import NarrativeSection
+from weft.models.narrative import NarrativePart
 from weft.store.project import Project
 
 DRAFT_PARA_CORE = (
@@ -42,13 +42,13 @@ DRAFT_PARA_CORE = (
 
 @dataclass
 class DraftResult:
-    section_id: str
+    part_id: str
     run_id: str
     drafts_by_node: dict[str, dict] = field(default_factory=dict)
     reminders: list[str] = field(default_factory=list)
 
 
-def _make_validate_script(section: NarrativeSection, tick_by_node: dict[str, str],
+def _make_validate_script(part: NarrativePart, tick_by_node: dict[str, str],
                           project: Project):
     """V 脚本：逐段形状校验 + 三规则；硬规则抛 DraftRuleError（拒绝生成）。"""
 
@@ -59,13 +59,13 @@ def _make_validate_script(section: NarrativeSection, tick_by_node: dict[str, str
                 raw = view[tick].value
             except (KeyError, AttributeError, TypeError) as exc:
                 raise DraftRuleError(
-                    _diag("E-DRAFT-SHAPE", node_id, section.id, "output",
+                    _diag("E-DRAFT-SHAPE", node_id, part.id, "output",
                           f"节点输出不可读：{exc}")) from exc
-            draft, shape = parse_node_draft(raw, node_id, section.id)
+            draft, shape = parse_node_draft(raw, node_id, part.id)
             if shape is not None:
                 raise DraftRuleError(shape)
-            node = next(n for n in section.nodes if n.id == node_id)
-            for diag in check_node_draft(draft, node, project, section.id):
+            node = next(n for n in part.nodes if n.id == node_id)
+            for diag in check_node_draft(draft, node, project, part.id):
                 if diag.is_error:
                     raise DraftRuleError(diag)
                 reminders.append(
@@ -75,12 +75,12 @@ def _make_validate_script(section: NarrativeSection, tick_by_node: dict[str, str
     return validate_draft
 
 
-def run_draft(project: Project, section: NarrativeSection, *, client,
+def run_draft(project: Project, part: NarrativePart, *, client,
               align: bool = True) -> DraftResult:
     """同步入口；内部自持事件循环（weft CLI 无既有 loop）。"""
-    spec = build_spec(project, section)
+    spec = build_spec(project, part)
     if not spec["nodes"]:
-        raise DraftError(f"[E-NOTHING-TO-DRAFT] 节 {section.id} 无 approved 节点")
+        raise DraftError(f"[E-NOTHING-TO-DRAFT] part {part.id} 无 approved 节点")
     run_id = uuid.uuid4().hex[:8]
     tick_by_node = spec["task_nodes"]
 
@@ -95,7 +95,7 @@ def run_draft(project: Project, section: NarrativeSection, *, client,
     if align:
         register_align_check_harness(reg)
     reg.script("weft_validate_draft")(
-        _make_validate_script(section, tick_by_node, project))
+        _make_validate_script(part, tick_by_node, project))
 
     module = Module(
         spec=spec,
@@ -103,7 +103,7 @@ def run_draft(project: Project, section: NarrativeSection, *, client,
         llm_client=client,
         event_bus=bus,
         registry=reg,
-        module_id=f"weft-draft-{section.id}-{run_id}",
+        module_id=f"weft-draft-{part.id}-{run_id}",
         review_harness=None,      # 决策 2：tasklist 是代码构造的，跳过一致性审核
         keep_records=False,       # 决策 3：零残留
         persist=False,
@@ -119,7 +119,7 @@ def run_draft(project: Project, section: NarrativeSection, *, client,
     except Exception as exc:
         raise DraftError(f"[E-DRAFT-FAILED] SpecModule run 失败：{exc}") from exc
 
-    result = DraftResult(section_id=section.id, run_id=run_id)
+    result = DraftResult(part_id=part.id, run_id=run_id)
     for firing in firings:
         # tickflow 语义：llm Failure 的节点出边写 False，V 不再触发（AND-join
         # 缺 token）——失败只能在 firings 里事后识别，V 脚本的形状/规则闸门
@@ -127,7 +127,7 @@ def run_draft(project: Project, section: NarrativeSection, *, client,
         if firing.status == "failed":
             node_id = tick_by_node.get(firing.node, firing.node)
             raise DraftRuleError(
-                _diag("E-DRAFT-SHAPE", node_id, section.id, "output",
+                _diag("E-DRAFT-SHAPE", node_id, part.id, "output",
                       f"节点输出不可读：{firing.error or 'harness 失败'}"))
         if firing.status == "aborted":
             raise DraftError(

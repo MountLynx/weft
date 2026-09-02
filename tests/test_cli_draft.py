@@ -11,13 +11,13 @@ def test_draft_section_not_found(tmp_path):
     make_minimal_project(tmp_path)
     result = runner.invoke(app, ["draft", "sec-99", str(tmp_path)])
     assert result.exit_code == 1
-    assert "E-SECTION-NOT-FOUND" in result.output
+    assert "E-PART-NOT-FOUND" in result.output
 
 
 def test_draft_nothing_approved(tmp_path):
     make_minimal_project(tmp_path)
-    write_card(tmp_path / "narrative", "02-intro",
-               {"id": "sec-02", "section": "Intro", "order": 2,
+    write_card(tmp_path / "narrative" / "02-intro", "part-01",
+               {"id": "sec-02", "section": "Intro",
                 "nodes": [{"id": "para-02-01", "purpose": "describe",
                            "uses": [], "status": "draft"}]})
     result = runner.invoke(app, ["draft", "sec-02", str(tmp_path)])
@@ -56,8 +56,8 @@ def test_draft_mock_no_align_flag(tmp_path):
 
 def test_draft_skips_non_approved_nodes(tmp_path):
     make_minimal_project(tmp_path)
-    write_card(tmp_path / "narrative", "01-results",
-               {"id": "sec-01", "section": "Results", "order": 1,
+    write_card(tmp_path / "narrative" / "01-results", "part-01",
+               {"id": "sec-01", "section": "Results",
                 "nodes": [
                     {"id": "para-01-01", "purpose": "describe",
                      "uses": [{"id": "fact-01", "role": "evidence"}],

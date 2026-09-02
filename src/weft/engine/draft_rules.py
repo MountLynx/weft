@@ -27,32 +27,32 @@ class DraftRuleError(RuntimeError):
             f"{diagnostic.message}")
 
 
-def _diag(code: str, node_id: str, section_id: str, field: str, message: str,
+def _diag(code: str, node_id: str, part_id: str, field: str, message: str,
           level: Level = Level.ERROR) -> Diagnostic:
-    return Diagnostic(level, code, f"drafts/{section_id}.md",
+    return Diagnostic(level, code, f"drafts/{part_id}.md",
                       f"{node_id}.{field}", message)
 
 
 def parse_node_draft(value: object, node_id: str,
-                     section_id: str) -> tuple[dict | None, Diagnostic | None]:
+                     part_id: str) -> tuple[dict | None, Diagnostic | None]:
     """harness JSON 输出形状校验：paragraph 非空 str，uses/cites 是 list[str]。"""
     if not isinstance(value, dict):
-        return None, _diag("E-DRAFT-SHAPE", node_id, section_id, "output",
+        return None, _diag("E-DRAFT-SHAPE", node_id, part_id, "output",
                            "输出不是 JSON 对象")
     paragraph = value.get("paragraph")
     if not isinstance(paragraph, str) or not paragraph.strip():
-        return None, _diag("E-DRAFT-SHAPE", node_id, section_id, "output",
+        return None, _diag("E-DRAFT-SHAPE", node_id, part_id, "output",
                            "paragraph 缺失或为空白")
     for key in ("uses", "cites"):
         v = value.get(key, [])
         if not isinstance(v, list) or any(not isinstance(x, str) for x in v):
-            return None, _diag("E-DRAFT-SHAPE", node_id, section_id, "output",
+            return None, _diag("E-DRAFT-SHAPE", node_id, part_id, "output",
                                f"{key} 不是字符串列表")
     return value, None
 
 
 def check_node_draft(draft: dict, node: Node, project: Project,
-                     section_id: str) -> list[Diagnostic]:
+                     part_id: str) -> list[Diagnostic]:
     """规则 1/2/3。返回诊断列表；硬规则（ERROR）由调用方 raise DraftRuleError。"""
     diags: list[Diagnostic] = []
     uses = [u.id for u in node.uses]
@@ -60,7 +60,7 @@ def check_node_draft(draft: dict, node: Node, project: Project,
     # get 缺省空表：形状校验放行过的缺键草稿（仅 paragraph）不应 KeyError
     for eid in draft.get("uses", []):
         if eid not in uses:
-            diags.append(_diag("E-USES-BEYOND-NODE", node.id, section_id, "uses",
+            diags.append(_diag("E-USES-BEYOND-NODE", node.id, part_id, "uses",
                                f"草稿标注实体 {eid} 不在本节点 uses"
                                f"（{', '.join(uses) or '空'}）"))
     # 本节点所用 claim 的 cites 并集（规则 2 的允许集）
@@ -87,11 +87,11 @@ def check_node_draft(draft: dict, node: Node, project: Project,
     for key, field in cite_fields:
         # 规则 1（硬）：草稿（正文+结构化）中的 [@key] 必须在 bib 内
         if key not in project.bib_keys:
-            diags.append(_diag("E-CITE-NOT-IN-BIB", node.id, section_id, field,
+            diags.append(_diag("E-CITE-NOT-IN-BIB", node.id, part_id, field,
                                f"citekey {key} 不在项目 bib"))
         # 规则 2（软）：[@key] 应属于本段所用 claim 的 cites
         elif key not in claim_cites:
-            diags.append(_diag("W-CITE-NOT-IN-CLAIM", node.id, section_id, field,
+            diags.append(_diag("W-CITE-NOT-IN-CLAIM", node.id, part_id, field,
                                f"citekey {key} 不属于本节点所用 claim 的 cites",
                                level=Level.WARNING))
     return diags

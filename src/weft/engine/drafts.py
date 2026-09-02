@@ -1,21 +1,21 @@
-"""草稿归一化写入：drafts/<section>.md + HTML 溯源注释（spec §6.5）。
+"""草稿归一化写入：drafts/<part>.md + HTML 溯源注释（spec §6.5）。
 
 路径白名单：本模块是 M2 唯一把 AI 产物落盘的地方，路径硬编码为
-root/drafts/<section_id>.md，不接受调用方传入路径；section_id 再过一次
-逃逸检查（纵深防御，id 正常来自 loader 校验过的叙事节）。
+root/drafts/<part_id>.md，不接受调用方传入路径；part_id 再过一次
+逃逸检查（纵深防御，id 正常来自 loader 校验过的叙事 part）。
 溯源注释的 uses 取节点声明的 uses（决策 9），不取草稿自报值。
 """
 from pathlib import Path
 
-from weft.models.narrative import NarrativeSection
+from weft.models.narrative import NarrativePart
 from weft.store.project import Project
 
 
-def render_draft_markdown(section: NarrativeSection, paragraphs_by_node: dict[str, str],
+def render_draft_markdown(part: NarrativePart, paragraphs_by_node: dict[str, str],
                           run_id: str) -> str:
-    """段落顺序 = 节内 nodes 顺序；未生成节点（draft/rejected）跳过。"""
-    lines = [f"<!-- weft:run={run_id} section={section.id} -->", ""]
-    for node in section.nodes:
+    """段落顺序 = part 内 nodes 顺序；未生成节点（draft/rejected）跳过。"""
+    lines = [f"<!-- weft:run={run_id} part={part.id} -->", ""]
+    for node in part.nodes:
         paragraph = paragraphs_by_node.get(node.id)
         if paragraph is None:
             continue
@@ -28,11 +28,11 @@ def render_draft_markdown(section: NarrativeSection, paragraphs_by_node: dict[st
     return "\n".join(lines) + "\n"
 
 
-def write_draft(project: Project, section_id: str, content: str) -> Path:
+def write_draft(project: Project, part_id: str, content: str) -> Path:
     drafts_dir = project.root / "drafts"
-    path = drafts_dir / f"{section_id}.md"
+    path = drafts_dir / f"{part_id}.md"
     if path.resolve().parent != drafts_dir.resolve():
-        raise ValueError(f"非法 section id（路径逃逸）：{section_id}")
+        raise ValueError(f"非法 part id（路径逃逸）：{part_id}")
     content = content.replace("\r\n", "\n").replace("\r", "\n")   # 固定 LF：写入前归一化
     drafts_dir.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="\n")

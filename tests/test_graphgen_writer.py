@@ -4,7 +4,7 @@ from pathlib import Path
 from weft.graphgen.index import build_index
 from weft.graphgen.writer import write_outputs
 from weft.models.cards import DataCard, FactCard
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 from tests.helpers import build_project
 
 
@@ -14,7 +14,7 @@ def _project(root=None, data=None):
         root=root or Path("."),
         data=data or [DataCard(id="data-01", status="approved")],
         facts=[FactCard(id="fact-01", data=["data-01"], statement="s", status="approved")],
-        sections=[NarrativeSection(id="sec-01", section="Results", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="Results", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="fact-01", role="evidence")], status="approved")]),
         ],

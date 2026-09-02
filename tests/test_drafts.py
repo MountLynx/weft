@@ -1,14 +1,14 @@
-"""草稿归一化渲染 + 白名单写入（drafts/<section>.md 唯一落盘点）。"""
+"""草稿归一化渲染 + 白名单写入（drafts/<part>.md 唯一落盘点）。"""
 import pytest
 
 from tests.helpers import build_project
 from weft.engine.drafts import render_draft_markdown, write_draft
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 
 
 def _section():
-    return NarrativeSection(
-        id="sec-01", section="Results", order=1,
+    return NarrativePart(
+        id="sec-01", section="Results",
         nodes=[Node(id="para-01-01", purpose="describe",
                     uses=[Use(id="fact-01", role="evidence")], status="approved"),
                Node(id="para-01-02", purpose="interpret",
@@ -20,7 +20,7 @@ def test_render_traceability_comments():
     paragraphs = {"para-01-01": "第一段。", "para-01-02": "第二段。"}
     out = render_draft_markdown(section, paragraphs, "ab12cd34")
     assert out == (
-        "<!-- weft:run=ab12cd34 section=sec-01 -->\n"
+        "<!-- weft:run=ab12cd34 part=sec-01 -->\n"
         "\n"
         "<!-- weft:node=para-01-01 uses=fact-01 -->\n"
         "第一段。\n"

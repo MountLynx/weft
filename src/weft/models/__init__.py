@@ -1,6 +1,6 @@
 from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard, ReviewStatus
 from weft.models.figures import FigureEntry
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 
 __all__ = [
     "ClaimCard",
@@ -9,7 +9,7 @@ __all__ = [
     "NoteCard",
     "ReviewStatus",
     "FigureEntry",
-    "NarrativeSection",
+    "NarrativePart",
     "Node",
     "Use",
 ]

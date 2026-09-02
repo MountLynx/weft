@@ -15,7 +15,7 @@ from weft.models.cards import (
     ParamCard,
 )
 from weft.models.figures import FigureEntry
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 from weft.store.project import Project
 
 
@@ -54,8 +54,8 @@ def make_minimal_project(root: Path) -> Path:
                                       "bibliography": "references.bib"})
     (root / "references.bib").write_text(
         "@article{key2020,\n  title = {T},\n  year = {2020},\n}\n", encoding="utf-8")
-    write_card(root / "narrative", "01-results",
-               {"id": "sec-01", "section": "Results", "order": 1,
+    write_card(root / "narrative" / "01-results", "part-01",
+               {"id": "sec-01", "section": "Results",
                 "nodes": [{"id": "para-01-01", "purpose": "describe",
                            "uses": [{"id": "fact-01", "role": "evidence"}],
                            "status": "approved"}]})
@@ -65,7 +65,7 @@ def make_minimal_project(root: Path) -> Path:
 
 
 def build_project(root: Path | None = None, *, data=None, facts=None, claims=None,
-                  notes=None, methods=None, params=None, sections=None, figures=None,
+                  notes=None, methods=None, params=None, parts=None, figures=None,
                   bib_keys=None, figures_dir: str = "figures") -> Project:
     """在内存中直接构造 Project（validation/graphgen 单测用，不落盘）。"""
     root = root or Path(".")
@@ -76,13 +76,14 @@ def build_project(root: Path | None = None, *, data=None, facts=None, claims=Non
     project.notes = {c.id: c for c in (notes or [])}
     project.methods = {c.id: c for c in (methods or [])}
     project.params = {c.id: c for c in (params or [])}
-    project.sections = list(sections or [])
+    project.parts = list(parts or [])
     project.figures = dict(figures or {})
     project.bib_keys = set(bib_keys or set())
     for cards in (project.data_cards, project.facts, project.claims, project.notes,
                   project.methods, project.params):
         for cid in cards:
             project.card_paths.setdefault(cid, Path(f"metadata/{cid}.md"))
-    for section in project.sections:
-        project.section_paths.setdefault(section.id, Path(f"narrative/{section.id}.md"))
+    for part in project.parts:
+        project.part_paths.setdefault(part.id, Path(f"narrative/01-results/{part.id}.md"))
+        project.part_chapters.setdefault(part.id, "01-results")
     return project

@@ -2,14 +2,14 @@ import pytest
 from pydantic import ValidationError
 
 from weft.models.figures import FigureEntry
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 
 
-def test_section_parses_spec_example():
-    section = NarrativeSection.model_validate({
-        "id": "sec-03",
-        "section": "Results",
-        "order": 3,
+def test_part_parses_v1_1_example():
+    part = NarrativePart.model_validate({
+        "id": "part-startup-01",
+        "section": "SNDPR 启动性能",
+        "workflow": "results",
         "nodes": [
             {
                 "id": "para-03-01",
@@ -24,8 +24,20 @@ def test_section_parses_spec_example():
             }
         ],
     })
-    assert section.nodes[0].uses[1].role == "conclusion"
-    assert section.nodes[0].logic == "先主结果，再补充次要结果"
+    assert part.nodes[0].uses[1].role == "conclusion"
+    assert part.workflow == "results"
+
+
+def test_part_workflow_defaults_to_none():
+    part = NarrativePart(id="p1", section="T")
+    assert part.workflow is None
+    assert part.nodes == []
+
+
+def test_retired_order_field_rejected():
+    # v1.1 §4.2：order 退役，extra=forbid 使旧文件 fail-closed（先跑迁移脚本）
+    with pytest.raises(ValidationError):
+        NarrativePart(id="p1", section="T", order=1)
 
 
 def test_node_defaults():
@@ -50,17 +62,11 @@ def test_use_role_is_free_string():
     assert use.role == "vibe"
 
 
-def test_section_order_is_int():
-    with pytest.raises(ValidationError):
-        NarrativeSection(id="sec-03", section="Results", order="third")
-
-
 def test_figure_entry_defaults():
     entry = FigureEntry.model_validate({"caption": "总图注"})
     assert entry.subfigs == {}
 
 
 def test_figure_entry_ignores_unknown_keys():
-    # figures.yaml 人工直接维护，解析宽松：未知键忽略
     entry = FigureEntry.model_validate({"caption": "c", "typo": 1})
     assert entry.caption == "c"

@@ -1,6 +1,6 @@
 from weft.models.cards import ClaimCard, DataCard, FactCard, MethodCard, NoteCard, ParamCard
 from weft.models.figures import FigureEntry
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 from weft.validation import validate_project
 from tests.helpers import build_project
 
@@ -27,7 +27,7 @@ def test_clean_project_has_no_diagnostics(tmp_path):
                           status="approved")],
         figures={"fig-01": FigureEntry(caption="c", subfigs={"a": "s"})},
         bib_keys={"key2020"},
-        sections=[NarrativeSection(id="sec-01", section="Results", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="Results", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="fact-01", role="evidence")], status="approved")]),
         ],
@@ -58,11 +58,11 @@ def test_dangling_supports_ref():
 
 def test_uses_must_point_at_fact_or_claim():
     # data 卡存在，但 uses 不允许指向 data（spec §2：叙事节点只引用 fact/claim）
-    sections = [NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+    sections = [NarrativePart(id="sec-01", section="R", nodes=[
         Node(id="para-01-01", purpose="describe",
              uses=[Use(id="data-01", role="evidence")], status="approved")])]
     data = [DataCard(id="data-01", status="approved")]
-    project = build_project(data=data, sections=sections)
+    project = build_project(data=data, parts=sections)
     diagnostics = validate_project(project)
     assert _one_error_code(diagnostics) == "E-DANGLING-REF"
     assert "uses" in _errors(diagnostics)[0].field
@@ -114,7 +114,7 @@ def test_parent_ref_and_subfig_ref_both_valid():
 
 def test_uses_may_point_at_method_or_param():
     # v1.1 §3.5：uses 目标扩展到 method/param，合法引用零诊断
-    sections = [NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+    sections = [NarrativePart(id="sec-01", section="R", nodes=[
         Node(id="para-01-01", purpose="describe",
              uses=[Use(id="qpcr", role="evidence"),
                    Use(id="qpcr-main", role="evidence")], status="approved")])]
@@ -122,7 +122,7 @@ def test_uses_may_point_at_method_or_param():
         methods=[MethodCard(id="qpcr", statement="s", protocol="p",
                             status="approved")],
         params=[ParamCard(id="qpcr-main", method="qpcr", status="approved")],
-        sections=sections)
+        parts=sections)
     assert validate_project(project) == []
 
 

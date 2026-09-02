@@ -6,7 +6,7 @@ from weft.engine.clients import ScriptedLLMClient
 from weft.engine.draft_rules import DraftRuleError
 from weft.engine.run import DraftError, run_draft
 from weft.models.cards import ClaimCard, FactCard
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 
 SEC = "sec-01"
 
@@ -29,7 +29,7 @@ def _section(n_approved=2):
              logic="", status="approved")
         for i in range(1, n_approved + 1)
     ]
-    return NarrativeSection(id=SEC, section="Results", order=1, nodes=nodes)
+    return NarrativePart(id=SEC, section="Results", nodes=nodes)
 
 
 def test_run_draft_end_to_end_two_paragraphs():
@@ -95,7 +95,7 @@ def test_run_draft_align_rejection_fails_run():
 
 
 def test_run_draft_nothing_to_draft():
-    section = NarrativeSection(id=SEC, section="Results", order=1, nodes=[])
+    section = NarrativePart(id=SEC, section="Results", nodes=[])
     with pytest.raises(DraftError) as excinfo:
         run_draft(_project(), section, client=ScriptedLLMClient())
     assert "E-NOTHING-TO-DRAFT" in str(excinfo.value)

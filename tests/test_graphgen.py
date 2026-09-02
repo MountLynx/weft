@@ -7,7 +7,7 @@ from weft.models.cards import (
     NoteCard,
     ParamCard,
 )
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 from tests.helpers import build_project
 
 
@@ -19,7 +19,7 @@ def _project(**overrides):
                         supports=["claim-01"], status="approved")],
         claims=[ClaimCard(id="claim-01", claim_type="uncited", statement="s",
                           status="approved")],
-        sections=[NarrativeSection(id="sec-01", section="Results", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="Results", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="fact-01", role="evidence")], status="approved")]),
         ],
@@ -72,7 +72,7 @@ def test_index_tolerates_dangling_refs():
     project = _project(
         facts=[FactCard(id="fact-01", data=["data-01", "ghost-data"], statement="s",
                         supports=["claim-01", "claim-ghost"], status="approved")],
-        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="R", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="fact-01", role="evidence"),
                        Use(id="ghost-use", role="evidence")], status="approved")]),
@@ -92,7 +92,7 @@ def test_direct_claim_seed_reachable():
     # 种子规则：node.uses 直接引用的 claim 也算可达（无需 fact 支撑）
     project = _project(
         facts=[],
-        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="R", nodes=[
             Node(id="para-01-01", purpose="interpret",
                  uses=[Use(id="claim-01", role="conclusion")], status="approved")]),
         ],
@@ -111,7 +111,7 @@ def test_multi_fact_partial_inheritance():
                         supports=["claim-01"], status="approved"),
                FactCard(id="fact-02", data=["ghost-d"], statement="t",
                         supports=["claim-01"], status="approved")],
-        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="R", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="fact-01", role="evidence")], status="approved")]),
         ],
@@ -146,7 +146,7 @@ def test_param_method_edge_and_inheritance():
         methods=[MethodCard(id="qpcr", statement="s", protocol="p",
                             status="approved")],
         params=[ParamCard(id="qpcr-main", method="qpcr", status="approved")],
-        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="R", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="qpcr-main", role="evidence")], status="approved")]),
         ],
@@ -163,7 +163,7 @@ def test_method_directly_used_reachable():
     project = _project(
         methods=[MethodCard(id="qpcr", statement="s", protocol="p",
                             status="approved")],
-        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="R", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="qpcr", role="evidence")], status="approved")]),
         ],
@@ -193,7 +193,7 @@ def test_dangling_param_method_tolerated():
     # 悬空引用是 validation 的职责；build_index 必须静默跳过
     project = _project(
         params=[ParamCard(id="p1", method="ghost", status="approved")],
-        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="R", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="p1", role="evidence")], status="approved")]),
         ],

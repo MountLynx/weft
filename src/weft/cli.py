@@ -54,12 +54,12 @@ def _print_review(project: Project) -> None:
         typer.echo("  （无）")
     typer.echo("待审阅叙事节点：")
     node_found = False
-    for section in project.sections:
-        for node in section.nodes:
+    for part in project.parts:
+        for node in part.nodes:
             if node.status == "draft":
                 node_found = True
-                rel = project.section_paths[section.id].as_posix()
-                typer.echo(f"  {section.id}/{node.id}  {rel}")
+                rel = project.part_paths[part.id].as_posix()
+                typer.echo(f"  {part.id}/{node.id}  {rel}")
     if not node_found:
         typer.echo("  （无）")
 
@@ -109,12 +109,12 @@ def review(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目
 
 @app.command()
 def draft(
-    section_id: str = typer.Argument(..., help="叙事节 id，如 sec-03"),
+    part_id: str = typer.Argument(..., help="part id，如 part-startup-01"),
     project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
     mock: bool = typer.Option(False, "--mock", help="免 key 假客户端（管线冒烟）"),
     no_align: bool = typer.Option(False, "--no-align", help="跳过对齐检查节点"),
 ) -> None:
-    """对指定叙事节执行生成（SpecModule run），产物写入 drafts/<section>.md。"""
+    """对指定叙事 part 执行生成（SpecModule run），产物写入 drafts/<part>.md。"""
     from weft.engine import DraftError, DraftRuleError, make_client, run_draft
     from weft.engine.drafts import render_draft_markdown, write_draft
 
@@ -125,32 +125,32 @@ def draft(
         typer.echo("—— 校验存在错误，拒绝生成")
         raise typer.Exit(code=1)
 
-    section = next((s for s in project.sections if s.id == section_id), None)
-    if section is None:
+    part = next((p for p in project.parts if p.id == part_id), None)
+    if part is None:
         _print_diagnostics([Diagnostic(
-            Level.ERROR, "E-SECTION-NOT-FOUND", ".", None,
-            f"叙事节 {section_id} 不存在")])
+            Level.ERROR, "E-PART-NOT-FOUND", ".", None,
+            f"叙事 part {part_id} 不存在")])
         raise typer.Exit(code=1)
-    if not any(n.status == "approved" for n in section.nodes):
+    if not any(n.status == "approved" for n in part.nodes):
         _print_diagnostics([Diagnostic(
             Level.ERROR, "E-NOTHING-TO-DRAFT",
-            project.section_paths[section.id].as_posix(), None,
-            f"节 {section_id} 内没有 status: approved 的叙事节点")])
+            project.part_paths[part.id].as_posix(), None,
+            f"part {part_id} 内没有 status: approved 的叙事节点")])
         raise typer.Exit(code=1)
 
     warnings = [d for d in diagnostics if not d.is_error]
 
     try:
         client = make_client(mock, project_root=project.root)
-        result = run_draft(project, section, client=client, align=not no_align)
+        result = run_draft(project, part, client=client, align=not no_align)
     except (DraftRuleError, DraftError) as exc:
         typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc
 
     paragraphs = {nid: d["paragraph"] for nid, d in result.drafts_by_node.items()}
-    content = render_draft_markdown(section, paragraphs, result.run_id)
+    content = render_draft_markdown(part, paragraphs, result.run_id)
     try:
-        path = write_draft(project, section.id, content)
+        path = write_draft(project, part.id, content)
     except OSError as exc:
         typer.echo(f"ERROR 无法写入 drafts/：{exc}")
         raise typer.Exit(code=1) from exc

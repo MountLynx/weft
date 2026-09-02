@@ -24,7 +24,7 @@ from weft.models.cards import (
     ParamCard,
 )
 from weft.models.figures import FigureEntry
-from weft.models.narrative import NarrativeSection
+from weft.models.narrative import NarrativePart
 from weft.store.project import Project
 
 _BIB_ENTRY = re.compile(r"@(?P<etype>[A-Za-z]+)\s*\{\s*(?P<key>[^,\s{}]+)\s*,")
@@ -56,7 +56,7 @@ def load_project(root: Path) -> tuple[Project, list[Diagnostic]]:
     seen_ids: dict[str, str] = {}  # id -> 首次出现的文件（实体共用命名空间）
 
     _load_cards(root, project, seen_ids, diagnostics)
-    _load_narrative(root, project, diagnostics)
+    _load_parts(root, project, diagnostics)
     _load_figures(root, project, diagnostics)
     _load_config(root, project, diagnostics)
     return project, diagnostics
@@ -144,22 +144,30 @@ def _load_card(root: Path, project: Project, seen_ids: dict[str, str],
     project.card_paths[card.id] = path.relative_to(root)
 
 
-def _load_narrative(root: Path, project: Project, diagnostics: list[Diagnostic]) -> None:
+def _load_parts(root: Path, project: Project, diagnostics: list[Diagnostic]) -> None:
+    """narrative/**/*.md 树扫描（v1.1 §4.2）：位置 = 目录路径 + 文件名前缀。"""
     directory = root / "narrative"
     if not directory.is_dir():
         return
-    seen_sections: dict[str, str] = {}
+    seen_parts: dict[str, str] = {}
     seen_nodes: dict[str, str] = {}
-    sections: list[NarrativeSection] = []
+    parts: list[NarrativePart] = []
 
-    for path in sorted(directory.glob("*.md")):
+    for path in sorted(directory.rglob("*.md")):
         rel = _rel(root, path)
+        rel_to_narrative = path.relative_to(directory)
+        if len(rel_to_narrative.parts) < 2:
+            diagnostics.append(Diagnostic(
+                Level.ERROR, "E-PART-NO-CHAPTER", rel, None,
+                "part 文件必须位于 narrative/<chapter>/ 子目录内"
+                "（v1 扁平文件请先跑 python -m weft.migrations.v1_1）"))
+            continue
         metadata, error = _load_frontmatter(path)
         if error is not None:
             diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", rel, None, error))
             continue
         try:
-            section = NarrativeSection.model_validate(metadata)
+            part = NarrativePart.model_validate(metadata)
         except ValidationError as exc:
             first = exc.errors()[0]
             field = ".".join(str(p) for p in first["loc"])
@@ -168,16 +176,17 @@ def _load_narrative(root: Path, project: Project, diagnostics: list[Diagnostic])
                 f"frontmatter 解析失败：{first['msg']}"))
             continue
 
-        if section.id in seen_sections:
+        if part.id in seen_parts:
             diagnostics.append(Diagnostic(
                 Level.ERROR, "E-DUPLICATE-ID", rel, "id",
-                f"叙事节 id {section.id} 重复，首次出现于 {seen_sections[section.id]}"))
+                f"part id {part.id} 重复，首次出现于 {seen_parts[part.id]}"))
             continue
-        seen_sections[section.id] = rel
-        project.section_paths[section.id] = path.relative_to(root)
-        sections.append(section)
+        seen_parts[part.id] = rel
+        project.part_paths[part.id] = path.relative_to(root)
+        project.part_chapters[part.id] = rel_to_narrative.parts[0]
+        parts.append(part)
 
-        for node in section.nodes:
+        for node in part.nodes:
             if node.id in seen_nodes:
                 diagnostics.append(Diagnostic(
                     Level.ERROR, "E-DUPLICATE-ID", rel, f"nodes[{node.id}]",
@@ -185,7 +194,7 @@ def _load_narrative(root: Path, project: Project, diagnostics: list[Diagnostic])
                 continue
             seen_nodes[node.id] = rel
 
-    project.sections = sorted(sections, key=lambda s: (s.order, s.id))
+    project.parts = sorted(parts, key=lambda p: project.part_paths[p.id].as_posix())
 
 
 def _load_figures(root: Path, project: Project, diagnostics: list[Diagnostic]) -> None:

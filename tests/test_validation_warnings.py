@@ -1,6 +1,6 @@
 from weft.models.cards import ClaimCard, DataCard, FactCard, MethodCard, NoteCard, ParamCard
 from weft.models.figures import FigureEntry
-from weft.models.narrative import NarrativeSection, Node, Use
+from weft.models.narrative import NarrativePart, Node, Use
 from weft.validation import validate_project
 from tests.helpers import build_project
 
@@ -12,7 +12,7 @@ def _codes(diagnostics):
 def _fact_used_by_narrative():
     return (
         [FactCard(id="fact-01", data=["data-01"], statement="s", status="approved")],
-        [NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        [NarrativePart(id="sec-01", section="R", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="fact-01", role="evidence")], status="approved")]),
         ],
@@ -50,7 +50,7 @@ def test_rejected_suppression_scoped_to_card_across_rules(tmp_path):
                         status="approved")]
     notes = [NoteCard(id="k2020", status="rejected")]  # rejected 且无 summary
     figures = {"fig-01": FigureEntry(caption="c", subfigs={"a": "s"})}
-    sections = [NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+    sections = [NarrativePart(id="sec-01", section="R", nodes=[
         # uses 让 approved 的 fact/claim 可达（否则 W-ORPHAN 会照报它们）；
         # claim-01 经直接 use 可达但仍无 fact 支持 → W-CLAIM-UNSUPPORTED 保留
         Node(id="para-01-01", purpose="speculate", status="approved",
@@ -59,7 +59,7 @@ def test_rejected_suppression_scoped_to_card_across_rules(tmp_path):
     ])]
     project = build_project(root=tmp_path, data=data, facts=facts, claims=claims,
                             notes=notes, figures=figures, bib_keys={"k2020"},
-                            sections=sections)
+                            parts=sections)
     codes = _codes(validate_project(project))
     assert "W-FIGURE-FILE-MISSING" not in codes      # rejected data 卡豁免
     assert "W-NOTE-NO-SUMMARY" not in codes          # rejected note 豁免
@@ -105,7 +105,7 @@ def test_orphan_data_warns():
 def test_data_reachable_via_fact_not_orphan():
     facts, sections = _fact_used_by_narrative()
     project = build_project(data=[DataCard(id="data-01", status="approved")],
-                            facts=facts, sections=sections)
+                            facts=facts, parts=sections)
     assert "W-ORPHAN" not in _codes(validate_project(project))
 
 
@@ -115,12 +115,12 @@ def test_claim_reached_only_via_supports_is_used():
                         status="approved")]
     facts = [FactCard(id="fact-01", data=["data-01"], statement="s",
                       supports=["claim-01"], status="approved")]
-    sections = [NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+    sections = [NarrativePart(id="sec-01", section="R", nodes=[
         Node(id="para-01-01", purpose="describe",
              uses=[Use(id="fact-01", role="evidence")], status="approved")]),
     ]
     project = build_project(data=[DataCard(id="data-01", status="approved")],
-                            facts=facts, claims=claims, sections=sections)
+                            facts=facts, claims=claims, parts=sections)
     assert "W-ORPHAN" not in _codes(validate_project(project))
 
 
@@ -143,7 +143,7 @@ def test_figure_file_present_no_warning(tmp_path):
         root=tmp_path,
         data=[DataCard(id="data-01", status="approved", refs=["fig-01a"])],
         facts=facts, figures={"fig-01": FigureEntry(caption="c", subfigs={"a": "s"})},
-        sections=sections)
+        parts=sections)
     assert "W-FIGURE-FILE-MISSING" not in _codes(validate_project(project))
 
 
@@ -180,12 +180,12 @@ def test_note_missing_for_cited_key_warns():
 
 def test_purpose_and_role_vocab_warnings():
     facts, sections = _fact_used_by_narrative()
-    sections = [NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+    sections = [NarrativePart(id="sec-01", section="R", nodes=[
         Node(id="para-01-01", purpose="speculate",
              uses=[Use(id="fact-01", role="vibe")], status="approved")]),
     ]
     project = build_project(data=[DataCard(id="data-01", status="approved")],
-                            facts=facts, sections=sections)
+                            facts=facts, parts=sections)
     codes = _codes(validate_project(project))
     assert "W-PURPOSE-VOCAB" in codes
     assert "W-ROLE-VOCAB" in codes
@@ -231,7 +231,7 @@ def test_method_orphan_warns_and_param_reach_saves_method():
                  MethodCard(id="used-m", statement="t", protocol="q",
                             status="approved")],
         params=[ParamCard(id="p1", method="used-m", status="approved")],
-        sections=[NarrativeSection(id="sec-01", section="R", order=1, nodes=[
+        parts=[NarrativePart(id="sec-01", section="R", nodes=[
             Node(id="para-01-01", purpose="describe",
                  uses=[Use(id="p1", role="evidence")], status="approved")])])
     orphans = [d for d in validate_project(project) if d.code == "W-ORPHAN"]

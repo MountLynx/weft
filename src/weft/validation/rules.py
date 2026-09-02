@@ -17,8 +17,8 @@ def _card_rel(project: Project, entity_id: str) -> str:
     return project.card_paths[entity_id].as_posix()
 
 
-def _section_rel(project: Project, section_id: str) -> str:
-    return project.section_paths[section_id].as_posix()
+def _part_rel(project: Project, part_id: str) -> str:
+    return project.part_paths[part_id].as_posix()
 
 
 def _check_dangling_refs(project: Project) -> list[Diagnostic]:
@@ -33,9 +33,9 @@ def _check_dangling_refs(project: Project) -> list[Diagnostic]:
             if cid not in project.claims:
                 out.append(Diagnostic(Level.ERROR, "E-DANGLING-REF", rel, "supports",
                                       f"fact 引用了不存在的 claim id：{cid}"))
-    for section in project.sections:
-        rel = _section_rel(project, section.id)
-        for node in section.nodes:
+    for part in project.parts:
+        rel = _part_rel(project, part.id)
+        for node in part.nodes:
             for use in node.uses:
                 if use.id not in project.facts and use.id not in project.claims \
                         and use.id not in project.methods \
@@ -210,9 +210,9 @@ def _check_note_cards_exist(project: Project) -> list[Diagnostic]:
 
 def _check_vocab(project: Project) -> list[Diagnostic]:
     out: list[Diagnostic] = []
-    for section in project.sections:
-        rel = _section_rel(project, section.id)
-        for node in section.nodes:
+    for part in project.parts:
+        rel = _part_rel(project, part.id)
+        for node in part.nodes:
             if node.status == "rejected":
                 continue
             if node.purpose not in PURPOSE_VOCAB:

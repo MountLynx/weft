@@ -1,8 +1,8 @@
-"""叙事节 → SpecModule spec + tasklist（通道②，代码确定性构造，spec §6.1/6.2）。
+"""叙事 part → SpecModule spec + tasklist（通道②，代码确定性构造，spec §6.1/6.2）。
 
 spec 形状：
 {
-  "section": {"id", "title", "order"},
+  "part": {"id", "title"},
   "task_nodes": {"p01": "para-01-01", ...},   # tick 名 → node id
   "nodes": {"para-01-01": {"purpose", "logic", "uses", "entities": [bundle, ...]}},
 }
@@ -12,7 +12,7 @@ import json
 
 from module_harness import TaskDefinition, Tasklist
 
-from weft.models.narrative import NarrativeSection
+from weft.models.narrative import NarrativePart
 from weft.store.project import Project
 
 
@@ -47,7 +47,7 @@ def entity_bundle(project: Project, entity_id: str) -> dict:
     raise ValueError(f"uses 指向非 fact/claim 实体或不存在：{entity_id}")
 
 
-def build_spec(project: Project, section: NarrativeSection) -> dict:
+def build_spec(project: Project, part: NarrativePart) -> dict:
     def _approved(eid: str) -> bool:
         for cards in (project.facts, project.claims):
             card = cards.get(eid)
@@ -55,7 +55,7 @@ def build_spec(project: Project, section: NarrativeSection) -> dict:
                 return card.status == "approved"
         return False
 
-    approved = [n for n in section.nodes if n.status == "approved"]
+    approved = [n for n in part.nodes if n.status == "approved"]
     nodes = {}
     for n in approved:
         usable = [u for u in n.uses if _approved(u.id)]
@@ -66,7 +66,7 @@ def build_spec(project: Project, section: NarrativeSection) -> dict:
             "entities": [entity_bundle(project, u.id) for u in usable],
         }
     return {
-        "section": {"id": section.id, "title": section.section, "order": section.order},
+        "part": {"id": part.id, "title": part.section},
         "task_nodes": {tick_name(i): n.id for i, n in enumerate(approved)},
         "nodes": nodes,
     }
