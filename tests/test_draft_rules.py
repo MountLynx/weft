@@ -1,6 +1,4 @@
 """生成时校验三规则（spec §4 生成时行）+ harness 输出形状解析。"""
-import pytest
-
 from tests.helpers import build_project
 from weft.diagnostics import Level
 from weft.engine.draft_rules import (
@@ -87,3 +85,28 @@ def test_error_types():
     _, diag = parse_node_draft(42, NODE_ID, SEC)
     assert isinstance(DraftRuleError(diag), RuntimeError)
     assert isinstance(DraftError("x"), RuntimeError)
+
+
+def test_missing_uses_cites_keys_do_not_raise():
+    draft, _ = parse_node_draft({"paragraph": "p"}, NODE_ID, SEC)
+    assert check_node_draft(draft, _node(), _project(), SEC) == []
+
+
+def test_multiple_violations_accumulate():
+    diags = check_node_draft({"paragraph": "p", "uses": ["claim-99"], "cites": ["nokey"]},
+                             _node(), _project(), SEC)
+    assert [d.code for d in diags] == ["E-USES-BEYOND-NODE", "E-CITE-NOT-IN-BIB"]
+
+
+def test_rule3_message_uses_kong_when_node_has_no_uses():
+    node = _node(uses=())
+    diags = check_node_draft({"paragraph": "p", "uses": ["claim-99"], "cites": []},
+                             node, _project(), SEC)
+    assert "（空）" in diags[0].message
+
+
+def test_draft_rule_error_str_and_diagnostic():
+    _, diag = parse_node_draft(42, NODE_ID, SEC)
+    err = DraftRuleError(diag)
+    assert err.diagnostic is diag
+    assert str(err) == f"[{diag.code}] {diag.path} 字段 {diag.field}: {diag.message}"

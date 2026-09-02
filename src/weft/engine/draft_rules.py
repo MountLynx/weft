@@ -53,7 +53,8 @@ def check_node_draft(draft: dict, node: Node, project: Project,
     diags: list[Diagnostic] = []
     uses = [u.id for u in node.uses]
     # 规则 3（硬）：草稿标注引用的实体 id ⊆ 节点 uses
-    for eid in draft["uses"]:
+    # get 缺省空表：形状校验放行过的缺键草稿（仅 paragraph）不应 KeyError
+    for eid in draft.get("uses", []):
         if eid not in uses:
             diags.append(_diag("E-USES-BEYOND-NODE", node.id, section_id, "uses",
                                f"草稿标注实体 {eid} 不在本节点 uses"
@@ -64,7 +65,7 @@ def check_node_draft(draft: dict, node: Node, project: Project,
         claim = project.claims.get(uid)
         if claim is not None:
             claim_cites.update(claim.cites)
-    for key in draft["cites"]:
+    for key in draft.get("cites", []):
         # 规则 1（硬）：[@key] 必须在 bib 内
         if key not in project.bib_keys:
             diags.append(_diag("E-CITE-NOT-IN-BIB", node.id, section_id, "cites",
