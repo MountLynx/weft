@@ -30,3 +30,4 @@ class Project:
     card_paths: dict[str, Path] = field(default_factory=dict)   # 实体 id -> 相对路径
     part_paths: dict[str, Path] = field(default_factory=dict)   # part id -> 相对路径
     part_chapters: dict[str, str] = field(default_factory=dict)  # part id -> 第一级目录名
+    assemble_mode: str = "strict"         # weft.yaml assemble_mode：strict | lenient

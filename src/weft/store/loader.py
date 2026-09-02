@@ -232,6 +232,13 @@ def _load_config(root: Path, project: Project, diagnostics: list[Diagnostic]) ->
 
     project.figures_dir = str(weft_cfg.get("figures_dir", "figures"))
 
+    project.assemble_mode = str(weft_cfg.get("assemble_mode", "strict"))
+    if project.assemble_mode not in ("strict", "lenient"):
+        diagnostics.append(Diagnostic(Level.ERROR, "E-PARSE", "weft.yaml",
+                                      "assemble_mode",
+                                      "assemble_mode 必须是 strict 或 lenient"))
+        project.assemble_mode = "strict"
+
     bib_field = quarto.get("bibliography")
     if isinstance(bib_field, str):
         bib_files = [bib_field]

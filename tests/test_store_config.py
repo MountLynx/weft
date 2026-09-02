@@ -99,3 +99,27 @@ def test_figures_yaml_non_utf8_is_parse_error(tmp_path):
     (tmp_path / "metadata" / "figures.yaml").write_bytes(b"fig-01: \xb0\xc2\n")
     project, diagnostics = load_project(tmp_path)
     assert [d.code for d in diagnostics] == ["E-PARSE"]
+
+
+def test_assemble_mode_defaults_strict(tmp_path):
+    make_minimal_project(tmp_path)
+    project, diagnostics = load_project(tmp_path)
+    assert diagnostics == []
+    assert project.assemble_mode == "strict"
+
+
+def test_assemble_mode_lenient_loaded(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"assemble_mode": "lenient"})
+    project, diagnostics = load_project(tmp_path)
+    assert diagnostics == []
+    assert project.assemble_mode == "lenient"
+
+
+def test_assemble_mode_invalid_is_parse_error(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"assemble_mode": "bogus"})
+    _, diagnostics = load_project(tmp_path)
+    parse = [d for d in diagnostics if d.code == "E-PARSE"]
+    assert len(parse) == 1
+    assert parse[0].field == "assemble_mode"

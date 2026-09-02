@@ -164,3 +164,31 @@ def draft(
         f"（{len(paragraphs)} 段，run={result.run_id}）")
     if warnings:
         _print_diagnostics(warnings)
+
+
+@app.command()
+def assemble(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录")) -> None:
+    """拼装已批准草稿 → generated/…/part-NN.qmd 与 chapter 级合并 qmd。
+
+    纯脚本无 LLM（v1.1 §4.4）；strict/lenient 经 weft.yaml assemble_mode 配置。
+    """
+    from weft.assemble import assemble_project
+
+    project, load_diags = load_project(project_dir)
+    diagnostics = load_diags + validate_project(project)
+    if any(d.is_error for d in diagnostics):
+        _print_diagnostics(diagnostics)
+        typer.echo("—— 校验存在错误，拒绝拼装")
+        raise typer.Exit(code=1)
+    try:
+        written, asm_diags = assemble_project(project, mode=project.assemble_mode)
+    except OSError as exc:
+        typer.echo(f"ERROR 无法写入 generated/：{exc}")
+        raise typer.Exit(code=1) from exc
+    for path in written:
+        typer.echo(f"已写入 {path.relative_to(project.root).as_posix()}")
+    errors = [d for d in asm_diags if d.is_error]
+    if errors:
+        _print_diagnostics(errors)
+        typer.echo(f"—— {len(errors)} 个 part 拼装失败（strict 模式）")
+        raise typer.Exit(code=1)
