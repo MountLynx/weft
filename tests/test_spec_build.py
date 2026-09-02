@@ -215,3 +215,31 @@ def test_temperature_follows_workflow():
         Node(id="para-01-01", purpose="describe", uses=[], status="approved")])
     tasklist = build_tasklist(build_spec(_project(), part, "methods"), align=False)
     assert tasklist.tasks["p01"].temperature == 0.2
+
+
+def test_param_bundle_guards_unapproved_or_dangling_method():
+    # §3.10：param 内嵌的 method 概要只读 approved；draft/悬空一律空串兜底
+    project = _project_with_methods()
+    project.methods["m-draft"] = MethodCard(id="m-draft", statement="草稿法",
+                                            protocol="草稿协议", status="draft")
+    project.params["p-draft"] = ParamCard(id="p-draft", method="m-draft",
+                                          values={"x": "1"}, status="approved")
+    project.params["p-dangling"] = ParamCard(id="p-dangling", method="ghost",
+                                             values={"y": "2"}, status="approved")
+    assert entity_bundle(project, "p-draft")["method"] == {
+        "id": "m-draft", "statement": "", "protocol": ""}
+    assert entity_bundle(project, "p-dangling")["method"] == {
+        "id": "ghost", "statement": "", "protocol": ""}
+
+
+def test_preceding_alias_accumulates_across_ticks():
+    # 前文别名逐 tick 累积：p03 同时引用 p01 与 p02（"\n".join 逻辑）
+    part = NarrativePart(id="sec-01", section="R", nodes=[
+        Node(id="para-01-01", purpose="describe", uses=[], status="approved"),
+        Node(id="para-01-02", purpose="interpret", uses=[], status="approved"),
+        Node(id="para-01-03", purpose="discuss", uses=[], status="approved")])
+    tasklist = build_tasklist(build_spec(_project(), part), align=False)
+    p03 = tasklist.tasks["p03"]
+    assert p03.inputs == {"p01": "p01", "p02": "p02"}
+    assert "{p01}" in p03.prompt
+    assert "{p02}" in p03.prompt

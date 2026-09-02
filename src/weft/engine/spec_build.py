@@ -55,6 +55,8 @@ def entity_bundle(project: Project, entity_id: str) -> dict:
     if entity_id in project.params:
         param = project.params[entity_id]
         method = project.methods.get(param.method)
+        if method is not None and method.status != "approved":
+            method = None   # §3.10：未审 method 的 protocol 不得进 prompt
         return {
             "id": entity_id, "kind": "param",
             "values": dict(param.values),
