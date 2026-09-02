@@ -2,6 +2,7 @@
 from pathlib import Path
 
 import frontmatter
+import pytest
 
 from weft.migrations.v1_1 import migrate_narrative_tree
 
@@ -62,3 +63,15 @@ def test_migration_is_idempotent(tmp_path):
 
 def test_migration_no_narrative_dir_is_noop(tmp_path):
     assert migrate_narrative_tree(tmp_path) == []
+
+
+def test_migration_conflicting_target_raises(tmp_path):
+    work = _v1_project(tmp_path)
+    edited_dir = work / "narrative" / "03-results"
+    edited_dir.mkdir()
+    edited_text = "---\nid: sec-03\n---\n\n人工编辑版。\n"
+    (edited_dir / "part-01.md").write_text(edited_text, encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        migrate_narrative_tree(work)
+    assert (work / "narrative" / "03-results.md").exists()
+    assert (edited_dir / "part-01.md").read_text(encoding="utf-8") == edited_text
