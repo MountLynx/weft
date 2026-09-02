@@ -37,7 +37,6 @@
 
 - 断点续跑/回滚接入 CLI（复用 SpecModule 原生能力）。
 - 溯源注释完善、`weft init` 项目模板与文档。
-- 真实 LLM 冒烟测试（pytest marker 默认跳过）。
 
 ## 扩展场景（M4 后，架构已预留）
 

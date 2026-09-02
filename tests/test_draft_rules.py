@@ -110,3 +110,43 @@ def test_draft_rule_error_str_and_diagnostic():
     err = DraftRuleError(diag)
     assert err.diagnostic is diag
     assert str(err) == f"[{diag.code}] {diag.path} 字段 {diag.field}: {diag.message}"
+
+
+def test_rule1_prose_cite_not_in_bib():
+    diags = check_node_draft(
+        {"paragraph": "结果 [@fact-01] 支持……", "uses": [], "cites": ["key2020"]},
+        _node(), _project(), SEC)
+    assert [d.code for d in diags] == ["E-CITE-NOT-IN-BIB"]
+    assert diags[0].field.endswith("paragraph")
+
+
+def test_rule2_prose_cite_not_in_claim_cites_is_warning():
+    diags = check_node_draft(
+        {"paragraph": "如 [@keyother] 所示。", "uses": [], "cites": []},
+        _node(), _project(bib=("key2020", "keyother")), SEC)
+    assert [d.code for d in diags] == ["W-CITE-NOT-IN-CLAIM"]
+    assert diags[0].field.endswith("paragraph")
+
+
+def test_prose_and_structured_cite_dedup():
+    diags = check_node_draft(
+        {"paragraph": "见 [@nokey]。", "uses": [], "cites": ["nokey"]},
+        _node(), _project(), SEC)
+    assert [d.code for d in diags] == ["E-CITE-NOT-IN-BIB"]   # 单条诊断
+
+
+def test_multi_cite_bracket_form_supported():
+    diags = check_node_draft(
+        {"paragraph": "见 [@key2020; @keyother]。", "uses": [], "cites": []},
+        _node(), _project(bib=("key2020", "keyother")), SEC)
+    # key2020 ∈ claim-01.cites → 静默通过；仅 keyother 触发 W（正文通道）
+    assert [d.code for d in diags] == ["W-CITE-NOT-IN-CLAIM"]
+    assert "keyother" in diags[0].message
+    assert diags[0].field.endswith("paragraph")
+
+
+def test_bare_crossref_not_flagged():
+    diags = check_node_draft(
+        {"paragraph": "如图 @fig-01a 所示。", "uses": [], "cites": []},
+        _node(), _project(), SEC)
+    assert diags == []
