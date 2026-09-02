@@ -20,6 +20,7 @@ def test_assemble_writes_part_and_chapter_qmd(tmp_path):
     assert result.exit_code == 0, result.output
     assert "generated/01-results/part-01.qmd" in result.output
     assert "generated/01-results.qmd" in result.output
+    assert "已写入 paper.qmd" in result.output
 
 
 def test_assemble_strict_missing_draft_exits_1(tmp_path):

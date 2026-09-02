@@ -125,3 +125,18 @@ def test_assemble_mode_invalid_is_parse_error(tmp_path):
     assert parse[0].field == "assemble_mode"
     # 钉住红线 3 的"安全默认继续"：非法值报诊断后必须回退 strict
     assert project.assemble_mode == "strict"
+
+
+def test_paper_file_defaults_paper_qmd(tmp_path):
+    make_minimal_project(tmp_path)
+    project, diagnostics = load_project(tmp_path)
+    assert diagnostics == []
+    assert project.paper_file == "paper.qmd"
+
+
+def test_paper_file_override(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"paper_file": "manuscript.qmd"})
+    project, diagnostics = load_project(tmp_path)
+    assert diagnostics == []
+    assert project.paper_file == "manuscript.qmd"
