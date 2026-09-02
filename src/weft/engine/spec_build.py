@@ -1,12 +1,13 @@
-"""叙事 part → SpecModule spec + tasklist（通道②，代码确定性构造，spec §6.1/6.2）。
+"""叙事 part → SpecModule spec + tasklist（通道②，代码确定性构造；v1.1 §3.5/§4.4）。
 
 spec 形状：
 {
   "part": {"id", "title"},
+  "workflow": "results",
   "task_nodes": {"p01": "para-01-01", ...},   # tick 名 → node id
   "nodes": {"para-01-01": {"purpose", "logic", "uses", "entities": [bundle, ...]}},
 }
-只收 status: approved 的节点与实体（spec §3.10：生成器只读 approved）。
+只收 status: approved 的节点与实体（§3.10）；uses 目标含 method/param（§3.5）。
 """
 import json
 
@@ -14,6 +15,7 @@ from module_harness import TaskDefinition, Tasklist
 
 from weft.models.narrative import NarrativePart
 from weft.store.project import Project
+from weft.workflow import WORKFLOW_SPECS
 
 
 def tick_name(index: int) -> str:
@@ -21,10 +23,8 @@ def tick_name(index: int) -> str:
 
 
 def entity_bundle(project: Project, entity_id: str) -> dict:
-    """已审阅实体全文 bundle（spec §6.1）；claim 额外带所引 note 的 summary。
-
-    uses 只准引 fact/claim（spec §2）；note 经 claim.cites 间接进入。
-    """
+    """已审阅实体全文 bundle（§6.1）；claim 带所引 note 的 summary；
+    method 带 protocol；param 带 values 与 method 概要（v1.1 §3.5）。"""
     if entity_id in project.facts:
         fact = project.facts[entity_id]
         return {
@@ -44,12 +44,32 @@ def entity_bundle(project: Project, entity_id: str) -> dict:
             "note_summaries": [{"key": k, "summary": project.notes[k].summary}
                                for k in claim.cites if k in project.notes],
         }
-    raise ValueError(f"uses 指向非 fact/claim 实体或不存在：{entity_id}")
+    if entity_id in project.methods:
+        method = project.methods[entity_id]
+        return {
+            "id": entity_id, "kind": "method",
+            "statement": method.statement,
+            "protocol": method.protocol,
+            "derived_from": list(method.derived_from),
+        }
+    if entity_id in project.params:
+        param = project.params[entity_id]
+        method = project.methods.get(param.method)
+        return {
+            "id": entity_id, "kind": "param",
+            "values": dict(param.values),
+            "method": {"id": param.method,
+                       "statement": method.statement if method else "",
+                       "protocol": method.protocol if method else ""},
+        }
+    raise ValueError(f"uses 指向不支持的实体类型或不存在：{entity_id}")
 
 
-def build_spec(project: Project, part: NarrativePart) -> dict:
+def build_spec(project: Project, part: NarrativePart,
+               workflow: str = "results") -> dict:
     def _approved(eid: str) -> bool:
-        for cards in (project.facts, project.claims):
+        for cards in (project.facts, project.claims, project.methods,
+                      project.params):
             card = cards.get(eid)
             if card is not None:
                 return card.status == "approved"
@@ -67,36 +87,47 @@ def build_spec(project: Project, part: NarrativePart) -> dict:
         }
     return {
         "part": {"id": part.id, "title": part.section},
+        "workflow": workflow,
         "task_nodes": {tick_name(i): n.id for i, n in enumerate(approved)},
         "nodes": nodes,
     }
 
 
-def _para_prompt(node_spec: dict) -> str:
-    """Layer 3（prompt_extra，追加语义）：本节点的要求与实体全文。"""
-    return (
+def _para_prompt(node_spec: dict, preceding_ticks: list[str]) -> str:
+    """Layer 3（prompt_extra，追加语义）：节点要求 + 实体全文 + part 内前文。"""
+    prompt = (
         f"节点 purpose：{node_spec['purpose']}\n"
         f"节点 logic：{node_spec['logic'] or '（无）'}\n"
         "可引用的已审阅实体（JSON，只准使用这些）：\n"
         + json.dumps(node_spec["entities"], ensure_ascii=False, indent=1)
     )
+    if preceding_ticks:
+        prompt += ("\n前文已生成的段落（本 part 内，仅供衔接，不得复述）：\n"
+                   + "\n".join(f"{{{t}}}" for t in preceding_ticks))
+    return prompt
 
 
 def build_tasklist(spec: dict, *, align: bool) -> Tasklist:
-    """p01..pNN 顺序链 --> [AL -->] V，flow 多行化（tickflow 每行只允许一条边）。
+    """p01..pNN 顺序链 --> [AL -->] V；part 内前文经 inputs 别名注入（决策 10）。
 
-    harness 层配置（prompt_core 等）在 run.py 注册；这里只给任务级覆盖。
+    harness 层配置（prompt_core 等）在 run.py 按工作流注册；这里给任务级
+    温度与 inputs 覆盖。flow 多行化（tickflow 起始标记行只允许一条边）。
     """
+    temperature = WORKFLOW_SPECS[spec.get("workflow", "results")]["temperature"]
     ticks = list(spec["task_nodes"])
     tasks: dict[str, TaskDefinition] = {}
-    for tick in ticks:
+    for i, tick in enumerate(ticks):
         node_spec = spec["nodes"][spec["task_nodes"][tick]]
-        tasks[tick] = TaskDefinition(
+        preceding = ticks[:i]
+        kwargs: dict = dict(
             type="harness", harness="draft_para",
-            prompt=_para_prompt(node_spec),
+            prompt=_para_prompt(node_spec, preceding),
             outputformat={"type": "json_object"},
-            temperature=0.3,
+            temperature=temperature,
         )
+        if preceding:
+            kwargs["inputs"] = {t: t for t in preceding}
+        tasks[tick] = TaskDefinition(**kwargs)
     if align:
         aliases = {f"d{i + 1}": tick for i, tick in enumerate(ticks)}
         tasks["AL"] = TaskDefinition(

@@ -5,7 +5,14 @@ from module_harness import HarnessConfig, HarnessRegistry, OutputFormat, Tasklis
 
 from tests.helpers import build_project
 from weft.engine.spec_build import build_spec, build_tasklist, entity_bundle
-from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
+from weft.models.cards import (
+    ClaimCard,
+    DataCard,
+    FactCard,
+    MethodCard,
+    NoteCard,
+    ParamCard,
+)
 from weft.models.narrative import NarrativePart, Node, Use
 
 
@@ -137,3 +144,74 @@ def test_tasklist_passes_real_validator():
     tasklist = build_tasklist(build_spec(_project(), section), align=True)
     errors = TasklistValidator.validate(tasklist, _stub_registry())
     assert errors == []
+
+
+def _part():
+    approved = Node(id="para-01-01", purpose="describe",
+                    uses=[Use(id="fact-01", role="evidence"),
+                          Use(id="claim-01", role="conclusion")],
+                    logic="先主结果", status="approved")
+    draft = Node(id="para-01-02", purpose="interpret", uses=[], status="draft")
+    return NarrativePart(id="sec-01", section="Results",
+                         nodes=[approved, draft])
+
+
+def _project_with_methods():
+    project = _project()
+    project.methods["qpcr"] = MethodCard(id="qpcr", statement="qPCR 定量",
+                                         protocol="1. 提取 DNA\n2. 体系配置与扩增",
+                                         status="approved")
+    project.params["qpcr-main"] = ParamCard(id="qpcr-main", method="qpcr",
+                                            values={"instrument": "QuantStudio 5"},
+                                            status="approved")
+    return project
+
+
+def test_entity_bundle_method_carries_protocol():
+    bundle = entity_bundle(_project_with_methods(), "qpcr")
+    assert bundle == {"id": "qpcr", "kind": "method", "statement": "qPCR 定量",
+                      "protocol": "1. 提取 DNA\n2. 体系配置与扩增",
+                      "derived_from": []}
+
+
+def test_entity_bundle_param_carries_values_and_method_summary():
+    # §3.3：method.protocol + param.values 一起进 prompt——param bundle 内嵌 method 概要
+    bundle = entity_bundle(_project_with_methods(), "qpcr-main")
+    assert bundle["kind"] == "param"
+    assert bundle["values"] == {"instrument": "QuantStudio 5"}
+    assert bundle["method"] == {"id": "qpcr", "statement": "qPCR 定量",
+                                "protocol": "1. 提取 DNA\n2. 体系配置与扩增"}
+
+
+def test_build_spec_filters_draft_methods():
+    # §3.10 延续：approved 过滤覆盖 method/param
+    project = _project_with_methods()
+    project.methods["m-draft"] = MethodCard(id="m-draft", statement="草稿",
+                                            protocol="x", status="draft")
+    part = NarrativePart(id="sec-01", section="R", nodes=[
+        Node(id="para-01-01", purpose="describe",
+             uses=[Use(id="m-draft", role="evidence"),
+                   Use(id="qpcr", role="evidence")], status="approved")])
+    node = build_spec(project, part)["nodes"]["para-01-01"]
+    assert [e["id"] for e in node["entities"]] == ["qpcr"]
+
+
+def test_preceding_paragraph_alias_injection():
+    # v1.1 §4.4：part 内前文经 inputs 别名注入后续段落；首段无前文
+    part = NarrativePart(id="sec-01", section="R", nodes=[
+        Node(id="para-01-01", purpose="describe", uses=[], status="approved"),
+        Node(id="para-01-02", purpose="interpret", uses=[], status="approved")])
+    tasklist = build_tasklist(build_spec(_project(), part), align=False)
+    p01, p02 = tasklist.tasks["p01"], tasklist.tasks["p02"]
+    assert "前文" not in p01.prompt
+    assert not p01.inputs
+    assert "{p01}" in p02.prompt
+    assert "仅供衔接，不得复述" in p02.prompt
+    assert p02.inputs == {"p01": "p01"}
+
+
+def test_temperature_follows_workflow():
+    part = NarrativePart(id="sec-01", section="M", nodes=[
+        Node(id="para-01-01", purpose="describe", uses=[], status="approved")])
+    tasklist = build_tasklist(build_spec(_project(), part, "methods"), align=False)
+    assert tasklist.tasks["p01"].temperature == 0.2
