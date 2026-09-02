@@ -31,3 +31,4 @@ class Project:
     part_paths: dict[str, Path] = field(default_factory=dict)   # part id -> 相对路径
     part_chapters: dict[str, str] = field(default_factory=dict)  # part id -> 第一级目录名
     assemble_mode: str = "strict"         # weft.yaml assemble_mode：strict | lenient
+    paper_file: str = "paper.qmd"         # weft.yaml paper_file：拼装产物文件名（M3 设计 §1）

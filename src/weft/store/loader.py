@@ -239,6 +239,8 @@ def _load_config(root: Path, project: Project, diagnostics: list[Diagnostic]) ->
                                       "assemble_mode 必须是 strict 或 lenient"))
         project.assemble_mode = "strict"
 
+    project.paper_file = str(weft_cfg.get("paper_file", "paper.qmd"))
+
     bib_field = quarto.get("bibliography")
     if isinstance(bib_field, str):
         bib_files = [bib_field]
