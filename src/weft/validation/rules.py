@@ -8,6 +8,7 @@ from __future__ import annotations
 from weft.diagnostics import Diagnostic, Level
 from weft.graphgen.index import build_index
 from weft.store.project import Project
+from weft.workflow import WORKFLOW_VOCAB
 
 PURPOSE_VOCAB = {"describe", "interpret", "compare", "transition"}
 ROLE_VOCAB = {"evidence", "conclusion", "comparison", "background", "counterpoint"}
@@ -229,6 +230,17 @@ def _check_vocab(project: Project) -> list[Diagnostic]:
     return out
 
 
+def _check_workflow(project: Project) -> list[Diagnostic]:
+    out: list[Diagnostic] = []
+    for part in project.parts:
+        if part.workflow and part.workflow not in WORKFLOW_VOCAB:
+            out.append(Diagnostic(
+                Level.ERROR, "E-WORKFLOW-UNKNOWN",
+                project.part_paths[part.id].as_posix(), "workflow",
+                f"workflow 不在词表 {sorted(WORKFLOW_VOCAB)}：{part.workflow}"))
+    return out
+
+
 def validate_project(project: Project) -> list[Diagnostic]:
     """交叉校验，返回错误在前（按路径/码排序）的全部诊断。"""
     diagnostics: list[Diagnostic] = []
@@ -243,6 +255,7 @@ def validate_project(project: Project) -> list[Diagnostic]:
     diagnostics += _check_notes_summary(project)
     diagnostics += _check_note_cards_exist(project)
     diagnostics += _check_vocab(project)
+    diagnostics += _check_workflow(project)
 
     order = {Level.ERROR: 0, Level.WARNING: 1}
     diagnostics.sort(key=lambda d: (order[d.level], d.path, d.code, d.field or ""))

@@ -144,3 +144,11 @@ def test_derived_from_not_in_bib_is_error():
     assert [d.code for d in _errors(diagnostics)] == \
         ["E-DERIVED-FROM-NOT-IN-BIB", "E-DERIVED-FROM-NOT-IN-BIB"]
     assert {d.field for d in _errors(diagnostics)} == {"derived_from"}
+
+
+def test_unknown_explicit_workflow_is_error():
+    part = NarrativePart(id="sec-01", section="T", workflow="resuls", nodes=[])
+    project = build_project(parts=[part])
+    diagnostics = validate_project(project)
+    assert _one_error_code(diagnostics) == "E-WORKFLOW-UNKNOWN"
+    assert _errors(diagnostics)[0].field == "workflow"

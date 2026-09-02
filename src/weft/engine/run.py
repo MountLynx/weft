@@ -27,17 +27,9 @@ from weft.engine.draft_rules import (
 from weft.engine.spec_build import build_spec, build_tasklist
 from weft.models.narrative import NarrativePart
 from weft.store.project import Project
+from weft.workflow import WORKFLOW_SPECS
 
-DRAFT_PARA_CORE = (
-    "你是学术写作引擎 weft 的行文器。依据任务提示给出的已审阅实体与节点要求，"
-    "写出一节论文中的一段正文（中文，学术论文语体）。\n"
-    "硬性约束：\n"
-    "1. 只准使用任务提示中列出的实体及其内容；不得引入任何未给出的数据、观点或结论。\n"
-    "2. 不得改写、编造实体卡的任何字段值。\n"
-    "3. 引文标注只准使用实体 bundle 给出的 bib key，以 [@key] 形式写在句尾。\n"
-    '输出 JSON（且仅输出 JSON，无其它文本）：'
-    '{"paragraph": "段落正文", "uses": ["引用的实体 id"], "cites": ["key"]}'
-)
+DRAFT_PARA_CORE = WORKFLOW_SPECS["results"]["prompt_core"]
 
 
 @dataclass
