@@ -29,11 +29,16 @@ def test_cited_without_cites_warns():
 def test_rejected_claim_skips_warnings_but_not_errors():
     claims = [ClaimCard(id="claim-01", claim_type="cited", statement="s",
                         cites=["ghostkey"], status="rejected")]
-    project = build_project(claims=claims, bib_keys=set())
+    methods = [MethodCard(id="m-01", statement="s", protocol="p",
+                          derived_from=["ghostkey"], status="rejected")]
+    project = build_project(claims=claims, methods=methods, bib_keys=set())
     diagnostics = validate_project(project)
     assert "W-CLAIM-CITED-NO-CITES" not in _codes(diagnostics)
     # 错误不受 rejected 豁免（设计决策 2）
     assert "E-CITES-NOT-IN-BIB" in _codes(diagnostics)
+    assert "E-DERIVED-FROM-NOT-IN-BIB" in _codes(diagnostics)
+    # rejected 卡零 W 痕迹：W-NOTE-MISSING/W-ORPHAN 均跳过 rejected
+    assert not [d for d in diagnostics if not d.is_error]
 
 
 def test_rejected_suppression_scoped_to_card_across_rules(tmp_path):
@@ -201,17 +206,20 @@ def test_diagnostics_sorted_errors_first_by_path():
 
 
 def test_derived_from_without_note_card_warns():
-    # §3.4：derived_from key 在 bib 但无 note 卡 → W-NOTE-MISSING（复用码）
+    # §3.4：derived_from key 在 bib 但无 note 卡 → W-NOTE-MISSING（复用码）；
+    # method 与 param 两通道各报一条（param 块无覆盖会漏检）
     project = build_project(
         methods=[MethodCard(id="qpcr", statement="s", protocol="p",
                             derived_from=["tang2025"], status="approved")],
-        params=[ParamCard(id="qpcr-main", method="qpcr", status="approved")],
+        params=[ParamCard(id="qpcr-main", method="qpcr",
+                          derived_from=["tang2025"], status="approved")],
         bib_keys={"tang2025"})
     diagnostics = validate_project(project)
     warn = [d for d in diagnostics if d.code == "W-NOTE-MISSING"]
-    assert len(warn) == 1
-    assert warn[0].field == "derived_from"
-    assert "tang2025" in warn[0].message
+    assert len(warn) == 2
+    assert {d.path for d in warn} == {"metadata/qpcr.md", "metadata/qpcr-main.md"}
+    assert {d.field for d in warn} == {"derived_from"}
+    assert all("tang2025" in d.message for d in warn)
 
 
 def test_method_orphan_warns_and_param_reach_saves_method():
