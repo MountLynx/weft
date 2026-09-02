@@ -40,3 +40,16 @@ def test_scripted_broken_flag_returns_non_json():
 
 def test_make_client_mock_returns_scripted():
     assert isinstance(make_client(mock=True), ScriptedLLMClient)
+
+
+def test_make_client_real_failure_wraps_draft_error(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)   # 空目录：无 config.json → from_env 报 ValueError
+    with pytest.raises(DraftError) as excinfo:
+        make_client(mock=False)
+    assert "真实 LLM 客户端构造失败" in str(excinfo.value)
+
+
+def test_align_routing_keyword_matches_builtin_prompt():
+    from module_harness.align import ALIGN_CHECK_CONFIG
+
+    assert "你是对齐检查器" in ALIGN_CHECK_CONFIG.prompt_core

@@ -5,6 +5,7 @@
 故自实现同协议假客户端：complete(**kwargs) → llm.client.LLMResponse。
 """
 import json
+from pathlib import Path
 
 from llm.client import LLMResponse
 
@@ -31,7 +32,7 @@ class ScriptedLLMClient:
     async def complete(self, **kwargs) -> LLMResponse:
         prompt = kwargs.get("prompt") or ""
         self.prompts.append(prompt)
-        if "对齐检查器" in prompt:
+        if "你是对齐检查器" in prompt:
             content = json.dumps({"aligned": True, "suggestions": ""})
         elif self.broken:
             content = "这不是 JSON"
@@ -42,13 +43,17 @@ class ScriptedLLMClient:
         return LLMResponse(content=content, usage={}, finish_reason="end_turn")
 
 
-def make_client(mock: bool):
-    """mock=True → ScriptedLLMClient；否则真实客户端（失败转 DraftError/E-DRAFT-FAILED）。"""
+def make_client(mock: bool, project_root: Path | None = None):
+    """mock=True → ScriptedLLMClient；否则真实客户端（失败转 DraftError/E-DRAFT-FAILED）。
+
+    project_root：config.json / .env / rules.txt 的候选根（SpecModule 回退链最高优先），
+    None 时由 LLMConfig.from_env 回退到 Path.cwd()。
+    """
     if mock:
         return ScriptedLLMClient()
     try:
         from llm import LLMConfig, create_llm_client
 
-        return create_llm_client(LLMConfig.from_env())
+        return create_llm_client(LLMConfig.from_env(project_root=project_root))
     except Exception as exc:
-        raise DraftError(f"真实 LLM 客户端构造失败（检查 .env / 环境变量）：{exc}") from exc
+        raise DraftError(f"真实 LLM 客户端构造失败（检查 config.json / .env）：{exc}") from exc
