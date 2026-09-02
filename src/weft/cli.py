@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-from weft.diagnostics import Diagnostic
+from weft.diagnostics import Diagnostic, Level
 from weft.graphgen.writer import write_outputs
 from weft.store.loader import load_project
 from weft.store.project import Project
@@ -105,3 +105,51 @@ def review(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目
         _print_diagnostics(load_diags)
         raise typer.Exit(code=1)
     _print_review(project)
+
+
+@app.command()
+def draft(
+    section_id: str = typer.Argument(..., help="叙事节 id，如 sec-03"),
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+    mock: bool = typer.Option(False, "--mock", help="免 key 假客户端（管线冒烟）"),
+    no_align: bool = typer.Option(False, "--no-align", help="跳过对齐检查节点"),
+) -> None:
+    """对指定叙事节执行生成（SpecModule run），产物写入 drafts/<section>.md。"""
+    from weft.engine import DraftError, DraftRuleError, make_client, run_draft
+    from weft.engine.drafts import render_draft_markdown, write_draft
+
+    project, load_diags = load_project(project_dir)
+    diagnostics = load_diags + validate_project(project)
+    if any(d.is_error for d in diagnostics):
+        _print_diagnostics(diagnostics)
+        typer.echo("—— 校验存在错误，拒绝生成")
+        raise typer.Exit(code=1)
+
+    section = next((s for s in project.sections if s.id == section_id), None)
+    if section is None:
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-SECTION-NOT-FOUND", ".", None,
+            f"叙事节 {section_id} 不存在")])
+        raise typer.Exit(code=1)
+    if not any(n.status == "approved" for n in section.nodes):
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-NOTHING-TO-DRAFT",
+            project.section_paths[section.id].as_posix(), None,
+            f"节 {section_id} 内没有 status: approved 的叙事节点")])
+        raise typer.Exit(code=1)
+
+    try:
+        client = make_client(mock, project_root=project.root)
+        result = run_draft(project, section, client=client, align=not no_align)
+    except (DraftRuleError, DraftError) as exc:
+        typer.echo(f"ERROR {exc}")
+        raise typer.Exit(code=1) from exc
+
+    paragraphs = {nid: d["paragraph"] for nid, d in result.drafts_by_node.items()}
+    content = render_draft_markdown(section, paragraphs, result.run_id)
+    path = write_draft(project, section.id, content)
+    for reminder in result.reminders:
+        typer.echo(f"WARN {reminder}")
+    typer.echo(
+        f"已写入 {path.relative_to(project.root).as_posix()}"
+        f"（{len(paragraphs)} 段，run={result.run_id}）")
