@@ -2,6 +2,7 @@
 
 规则 1 为正文级（§4「草稿中」语义）：段落 [@key]（含 [@a; @b] 多引文形式）与
 结构化 cites 双通道合并校验 bib 归属；裸 @id 交叉引用（无方括号）不在规则内。
+workflow=methods 裁剪引文规则 1/2（v1.1 §4.3）：方法章不写文献引注。
 纯函数、不 import specmodule：从 harness JSON dict 到诊断的映射可独立单测。
 硬规则违规由 V 脚本转成 DraftRuleError 上抛（拒绝生成）；软提醒收集带回。
 DraftError 与 DraftRuleError 集中在此定义，clients/run 复用（避免循环依赖）。
@@ -52,17 +53,29 @@ def parse_node_draft(value: object, node_id: str,
 
 
 def check_node_draft(draft: dict, node: Node, project: Project,
-                     part_id: str) -> list[Diagnostic]:
-    """规则 1/2/3。返回诊断列表；硬规则（ERROR）由调用方 raise DraftRuleError。"""
+                     part_id: str, workflow: str = "results") -> list[Diagnostic]:
+    """规则 1/2/3 + 参数存在性（§4.3：methods 裁剪引文规则、保留 uses 越界）。
+
+    返回诊断列表；硬规则（ERROR）由调用方 raise DraftRuleError。
+    """
     diags: list[Diagnostic] = []
     uses = [u.id for u in node.uses]
-    # 规则 3（硬）：草稿标注引用的实体 id ⊆ 节点 uses
+    # 规则 3（硬，全工作流）：草稿标注引用的实体 id ⊆ 节点 uses
     # get 缺省空表：形状校验放行过的缺键草稿（仅 paragraph）不应 KeyError
     for eid in draft.get("uses", []):
         if eid not in uses:
             diags.append(_diag("E-USES-BEYOND-NODE", node.id, part_id, "uses",
                                f"草稿标注实体 {eid} 不在本节点 uses"
                                f"（{', '.join(uses) or '空'}）"))
+    # 参数存在性（硬，全工作流；§4.3 校验裁剪保留项）
+    for uid in uses:
+        param = project.params.get(uid)
+        if param is not None and not param.values:
+            diags.append(_diag("E-PARAM-NO-VALUES", node.id, part_id, "uses",
+                               f"使用的 param 卡 {uid} 没有任何 values"))
+    if workflow == "methods":
+        # §4.3：methods 裁剪引文规则 1/2（方法章不写文献引注）
+        return diags
     # 本节点所用 claim 的 cites 并集（规则 2 的允许集）
     claim_cites: set[str] = set()
     for uid in uses:
@@ -75,8 +88,8 @@ def check_node_draft(draft: dict, node: Node, project: Project,
     cite_fields: list[tuple[str, str]] = []
     seen: set[str] = set()
     for group in re.findall(r"\[@([^\]]+)\]", draft.get("paragraph", "")):
-        for part in group.split(";"):
-            key = part.strip().lstrip("@")
+        for part_key in group.split(";"):
+            key = part_key.strip().lstrip("@")
             if key and key not in seen:
                 seen.add(key)
                 cite_fields.append((key, "paragraph"))

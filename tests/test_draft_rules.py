@@ -7,7 +7,7 @@ from weft.engine.draft_rules import (
     check_node_draft,
     parse_node_draft,
 )
-from weft.models.cards import ClaimCard
+from weft.models.cards import ClaimCard, ParamCard
 from weft.models.narrative import Node, Use
 
 SEC = "sec-01"
@@ -149,4 +149,41 @@ def test_bare_crossref_not_flagged():
     diags = check_node_draft(
         {"paragraph": "如图 @fig-01a 所示。", "uses": [], "cites": []},
         _node(), _project(), SEC)
+    assert diags == []
+
+
+def test_methods_workflow_skips_citation_rules():
+    # §4.3：methods 裁剪规则 1/2；正文里的 [@ghost] 也不拦
+    diags = check_node_draft(
+        {"paragraph": "p [@ghost2020]", "uses": [], "cites": ["nokey"]},
+        _node(), _project(), SEC, workflow="methods")
+    assert diags == []
+
+
+def test_results_workflow_keeps_citation_rules():
+    diags = check_node_draft({"paragraph": "p", "uses": [], "cites": ["nokey"]},
+                             _node(), _project(), SEC, workflow="results")
+    assert [d.code for d in diags] == ["E-CITE-NOT-IN-BIB"]
+
+
+def test_used_param_without_values_is_error():
+    # §4.3 校验裁剪保留项：参数存在性（全工作流）
+    project = build_project(
+        claims=[ClaimCard(id="claim-01", claim_type="cited", statement="s",
+                          cites=["key2020"], status="approved")],
+        params=[ParamCard(id="qpcr-main", method="qpcr", values={},
+                          status="approved")],
+        bib_keys={"key2020"})
+    diags = check_node_draft({"paragraph": "p", "uses": [], "cites": []},
+                             _node(uses=("qpcr-main",)), project, SEC)
+    assert [d.code for d in diags] == ["E-PARAM-NO-VALUES"]
+    assert diags[0].level is Level.ERROR
+
+
+def test_used_param_with_values_passes():
+    project = build_project(
+        params=[ParamCard(id="qpcr-main", method="qpcr",
+                          values={"instrument": "QS5"}, status="approved")])
+    diags = check_node_draft({"paragraph": "p", "uses": [], "cites": []},
+                             _node(uses=("qpcr-main",)), project, SEC)
     assert diags == []

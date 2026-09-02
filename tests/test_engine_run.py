@@ -5,7 +5,7 @@ from tests.helpers import build_project
 from weft.engine.clients import ScriptedLLMClient
 from weft.engine.draft_rules import DraftRuleError
 from weft.engine.run import DraftError, run_draft
-from weft.models.cards import ClaimCard, FactCard
+from weft.models.cards import ClaimCard, FactCard, MethodCard, ParamCard
 from weft.models.narrative import NarrativePart, Node, Use
 
 SEC = "sec-01"
@@ -99,3 +99,40 @@ def test_run_draft_nothing_to_draft():
     with pytest.raises(DraftError) as excinfo:
         run_draft(_project(), section, client=ScriptedLLMClient())
     assert "E-NOTHING-TO-DRAFT" in str(excinfo.value)
+
+
+def test_run_draft_methods_workflow_routes_prompt_and_skips_cites():
+    project = build_project(
+        methods=[MethodCard(id="qpcr", statement="qPCR 定量", protocol="1. 提取",
+                            status="approved")],
+        params=[ParamCard(id="qpcr-main", method="qpcr",
+                          values={"instrument": "QS5"}, status="approved")],
+        bib_keys=set())
+    part = NarrativePart(id=SEC, section="Methods", nodes=[
+        Node(id="para-01-01", purpose="describe",
+             uses=[Use(id="qpcr-main", role="evidence")], status="approved")])
+    client = ScriptedLLMClient(cites=["ghost2020"])
+    result = run_draft(project, part, client=client, align=False,
+                       workflow="methods")
+    assert result.reminders == []                 # methods 裁剪引文规则
+    assert "操作协议" in client.prompts[0]        # methods prompt_core 路由
+    assert "1. 提取" in client.prompts[0]         # param bundle 内嵌 method 概要
+
+
+def test_run_draft_results_workflow_keeps_cite_reminder():
+    # ghost2020 在 bib（规则 1 过）但不在 claim cites（规则 2 提醒）——
+    # results 工作流保留软提醒（对照 methods 版本：同一 ghost cite 静默通过）。
+    client = ScriptedLLMClient(cites=["ghost2020"])
+    result = run_draft(_project(bib=("key2020", "ghost2020")),
+                       _section(n_approved=1),
+                       client=client, align=False, workflow="results")
+    assert any("W-CITE-NOT-IN-CLAIM" in r for r in result.reminders)
+
+
+def test_run_draft_passes_preceding_paragraph_to_successor():
+    # Task 7 评审约定：前文 JSON 经 view 注入的端到端证据——p02 渲染后的
+    # prompt 里应出现 p01 的输出文本（ScriptedLLMClient 收到的已是渲染后 prompt）
+    client = ScriptedLLMClient()
+    run_draft(_project(), _section(n_approved=2), client=client, align=False)
+    assert len(client.prompts) == 2
+    assert "（mock 段落）正文。" in client.prompts[1]

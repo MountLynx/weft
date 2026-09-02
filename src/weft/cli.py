@@ -117,6 +117,7 @@ def draft(
     """对指定叙事 part 执行生成（SpecModule run），产物写入 drafts/<part>.md。"""
     from weft.engine import DraftError, DraftRuleError, make_client, run_draft
     from weft.engine.drafts import render_draft_markdown, write_draft
+    from weft.workflow import resolve_workflow
 
     project, load_diags = load_project(project_dir)
     diagnostics = load_diags + validate_project(project)
@@ -142,7 +143,9 @@ def draft(
 
     try:
         client = make_client(mock, project_root=project.root)
-        result = run_draft(project, part, client=client, align=not no_align)
+        result = run_draft(project, part, client=client, align=not no_align,
+                           workflow=resolve_workflow(part,
+                                                     project.part_chapters[part.id]))
     except (DraftRuleError, DraftError) as exc:
         typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc
