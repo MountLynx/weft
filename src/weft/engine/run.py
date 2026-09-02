@@ -111,7 +111,9 @@ def run_draft(project: Project, section: NarrativeSection, *, client,
         stream_log=False,
     )
     try:
-        firings = asyncio.run(module.run())
+        # 显式 max_ticks 上限：默认 100 会让 >99 节点的节静默耗尽 tick，
+        # V/AL 不触发 = 校验被绕过；链式 flow 实际需 N+2 tick，留足余量。
+        firings = asyncio.run(module.run(max_ticks=len(tick_by_node) + 10))
     except DraftRuleError:
         raise
     except Exception as exc:
@@ -133,7 +135,9 @@ def run_draft(project: Project, section: NarrativeSection, *, client,
         if firing.node in tick_by_node and isinstance(firing.output, dict):
             result.drafts_by_node[tick_by_node[firing.node]] = firing.output
         elif firing.node == "AL" and isinstance(firing.output, dict):
-            if firing.output.get("aligned") is False:
+            # json_object 只保证是对象、不保证 schema：aligned 缺失/非布尔
+            # 一律视为未通过（fail-closed），不得静默放行对齐闸门。
+            if firing.output.get("aligned") is not True:
                 raise DraftError(
                     f"[E-DRAFT-FAILED] 对齐检查未通过：{firing.output.get('suggestions', '')}")
         elif firing.node == "V" and isinstance(firing.output, dict):

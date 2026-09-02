@@ -4,7 +4,7 @@ import pytest
 from tests.helpers import build_project
 from weft.engine.clients import ScriptedLLMClient
 from weft.engine.draft_rules import DraftRuleError
-from weft.engine.run import run_draft
+from weft.engine.run import DraftError, run_draft
 from weft.models.cards import ClaimCard, FactCard
 from weft.models.narrative import NarrativeSection, Node, Use
 
@@ -73,3 +73,29 @@ def test_run_draft_without_align_skips_align_node():
     client = ScriptedLLMClient()
     run_draft(_project(), _section(n_approved=1), client=client, align=False)
     assert not any("对齐检查器" in p for p in client.prompts)
+
+
+def test_run_draft_infrastructure_failure_wraps_draft_error():
+    from llm.client import LLMError
+
+    class _DeadClient:
+        async def complete(self, **kwargs):
+            raise LLMError("网络超时")
+
+    with pytest.raises(DraftError) as excinfo:
+        run_draft(_project(), _section(n_approved=1), client=_DeadClient())
+    assert "E-DRAFT-FAILED" in str(excinfo.value)
+
+
+def test_run_draft_align_rejection_fails_run():
+    client = ScriptedLLMClient(aligned=False)
+    with pytest.raises(DraftError) as excinfo:
+        run_draft(_project(), _section(n_approved=1), client=client)
+    assert "对齐检查未通过" in str(excinfo.value)
+
+
+def test_run_draft_nothing_to_draft():
+    section = NarrativeSection(id=SEC, section="Results", order=1, nodes=[])
+    with pytest.raises(DraftError) as excinfo:
+        run_draft(_project(), section, client=ScriptedLLMClient())
+    assert "E-NOTHING-TO-DRAFT" in str(excinfo.value)

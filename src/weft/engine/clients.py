@@ -22,18 +22,21 @@ class ScriptedLLMClient:
 
     def __init__(self, paragraph: str = "（mock 段落）正文。",
                  uses: list[str] | None = None, cites: list[str] | None = None,
-                 broken: bool = False) -> None:
+                 broken: bool = False, aligned: bool = True) -> None:
         self.paragraph = paragraph
         self.uses = list(uses or [])
         self.cites = list(cites or [])
         self.broken = broken
+        self.aligned = aligned
         self.prompts: list[str] = []   # 测试断言 prompt 注入用
 
     async def complete(self, **kwargs) -> LLMResponse:
         prompt = kwargs.get("prompt") or ""
         self.prompts.append(prompt)
         if "你是对齐检查器" in prompt:
-            content = json.dumps({"aligned": True, "suggestions": ""})
+            content = json.dumps(
+                {"aligned": self.aligned,
+                 "suggestions": "" if self.aligned else "段落偏离已审观点"})
         elif self.broken:
             content = "这不是 JSON"
         else:
