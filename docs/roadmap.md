@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-**M2 生成层已完成并合入 main（2026-09-02）**：`engine/` 适配层（specmodule==0.1.4，通道②直构 tasklist，零残留嵌入）+ `weft draft <section>` 单章节端到端生成到 `drafts/`，含生成时三规则闸门、对齐检查（`--no-align` 可关）、溯源注释；免 key `ScriptedLLMClient` 管线测试全绿，真实 LLM 冒烟以 `pytest -m smoke` 显式运行。M1 数据层（97 测试）已于同日合入。下一步进入 M3 渲染层。
+**v1.1 增补已实现并合入 main（2026-09-02）**：method/param 卡（methods/params 目录、全局 id 命名空间、derived_from 校验）、narrative 目录树（chapter/part，order 退役，迁移脚本 `python -m weft.migrations.v1_1`）、workflow 路由（introduction/methods/results/discussion 四套 prompt 与温度，methods 裁剪引文规则）、part 内前文传递、`weft assemble`（part qmd + chapter 合并 + heading 层级映射，strict/lenient）。M3 渲染层剩余：图表落点插入与 `weft render`。
 
 ## M1 数据层 ✅（2026-09-02 合入 main）
 
@@ -27,11 +27,11 @@
 - 验收路径：单章节（03-results + 04-discussion）端到端生成；先 `MockLLMClient`（无 key 可测）后真实 LLM。
 - CLI：`weft draft <section>`，`--mock` 免 key 管线冒烟、`--no-align` 跳过对齐；生成前强校验闸门（有错误即拒绝）。
 
-## M3 渲染层 ⬜
+## M3 渲染层 🔨
 
-- `assemble/`：按 nodes 顺序拼装已批准草稿 → `generated/<section>.qmd`；strict/lenient 模式经 `weft.yaml` 配置（默认 strict）。
-- 图表落点：fact→data→refs 首次出现处插入，图注取自 figures.yaml，crossref 用 Quarto label（`@fig-01a` / `@tbl-01`）；显示形式由 `_quarto.yml` crossref 配置决定。
-- `render.py`：quarto 子进程封装 + CLI `weft render`；打通 卡片→叙事→生成→组装→Quarto 全闭环。
+- `assemble/` ✅（v1.1 §4.4 提前交付）：part qmd 拼装 + chapter 目录序合并 + heading 层级映射；strict/lenient 经 weft.yaml `assemble_mode`（默认 strict）。
+- 图表落点 ⬜：fact→data→refs 首次出现处插入，图注取自 figures.yaml，crossref 用 Quarto label（`@fig-01a` / `@tbl-01`）；显示形式由 `_quarto.yml` crossref 配置决定。
+- `render.py` ⬜：quarto 子进程封装 + CLI `weft render`；打通 卡片→叙事→生成→组装→Quarto 全闭环。
 
 ## M4 打磨 ⬜
 
