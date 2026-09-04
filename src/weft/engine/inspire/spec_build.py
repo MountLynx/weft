@@ -72,11 +72,13 @@ def _review_prompt(digest: str) -> str:
     )
 
 
-def _match_prompt(digest: str) -> str:
+def _match_prompt(inspiration_text: str, digest: str) -> str:
     return (
         "【灵感·匹配】\n"
         "任务：为草案做三类匹配：fact→现有 data 卡关联；claim 的 cited/uncited "
         "分类与文献匹配；占位表述→现有 fact 卡匹配。\n"
+        f"灵感全文（文中 [@key] 形式的显式引用是最强信号：这些 key 必须填入"
+        f"最贴切 claim 的 cites，除非该 key 不在索引中）：\n{inspiration_text}\n"
         f"现有卡片摘要索引：\n{digest}\n"
         "卡片草案（JSON）：\n{t02}\n"
         "审查结论（JSON）：\n{t03}\n"
@@ -89,7 +91,7 @@ def build_inspire_tasklist(inspiration_text: str, digest: str) -> Tasklist:
         "t01": _logic_prompt(inspiration_text),
         "t02": _extract_prompt(inspiration_text),
         "t03": _review_prompt(digest),
-        "t04": _match_prompt(digest),
+        "t04": _match_prompt(inspiration_text, digest),
     }
     tasks: dict[str, TaskDefinition] = {}
     for tick, prompt in prompts.items():

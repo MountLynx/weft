@@ -61,3 +61,13 @@ def test_digest_lists_bib_keys():
     """T4 文献匹配候选源：bib key 必须在索引中（e2e 实测缺失导致全漏配）。"""
     text = build_digest(_full_project())
     assert "== bib ==" in text and "smith2020" in text
+
+
+def test_digest_truncates_long_note_summaries():
+    """真实 bib abstract 每条上千字符——digest 是索引不是全文，摘要截前缀。"""
+    proj = build_project(notes=[NoteCard(id="long2020", summary="很长的摘要" * 300,
+                                         status="approved")])
+    text = build_digest(proj)
+    line = next(ln for ln in text.splitlines() if "long2020" in ln)
+    assert len(line) < 400
+    assert "很长的摘要" in line   # 前缀保留，语义信号够匹配用

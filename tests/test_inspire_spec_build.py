@@ -31,6 +31,9 @@ def test_prompts_carry_markers_content_and_json_format():
     assert "【灵感·卡片拆解】" in p2 and TEXT in p2
     assert "【灵感·现有卡审查】" in p3 and DIGEST in p3 and "{t02}" in p3
     assert "【灵感·匹配】" in p4 and "{t02}" in p4 and "{t03}" in p4
+    # 灵感原文必须进 T4：[@key] 显式引用是文献匹配的最强信号，
+    # T2 拆卡会把标记丢掉（e2e 实测：原文缺席导致显式引用全漏配）
+    assert TEXT in p4
     for t in tl.tasks.values():
         assert t.type == "harness"
         assert t.outputformat == {"type": "json_object"}

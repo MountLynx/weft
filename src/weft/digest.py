@@ -14,6 +14,15 @@ def _joined(values: list[str]) -> str:
     return ",".join(values) if values else "-"
 
 
+def _cap(text: str, limit: int = 240) -> str:
+    """摘要索引只留前缀：digest 是比对索引不是全文（全文在卡片里）。
+
+    真实 Zotero abstract 每条上千字符，全量入索引会撑爆上下文
+    （实测 267 卡 ≈ 41 万字符 ≈ 13.7 万 token）。
+    """
+    return text if len(text) <= limit else text[:limit] + "…"
+
+
 def _fact_line(fid: str, fact: FactCard) -> str:
     return (f"{fid} | {fact.status} | {fact.statement}"
             f" | data={_joined(fact.data)} | supports={_joined(fact.supports)}")
@@ -34,7 +43,7 @@ def build_digest(project: Project) -> str:
         ("fact", [_fact_line(fid, f) for fid, f in sorted(project.facts.items())]),
         ("claim", [_claim_line(cid, c) for cid, c in sorted(project.claims.items())]),
         ("note", [
-            f"{nid} | {n.status} | {n.summary or '（无摘要）'}"
+            f"{nid} | {n.status} | {_cap(n.summary or '（无摘要）')}"
             for nid, n in sorted(project.notes.items())]),
         ("method", [
             f"{mid} | {m.status} | {m.statement}"
