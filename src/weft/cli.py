@@ -277,13 +277,16 @@ def inspire(
 
     text = source.read_text(encoding="utf-8")
     try:
-        result = run_inspire(project, text, client=make_client(mock, project_root=project.root))
+        result = run_inspire(project, text, client=make_client(mock, project_root=project.root),
+                             source=source.name)
         outcome = apply_inspiration(project, source=source, logic=result.logic,
                                     extract=result.extract, review=result.review,
                                     match=result.match)
     except (InspireError, DraftError, ValueError, OSError) as exc:
         typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc
+    if result.resumed:
+        typer.echo("本次为断点续跑：已完成节点取自上次快照（generated/inspirations/.runs/）")
     for path in outcome.written_cards:
         typer.echo(f"已写入 {path.relative_to(project.root).as_posix()}")
     for path in outcome.proposals:

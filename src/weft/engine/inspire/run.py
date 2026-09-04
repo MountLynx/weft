@@ -1,12 +1,19 @@
 """inspire 管线运行层：T1–T4 一次 SpecModule run（inspire 设计 §4）。
 
-零残留嵌入同 M2 决策 3；A1 聚合在 run 层之外（apply.py，计划 D1）。
-失败语义同 M2 决策 14c：harness 失败不流向后继，firings 事后扫描 fail-closed
+A1 聚合在 run 层之外（apply.py，计划 D1）。与 M2 draft 的零残留 fast mode
+不同，inspire 开启 persist（base_dir 指向 generated/inspirations/.runs/，
+weft 受管目录）：每 tick 快照落 run.sqlite，失败后重跑同一灵感经
+Module.resume() 从断点续跑（已执行节点不重算），节点输出经
+load_snapshot_summary 取回。灵感换名即换 module_id，互不干扰。
+
+失败语义同 M2 决策 14c：harness 失败不流向后继，事后扫描 fail-closed
 （failed → E-INSPIRE-SHAPE，aborted / 缺输出 → E-INSPIRE-FAILED）。
 """
 import asyncio
-import uuid
+import re
+import shutil
 from dataclasses import dataclass
+from pathlib import Path
 
 from module_harness import (
     EventBus,
@@ -15,6 +22,8 @@ from module_harness import (
     Module,
     OutputFormat,
 )
+from module_harness.query import load_snapshot_summary, run_db_path
+from module_harness.status import query_run_status
 from pydantic import ValidationError
 
 from weft.digest import build_digest
@@ -49,6 +58,17 @@ class InspireResult:
     extract: ExtractOutput
     review: ReviewOutput
     match: MatchOutput
+    module_id: str = ""
+    resumed: bool = False
+
+
+def _runs_base(project: Project) -> Path:
+    return project.root / "generated" / "inspirations" / ".runs"
+
+
+def _module_id(source: str) -> str:
+    slug = re.sub(r"[^A-Za-z0-9_-]+", "-", Path(source).stem).strip("-")
+    return f"weft-inspire-{slug or 'inspire'}"[:120]
 
 
 def _register_harnesses(reg) -> None:
@@ -68,34 +88,85 @@ def _register_harnesses(reg) -> None:
         ))
 
 
-def run_inspire(project: Project, text: str, *, client) -> InspireResult:
-    run_id = uuid.uuid4().hex[:8]
+def _build_module(project: Project, text: str, client, module_id: str) -> Module:
     tasklist = build_inspire_tasklist(text, build_digest(project))
     bus = EventBus()
     reg = HarnessRegistry(llm_client=client, event_bus=bus)
     _register_harnesses(reg)
-
-    module = Module(
+    return Module(
         spec={"task_nodes": {tick: tick for tick in _TICK_MODELS}},
         tasklist=tasklist,
         llm_client=client,
         event_bus=bus,
         registry=reg,
-        module_id=f"weft-inspire-{run_id}",
+        module_id=module_id,
+        base_dir=_runs_base(project),
         review_harness=None,      # tasklist 代码构造，跳过一致性审核（M2 决策 2）
-        keep_records=False,       # 零残留（M2 决策 3）
-        persist=False,
-        status_file=False,
+        keep_records=True,        # firings 落库：断点取回节点输出 + 审计
+        persist=True,             # 每 tick 快照（续跑依赖）
+        status_file=True,         # 阶段状态（跨进程查询）
+        control=False,
         stream_log=False,
     )
+
+
+def run_inspire(project: Project, text: str, *, client,
+                source: str = "inspire") -> InspireResult:
+    module_id = _module_id(source)
+    base_dir = _runs_base(project)
+    prior = load_snapshot_summary(module_id, base_dir=base_dir)
+
+    resumed = False
+    resume_tick = 0
+    if prior is not None:
+        outs = prior.get("outputs") or {}
+        # 失败节点的快照 output 是 Failure 描述字符串（非 dict）——不算完成
+        complete = all(isinstance(outs.get(t), dict) for t in _TICK_MODELS)
+        status = query_run_status(module_id, base_dir=base_dir)
+        if complete:
+            # 上一次已全程完成：同灵感重跑 = 全新运行，清场防陈旧输出混入
+            # 实际落盘布局：base_dir/.specmodule/runs/<module_id>/
+            shutil.rmtree(run_db_path(module_id, base_dir=base_dir).parent,
+                          ignore_errors=True)
+            prior = None
+        elif status is not None and status.phase == "running":
+            raise InspireError(
+                f"[E-INSPIRE-FAILED] run {module_id} 正在运行（phase=running），"
+                "不接受并发重跑")
+        else:
+            # 断点续跑：失败节点在 tickflow 里已被消费（出边写 False），
+            # resume 不会重试——须回退到最后一个成功节点的 tick 快照。
+            # 线性链 t01..t04：tick i = 节点 t0{i+1}。
+            leading = 0
+            for tick in _TICK_MODELS:
+                if isinstance(outs.get(tick), dict):
+                    leading += 1
+                else:
+                    break
+            if leading == 0:
+                # 首节点即失败，无可回退快照 → 清场全新跑
+                shutil.rmtree(run_db_path(module_id, base_dir=base_dir).parent,
+                              ignore_errors=True)
+            else:
+                resumed = True
+                resume_tick = leading - 1
+
+    module = _build_module(project, text, client, module_id)
     try:
-        firings = asyncio.run(module.run(max_ticks=_MAX_TICKS))
+        if resumed:
+            firings = asyncio.run(module.resume(rollback_to=resume_tick,
+                                                max_ticks=_MAX_TICKS))
+        else:
+            firings = asyncio.run(module.run(max_ticks=_MAX_TICKS))
     except InspireError:
         raise
     except Exception as exc:
         raise InspireError(f"[E-INSPIRE-FAILED] SpecModule run 失败：{exc}") from exc
 
-    outputs: dict[str, dict] = {}
+    # 节点输出：以持久化 firings 的最新值为底（续跑时覆盖已完成节点），
+    # 本次 firings 里的输出优先（更新）。
+    summary = load_snapshot_summary(module_id, base_dir=base_dir)
+    outputs: dict[str, dict] = dict((summary or {}).get("outputs") or {})
     for firing in firings:
         if firing.status == "failed":
             raise InspireError(
@@ -106,7 +177,8 @@ def run_inspire(project: Project, text: str, *, client) -> InspireResult:
                 f"[E-INSPIRE-FAILED] 节点 {firing.node} 基础设施失败：{firing.error}")
         if isinstance(firing.output, dict):
             outputs[firing.node] = firing.output
-    missing = set(_TICK_MODELS) - set(outputs)
+    missing = {t for t in _TICK_MODELS
+               if not isinstance(outputs.get(t), dict)}
     if missing:
         raise InspireError(f"[E-INSPIRE-FAILED] 节点未完成：{sorted(missing)}")
 
@@ -118,6 +190,7 @@ def run_inspire(project: Project, text: str, *, client) -> InspireResult:
             raise InspireError(
                 f"[E-INSPIRE-SHAPE] 节点 {tick} 输出不合 schema："
                 f"{exc.errors()[0]['msg']}") from exc
-    return InspireResult(run_id=run_id, logic=parsed["t01"],
+    return InspireResult(run_id=module_id, logic=parsed["t01"],
                          extract=parsed["t02"], review=parsed["t03"],
-                         match=parsed["t04"])
+                         match=parsed["t04"], module_id=module_id,
+                         resumed=resumed)

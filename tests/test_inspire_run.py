@@ -47,8 +47,8 @@ def _client(**overrides) -> FakeInspireClient:
     return FakeInspireClient(responses)
 
 
-def _project() -> Project:
-    return build_project(
+def _project(root=None) -> Project:
+    return build_project(root=root, 
         data=[DataCard(id="data-01", refs=["fig-01a"], description="速率测量",
                        status="approved")],
         facts=[FactCard(id="fact-01", data=["data-01"], statement="温度提高速率。",
@@ -106,3 +106,48 @@ def test_run_inspire_missing_node_output_is_failed():
                                 if k != "【灵感·匹配】"})
     with pytest.raises(InspireError, match="E-INSPIRE-FAILED"):
         run_inspire(_project(), "随手记", client=client)
+
+
+def _runs_dir(project: Project):
+    from module_harness.query import load_snapshot_summary
+    return project.root / "generated" / "inspirations" / ".runs"
+
+
+def test_run_persists_checkpoints_and_no_root_residue(tmp_path):
+    """persist 接入：快照落 generated/inspirations/.runs/，项目根零 .specmodule。"""
+    from module_harness.query import load_snapshot_summary
+
+    project = _project(tmp_path)
+    result = run_inspire(project, "随手记", client=_client(), source="idea.md")
+    assert result.module_id == "weft-inspire-idea"
+    summary = load_snapshot_summary(
+        result.module_id, base_dir=_runs_dir(project))
+    assert summary is not None
+    assert set(summary["outputs"]) >= {"t01", "t02", "t03", "t04"}
+    assert not (project.root / ".specmodule").exists()
+
+
+def test_run_resumes_from_checkpoint_after_failure(tmp_path):
+    """t04 失败后重跑同一灵感：只补跑失败节点，已完成节点不重算。"""
+    project = _project(tmp_path)
+    flaky = _client(**{"【灵感·匹配】": "这不是 JSON"})
+    with pytest.raises(InspireError):
+        run_inspire(project, "随手记", client=flaky, source="idea.md")
+
+    second = _client()
+    result = run_inspire(project, "随手记", client=second, source="idea.md")
+    assert result.resumed is True
+    assert result.match.fact_data[0].data_ids == ["data-01"]
+    # 断点续跑：T1–T3 不再调用 LLM
+    assert not any("逻辑核查" in p for p in second.prompts)
+    assert any("匹配" in p for p in second.prompts)
+
+
+def test_run_fresh_after_completed_run(tmp_path):
+    """成功后的同灵感重跑 = 全新运行（清场重跑，不续跑）。"""
+    project = _project(tmp_path)
+    run_inspire(project, "随手记", client=_client(), source="idea.md")
+    second = _client()
+    result = run_inspire(project, "随手记", client=second, source="idea.md")
+    assert result.resumed is False
+    assert len([p for p in second.prompts]) == 4
