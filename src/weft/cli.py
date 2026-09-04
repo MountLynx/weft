@@ -1,4 +1,4 @@
-"""typer 入口：weft validate / graph / review（spec §8，M1 交付前三个）。"""
+"""typer 入口：weft init / validate / graph / review / draft / assemble / render。"""
 from __future__ import annotations
 
 import sys
@@ -62,6 +62,25 @@ def _print_review(project: Project) -> None:
                 typer.echo(f"  {part.id}/{node.id}  {rel}")
     if not node_found:
         typer.echo("  （无）")
+
+
+@app.command()
+def init(
+    project_dir: Path = typer.Argument(Path("."), help="要创建的项目目录（默认当前目录）"),
+) -> None:
+    """生成最小合法项目骨架（init 后即可通过 weft validate）。"""
+    from weft.scaffold import InitCollisionError, init_project
+
+    try:
+        created = init_project(project_dir)
+    except InitCollisionError as exc:
+        preview = "、".join(exc.entries[:5]) + ("…" if len(exc.entries) > 5 else "")
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-INIT-COLLISION", str(exc.root), None,
+            f"目标目录非空（{preview}）；为避免覆盖，未写入任何文件")])
+        raise typer.Exit(code=1) from exc
+    for path in created:
+        typer.echo(f"已创建 {path.relative_to(project_dir).as_posix()}")
 
 
 @app.command()
