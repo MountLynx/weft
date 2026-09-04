@@ -130,12 +130,25 @@ def test_apply_supplement_creates_proposal_with_original_fields(tmp_path):
     assert "取代 fact-01" in text
 
 
-def test_apply_supplement_rejects_missing_target(tmp_path):
+def test_apply_demotes_supplement_with_invalid_target(tmp_path):
+    """supplement 目标不存在或不是 fact/claim 卡 → 降级为 new 草稿卡 + WARN。
+
+    e2e 实测：真实模型会把 fact 草案标 supplement、against 填 data 卡；
+    整链 fail-closed 拒绝固然安全，但重跑四节点成本高，无歧义误分类降级即可。
+    """
     review = _review(extra=[{"key": "f1", "verdict": "supplement",
-                             "against": ["fact-99"],
+                             "against": ["data-01"],
                              "merged_statement": "x"}])
-    with pytest.raises(Exception):
-        _apply(tmp_path, review=review)
+    outcome = _apply(tmp_path, review=review)
+    assert (tmp_path / "metadata" / "facts" / "fact-02.md") in outcome.written_cards
+    assert not (tmp_path / "inspirations" / "proposals" / "data-01.md").exists()
+    assert any("降级" in note for note in outcome.notes)
+    review2 = _review(extra=[{"key": "f1", "verdict": "supplement",
+                              "against": ["fact-99"], "merged_statement": "x"}])
+    outcome2 = _apply(tmp_path / "second", review=review2)
+    assert (tmp_path / "second" / "metadata" / "facts" / "fact-02.md") \
+        in outcome2.written_cards
+    assert any("降级" in note for note in outcome2.notes)
 
 
 def test_apply_report_carries_logic_and_placeholder_sections(tmp_path):
@@ -150,3 +163,24 @@ def test_apply_report_carries_logic_and_placeholder_sections(tmp_path):
     assert "后半句缺少主语" in report
     assert "xxx%" in report and "需补充" in report
     assert any("缺文献" in note or "cited" in note for note in outcome.notes)
+
+
+def test_apply_duplicate_supplement_targets_keeps_first(tmp_path):
+    """两个草案补充同一目标卡 → 先到先得，后者降级为新建卡并提示（不静默覆盖）。"""
+    review = _review(extra=[
+        {"key": "c1", "verdict": "supplement", "against": ["claim-01"],
+         "merged_statement": "温度有正效应，且随搅拌增强。", "reason": "补充A"},
+        {"key": "f1", "verdict": "supplement", "against": ["claim-01"],
+         "merged_statement": "另一角度的补充。", "reason": "补充B"},
+    ])
+    match = MatchOutput.model_validate({
+        "fact_data": [{"key": "f1", "data_ids": ["data-01"]}],
+        "claim_cites": [{"key": "c1", "claim_type": "uncited"}]})
+    outcome = _apply(tmp_path, review=review, match=match)
+    proposal = tmp_path / "inspirations" / "proposals" / "claim-01.md"
+    assert proposal in outcome.proposals
+    # 先到者胜：拆解顺序里 f1 在前，f1 的补充成为提案
+    assert "另一角度的补充" in proposal.read_text(encoding="utf-8")
+    assert any("降级" in n for n in outcome.notes)
+    # 后者（c1）降级为新建草稿卡
+    assert (tmp_path / "metadata" / "claims" / "uncited" / "claim-02.md").is_file()

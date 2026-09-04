@@ -59,6 +59,23 @@ def _project() -> Project:
         bib_keys={"key2020"})
 
 
+def test_harnesses_register_with_raised_max_tokens():
+    """真实推理模型思考 token 会耗尽默认 4096 输出上限（e2e 实测 finish=length
+    且 content 空）；inspire harness 必须经 api_params 抬高 max_tokens。"""
+    from weft.engine.inspire import run as inspire_run
+
+    recorded = []
+
+    class StubReg:
+        def harness(self, name, cfg):
+            recorded.append((name, cfg))
+
+    inspire_run._register_harnesses(StubReg())
+    assert [name for name, _ in recorded] == list(inspire_run._HARNESS_CORES)
+    for _, cfg in recorded:
+        assert cfg.api_params == {"max_tokens": 32768}
+
+
 def test_run_inspire_parses_all_node_outputs():
     client = _client()
     result = run_inspire(_project(), "随手记：升温加速。", client=client)

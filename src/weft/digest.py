@@ -48,7 +48,9 @@ def build_digest(project: Project) -> str:
             f"{key} | {entry.caption}" + (f"（子图: {entry.subfigs}）"
                                           if entry.subfigs else "")
             for key, entry in sorted(project.figures.items())]),
+        ("bib", sorted(project.bib_keys)),
     ]
+    sections = [(name, lines) for name, lines in sections]
     blocks = [f"== {name} ==\n" + "\n".join(lines)
               for name, lines in sections if lines]
     return "\n".join(blocks)

@@ -55,3 +55,9 @@ def test_digest_marks_card_status():
 
 def test_digest_is_deterministic():
     assert build_digest(_full_project()) == build_digest(_full_project())
+
+
+def test_digest_lists_bib_keys():
+    """T4 文献匹配候选源：bib key 必须在索引中（e2e 实测缺失导致全漏配）。"""
+    text = build_digest(_full_project())
+    assert "== bib ==" in text and "smith2020" in text

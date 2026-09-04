@@ -26,7 +26,8 @@ _REVIEW_SCHEMA = (
     '输出 JSON：{"classifications": [{"key": "…", "verdict": "new|conflict|supplement",'
     ' "against": ["现有卡id"], "reason": "理由", "merged_statement": ""}]}。'
     "规则：new=全新；conflict=与现有卡事实矛盾（against 填冲突卡 id，reason 必填）；"
-    "supplement=与现有卡高度相关且略有补充（against 填目标卡 id，"
+    "supplement=与现有 fact/claim 卡高度相关且略有补充（目标只能是现存 fact/claim 卡，"
+    "data/note 是人工维护的输入卡，禁止作为补充目标；against 填目标卡 id，"
     "merged_statement 必填：包含原卡全部信息与补充内容的完整新卡陈述，不得丢失原卡信息）。"
 )
 
@@ -35,8 +36,11 @@ _MATCH_SCHEMA = (
     ' "claim_cites": [{"key": "…", "claim_type": "cited|uncited", "cites": ["bib key"],'
     ' "reason": "…"}], "placeholders": [{"text": "占位原文", "matched_fact": "现有fact卡id或null"}]}。'
     "规则：fact 至少关联到一张现有 data 卡才可给 data_ids，关联不到就留空数组；"
-    "cites 只能取索引中出现的 note/bib key，语义上需要文献但找不到→cited 且 cites 留空，"
-    "不需要文献→uncited；占位优先在现有 fact 卡中匹配，没有则 matched_fact=null。"
+    "cites 只能取索引中出现的 note/bib key；索引中的 bib key 通常编码了作者与年份"
+    "（如 gikonyo2023 = Gikonyo 2023），灵感中明确署名引用（如“Gikonyo et al., 2023”）"
+    "或以 [@key] 引用的文献，必须在索引中查找对应 key 填入 cites，找不到才留空；"
+    "语义上需要文献但索引没有→cited 且 cites 留空，不需要文献→uncited；"
+    "占位优先在现有 fact 卡中匹配，没有则 matched_fact=null。"
 )
 
 

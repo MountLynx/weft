@@ -51,18 +51,29 @@ class InspireResult:
     match: MatchOutput
 
 
-def run_inspire(project: Project, text: str, *, client) -> InspireResult:
-    run_id = uuid.uuid4().hex[:8]
-    tasklist = build_inspire_tasklist(text, build_digest(project))
-    bus = EventBus()
-    reg = HarnessRegistry(llm_client=client, event_bus=bus)
+def _register_harnesses(reg) -> None:
+    """注册 T1–T4 四个 harness；api_params 抬高输出上限。
+
+    SpecModule 硬编码默认 max_tokens=4096，config.json 不可达（from_env 只读
+    providers/models/rules）；推理型模型思考 token 即可耗尽 4096，content 为空
+    （finish=length，e2e 实测）。api_params 优先级最高，唯此一途。
+    """
     for name, core in _HARNESS_CORES.items():
         reg.harness(name, HarnessConfig(
             prompt_core=core,
             output_format=OutputFormat(type="json_object"),
             notdo=["不要输出 JSON 以外的任何文本"],
             temperature=0.2,
+            api_params={"max_tokens": 32768},
         ))
+
+
+def run_inspire(project: Project, text: str, *, client) -> InspireResult:
+    run_id = uuid.uuid4().hex[:8]
+    tasklist = build_inspire_tasklist(text, build_digest(project))
+    bus = EventBus()
+    reg = HarnessRegistry(llm_client=client, event_bus=bus)
+    _register_harnesses(reg)
 
     module = Module(
         spec={"task_nodes": {tick: tick for tick in _TICK_MODELS}},

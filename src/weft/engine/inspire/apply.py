@@ -63,18 +63,35 @@ def apply_inspiration(project: Project, *, source: Path, logic: LogicOutput,
     outcome = ApplyOutcome()
     contradictions: list[str] = []
 
-    # —— 前置校验（任何失败在写盘前抛出）——
+    # —— 前置处理：非法 supplement 降级为 new（e2e 实测模型会拿 data 卡当目标）——
+    demoted: set[str] = set()
+    claimed_targets: set[str] = set()
     for card in extract.cards:
         cls = cls_by_key.get(card.key)
         if cls is not None and cls.verdict == "supplement":
-            if not cls.against:
-                raise ValueError(f"草案 {card.key} 标记 supplement 但未给目标卡")
-            target = cls.against[0]
-            if target not in project.facts and target not in project.claims:
-                raise ValueError(f"补充目标卡不存在：{target}")
+            target = cls.against[0] if cls.against else None
+            if target is None or (target not in project.facts
+                                  and target not in project.claims):
+                demoted.add(card.key)
+                outcome.notes.append(
+                    f"草案 {card.key} 的补充目标 {target or '（未填）'} "
+                    "不是现存 fact/claim 卡，降级为新建草稿卡")
+            elif target in claimed_targets:
+                demoted.add(card.key)
+                outcome.notes.append(
+                    f"草案 {card.key} 的补充目标 {target} 已有先到的提案，"
+                    "降级为新建草稿卡（两条补充需人工合并）")
+            else:
+                claimed_targets.add(target)
     archive = inspirations / "processed" / source.name
     if archive.exists():
         raise ValueError(f"归档重名，拒绝覆盖：{archive}")
+
+    def _verdict(key: str) -> str:
+        if key in demoted:
+            return "new"
+        cls = cls_by_key.get(key)
+        return cls.verdict if cls is not None else "new"
 
     # —— id 分配 ——
     landing_facts: dict[str, str] = {}    # 临时 key → 真实 fact id
@@ -84,10 +101,9 @@ def apply_inspiration(project: Project, *, source: Path, logic: LogicOutput,
     supplement_specs: list[tuple[str, str]] = []   # (目标卡 id, 临时 key)
 
     for card in extract.cards:
-        cls = cls_by_key.get(card.key)
-        verdict = cls.verdict if cls is not None else "new"
+        verdict = _verdict(card.key)
         if verdict == "supplement":
-            supplement_specs.append((cls.against[0], card.key))
+            supplement_specs.append((cls_by_key[card.key].against[0], card.key))
             continue
         if card.kind == "fact":
             matched = fact_match.get(card.key)
@@ -113,7 +129,7 @@ def apply_inspiration(project: Project, *, source: Path, logic: LogicOutput,
     entries: list[tuple[str, dict]] = []
     for card in extract.cards:
         cls = cls_by_key.get(card.key)
-        verdict = cls.verdict if cls is not None else "new"
+        verdict = _verdict(card.key)
         origin = f"灵感 {source.name}"
         if card.key in landing_facts:
             entries.append(("fact", {
@@ -180,7 +196,8 @@ def _write_report(report: Path, source: Path, logic: LogicOutput,
     lines += [f"- {p.relative_to(report.parents[2]).as_posix()}" for p in cards] \
         or ["- （无）"]
     lines += ["", "## 替换提案（审后 `weft replace <目标卡id>` 应用）", ""]
-    lines += [f"- {p.as_posix()}" for p in proposals] or ["- （无）"]
+    lines += [f"- {p.relative_to(report.parents[2]).as_posix()}"
+              for p in proposals] or ["- （无）"]
     lines += ["", "## 匹配与缺口", ""]
     for m in match.claim_cites:
         if m.claim_type == "cited" and not m.cites:
