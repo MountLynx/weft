@@ -50,12 +50,13 @@ def _register_harnesses(reg, workflow_spec: dict) -> None:
     SpecModule 硬编码默认 max_tokens=4096 且 config.json 不可达；推理型模型
     思考 token 即可耗尽 4096、content 为空（finish=length，e2e 实测——
     inspire 管线同因同修，见 2026-09-04-weft-inspire.md 计划 D13）。
+    draft_gen 温度取 workflow 的 §4.3 章节梯度（methods 低 / discussion 高）。
     """
     reg.harness("draft_gen", HarnessConfig(
         prompt_core=workflow_spec["prompt_core"],
-        output_format=OutputFormat(type="json_object"),
-        notdo=["不要输出 JSON 以外的任何文本", "不得使用 Markdown 标题或列表"],
-        temperature=0.4,
+        output_format=OutputFormat(type="text"),
+        notdo=["不要输出任何解释或前后缀", "不得使用 Markdown 标题或列表"],
+        temperature=workflow_spec["temperature"],
         api_params={"max_tokens": 32768},
     ))
     reg.harness("draft_check", HarnessConfig(

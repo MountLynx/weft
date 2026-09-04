@@ -37,6 +37,7 @@ c2 --> f
 | D4 | fill 后仍跑 `[@key] ∈ bib` 硬校验（双保险） |
 | D5 | mock 客户端：gen 从 prompt JSON 提取 uses 发占位符；check 恒 pass；link/polish 回显定界符内文本 |
 | D7 | g 的 uses bundle 中 fact.data 条目带 refs 图注视图 `{label, caption?, subfig?}`（figures.yaml 顺 fact→data→refs 取，悬空 ref 只留 label）。动机：data.description 只描述数据集合、不含图形形式（如"长期运行的 MLVSS/MLSS 数据"），模型写 `{{fact-xx}}` 落点句需要知道图的内容与形式——这正是设计 §6.1 实体全文清单里 caption 项的落地；c1/c2 共用同一 spec JSON 同步受益 |
+| D8 | 清理 prompt_core 的 v1 残留：四个 chapter prompt_core 删除"[@key] 句尾"引文规则（与占位符规则正面冲突——模型若服从会写出真 [@key]，f 填充后的 `_CITEKEY` 校验只查 key∈bib，穿透过成稿绕开 claim.cites 纪律）与 JSON 输出指令/uses 自报（D3/D6 已废）；`citation_rules` 死字段删除；draft_gen 温度改接 workflow 的 §4.3 梯度（v2 曾硬编码 0.4 使梯度静默失效）；run.py draft_gen harness 注册 output_format 改 text（原 json_object 靠 TaskDefinition 级覆盖才没出事）。prompt_core 只留人设 + 章节语体 + 章节硬约束，引用形式与输出格式由 gen_prompt 尾部统一管辖 |
 
 ## 任务分解（TDD）
 
@@ -56,3 +57,4 @@ c2 --> f
 - e2e：/tmp/weft-inspire-real sec-03 真实 LLM 三节点连跑（结果见提交说明）。
 - D6（执行期新增）：g 与 l/p 均为纯文本输出，工作文本以 <<<PARAGRAPH…>>> 定界符在链上直传——JSON 包裹会让 mock 与模型都要二次解析，纯文本直传更稳。
 - D7 落地（2026-09-04）：新增 2 测试（图注视图 + 降级路径），全量 259 passed, 1 deselected。
+- D8 落地（2026-09-04）：新增 1 测试（v1 残留反断言：prompt_core 无 [@key]/JSON）+ 温度接线钉（stub 温度 0.55 区分硬编码），全量 260 passed, 1 deselected。

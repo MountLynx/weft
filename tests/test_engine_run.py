@@ -20,11 +20,13 @@ def test_harnesses_register_with_raised_max_tokens():
         def script(self, name):
             return lambda fn: None
 
-    draft_run._register_harnesses(StubReg(), {"prompt_core": "", "temperature": 0.4})
+    draft_run._register_harnesses(StubReg(), {"prompt_core": "", "temperature": 0.55})
     assert set(recorded) == {"draft_gen", "draft_check", "draft_link",
                              "draft_polish"}
     for cfg in recorded.values():
         assert cfg.api_params == {"max_tokens": 32768}
+    # §4.3 温度梯度接线：draft_gen 消费 workflow 温度（v2 曾硬编码 0.4 使梯度失效）
+    assert recorded["draft_gen"].temperature == 0.55
 
 
 def test_run_draft_mock_generates_and_fills(tmp_path):

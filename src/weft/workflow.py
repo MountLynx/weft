@@ -17,7 +17,8 @@ WORKFLOW_VOCAB = ("introduction", "methods", "results", "discussion")
 
 _NUM_PREFIX = re.compile(r"^[\d\s._-]+")
 
-# temperature 按 §4.3：introduction 中 / methods 低 / results 中（M2 原值）/ discussion 中高
+# temperature 按 §4.3：introduction 中 / methods 低 / results 中（M2 原值）/ discussion 中高；
+# draft v2 起 draft_gen harness 消费此温度（v1 的 citation_rules 字段已随占位符体系移除）
 WORKFLOW_SPECS: dict[str, dict] = {
     "introduction": {
         "prompt_core": (
@@ -26,13 +27,9 @@ WORKFLOW_SPECS: dict[str, dict] = {
             "硬性约束：\n"
             "1. 只准使用任务提示中列出的实体及其内容；不得引入任何未给出的文献结论。\n"
             "2. 不得改写、编造实体卡的任何字段值；节点 logic 是本段的组织纲，"
-            "按其顺序与侧重展开。\n"
-            "3. 引文标注只准使用实体 bundle 给出的 bib key，以 [@key] 形式写在句尾。\n"
-            '输出 JSON（且仅输出 JSON，无其它文本）：'
-            '{"paragraph": "段落正文", "uses": ["引用的实体 id"], "cites": ["key"]}'
+            "按其顺序与侧重展开。"
         ),
         "temperature": 0.5,
-        "citation_rules": True,
     },
     "methods": {
         "prompt_core": (
@@ -43,12 +40,9 @@ WORKFLOW_SPECS: dict[str, dict] = {
             "1. 只准展开任务提示给出的协议步骤与参数值；"
             "不得虚构任何步骤、试剂、仪器或数值。\n"
             "2. 不得改写实体卡的任何字段值；数值与单位必须与 param.values 完全一致。\n"
-            "3. 方法章不写文献引注。\n"
-            '输出 JSON（且仅输出 JSON，无其它文本）：'
-            '{"paragraph": "段落正文", "uses": ["引用的实体 id"], "cites": []}'
+            "3. 方法章不写文献引注。"
         ),
         "temperature": 0.2,
-        "citation_rules": False,
     },
     "results": {
         "prompt_core": (
@@ -57,13 +51,9 @@ WORKFLOW_SPECS: dict[str, dict] = {
             "硬性约束：\n"
             "1. 只准使用任务提示中列出的实体及其内容；"
             "不得引入任何未给出的数据、观点或结论。\n"
-            "2. 不得改写、编造实体卡的任何字段值。\n"
-            "3. 引文标注只准使用实体 bundle 给出的 bib key，以 [@key] 形式写在句尾。\n"
-            '输出 JSON（且仅输出 JSON，无其它文本）：'
-            '{"paragraph": "段落正文", "uses": ["引用的实体 id"], "cites": ["key"]}'
+            "2. 不得改写、编造实体卡的任何字段值。"
         ),
         "temperature": 0.3,
-        "citation_rules": True,
     },
     "discussion": {
         "prompt_core": (
@@ -71,13 +61,9 @@ WORKFLOW_SPECS: dict[str, dict] = {
             "写一段讨论章正文（中文，学术论文语体），侧重结果间的对比、解释与归因。\n"
             "硬性约束：\n"
             "1. 只准使用任务提示中列出的实体及其内容；比较对象限于实体给出的文献。\n"
-            "2. 不得改写、编造实体卡的任何字段值。\n"
-            "3. 引文标注只准使用实体 bundle 给出的 bib key，以 [@key] 形式写在句尾。\n"
-            '输出 JSON（且仅输出 JSON，无其它文本）：'
-            '{"paragraph": "段落正文", "uses": ["引用的实体 id"], "cites": ["key"]}'
+            "2. 不得改写、编造实体卡的任何字段值。"
         ),
         "temperature": 0.6,
-        "citation_rules": True,
     },
 }
 
