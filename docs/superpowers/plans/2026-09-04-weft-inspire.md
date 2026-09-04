@@ -41,3 +41,6 @@
 1. 全量 286 passed, 1 deselected（实测）。
 2. 真实 CLI 冒烟：make_minimal 项目 + `weft inspire` --mock 全链落盘三件套；`weft missing-cites`；`weft replace`。
 3. roadmap/AGENTS/诊断码总表同步。
+| D11 | inspire 开启 persist（base_dir=generated/inspirations/.runs/）+ Module.resume 断点续跑：同灵感重跑时回退到最后成功节点的 tick 快照，只补跑失败节点；成功后同灵感再跑 = 清场全新跑；已完成节点输出经 load_snapshot_summary 取回 | 用户指出应复用 SpecModule 原生快照/续跑；e2e 实测全链重跑成本高 |
+| D12 | SpecModule 实测语义：失败节点的 firing 已被消费（出边写 False），resume 缺省不重试——必须显式 `resume(rollback_to=<最后成功 tick>)`；失败节点的快照 output 是 `Failure(...)` 描述字符串（非 dict），续跑判定须校验值类型而非键存在 | 单测+调试实测 |
+| D13 | LLM 空输出（finish=length，推理模型思考 token 耗尽 4096）无可提取，OutputValidator 的围栏/JSON 提取兜底帮不上——api_params 抬高 max_tokens 是正解；OutputFormat json_schema + 强制 tool-use 为可选加强（未启用） | 源码调研 module_harness/outputfmt.py、llm/client.py |
