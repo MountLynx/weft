@@ -47,7 +47,7 @@ def test_check_link_polish_prompts_inject_views(tmp_path):
 
 def test_node_spec_drops_unapproved_uses(tmp_path):
     from tests.helpers import write_card
-    project, _ = load_project(make_minimal_project(tmp_path))
+    project = make_minimal_project(tmp_path)
     write_card(tmp_path / "metadata" / "facts", "fact-02",
                {"id": "fact-02", "data": ["data-01"], "statement": "draft 卡",
                 "status": "draft"})
@@ -56,3 +56,15 @@ def test_node_spec_drops_unapproved_uses(tmp_path):
     node.uses.append(type(node.uses[0])(id="fact-02", role="evidence"))
     spec = build_node_spec(project, node)
     assert [u["id"] for u in spec["uses"]] == ["fact-01"]
+
+
+def test_node_spec_only_card_self_content(tmp_path):
+    """g 只拿卡自身内容：无 data/note 派生上下文（用户设计指令）。"""
+    from weft.models.narrative import Node, Use
+    project, _ = load_project(make_minimal_project(tmp_path))
+    node = Node(id="p", purpose="describe",
+                uses=[Use(id="claim-01", role="conclusion"),
+                      Use(id="fact-01", role="evidence")], status="approved")
+    spec = build_node_spec(project, node)
+    assert set(spec["uses"][0]) == {"id", "role", "kind", "claim_type", "statement"}
+    assert set(spec["uses"][1]) == {"id", "role", "kind", "statement"}

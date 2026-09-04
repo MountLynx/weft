@@ -82,3 +82,11 @@ def test_parse_output_shapes():
     assert diag.level == Level.ERROR
     ok, _ = parse_output({"verdict": "pass"}, CheckOutput, "n", "s")
     assert ok.verdict == "pass"
+
+
+def test_fill_collapses_double_parens_around_cites():
+    """模型常自己给占位符包中文括号，填充后再加一层 → 塌缩去重。"""
+    text, _ = fill_placeholders(
+        "对比成立（{{claim-01}}）。", _node("claim-01"), "sec-01", _project())
+    assert "（（" not in text and "））" not in text
+    assert "（[@key2020]）" in text

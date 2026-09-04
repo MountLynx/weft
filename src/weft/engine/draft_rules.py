@@ -120,6 +120,9 @@ def fill_placeholders(text: str, node: Node, part_id: str,
         return "（" + "；".join(f"[@{k}]" for k in cites) + "）"
 
     text = _PLACEHOLDER.sub(_sub, text)
+    # 模型常自己给占位符包中文括号，填充后再加一层 → 塌缩去重（e2e 实测）
+    # 模型常自己包中文括号，填充后再加一层：直接塌缩（学术文本无合法双括号）
+    text = text.replace("（（", "（").replace("））", "）")
     leftover = _PLACEHOLDER.search(text)
     if leftover:
         raise DraftRuleError(_diag("E-DRAFT-SHAPE", node.id, part_id, "paragraph",

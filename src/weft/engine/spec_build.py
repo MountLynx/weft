@@ -31,7 +31,11 @@ _CLAIM_CLASS_EXPLAIN = (
 
 
 def build_node_spec(project: Project, node: Node) -> dict:
-    """单节点 → uses 实体全文 bundle（只收 approved；claim 带分类与 note 摘要）。"""
+    """单节点 → uses bundle：只给 fact/claim 卡自身内容（statement+claim 分类）。
+
+    不传 data/note 派生上下文（生成只需要"这是什么 fact、什么 claim"；
+    图表与文献由 f 脚本按占位符确定性填充，用户设计指令）。
+    """
     uses = []
     for u in node.uses:
         if u.id in project.facts:
@@ -41,8 +45,6 @@ def build_node_spec(project: Project, node: Node) -> dict:
             uses.append({
                 "id": u.id, "role": u.role, "kind": "fact",
                 "statement": card.statement,
-                "data": [{"id": d, "description": project.data_cards[d].description}
-                         for d in card.data if d in project.data_cards],
             })
         elif u.id in project.claims:
             card = project.claims[u.id]
@@ -52,9 +54,6 @@ def build_node_spec(project: Project, node: Node) -> dict:
                 "id": u.id, "role": u.role, "kind": "claim",
                 "claim_type": card.claim_type,
                 "statement": card.statement,
-                "cites": list(card.cites),
-                "note_summaries": [{"key": k, "summary": project.notes[k].summary}
-                                   for k in card.cites if k in project.notes],
             })
     return {"node": {"id": node.id, "purpose": node.purpose, "logic": node.logic},
             "uses": uses}
