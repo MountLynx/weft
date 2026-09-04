@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-**M3 渲染层已实现并合入 main（2026-09-02）**：`weft assemble` 在 part/chapter 级 qmd 之外产出项目根 `paper.qmd`（chapter 原样并入 + References refs div 定位 + Figures/Tables 字面编号，文件名经 weft.yaml `paper_file` 配置，默认 paper.qmd）；投稿资源约定 `assets/`（references.bib / style.csl / template.docx，样例项目已迁移；style.csl 为 Zotero elsevier-with-titles，CC-BY-SA 3.0，出处见文件内 rights 元素）；`weft render`（quarto 子进程封装，docx 默认目标，`--to` 透传）。卡片→叙事→生成→组装→Quarto 全闭环打通。下一步：M4 打磨。
+**M3 渲染层已实现并合入 main（2026-09-02）**：`weft assemble` 在 part/chapter 级 qmd 之外产出项目根 `paper.qmd`（chapter 原样并入 + References refs div 定位 + Figures/Tables 字面编号，文件名经 weft.yaml `paper_file` 配置，默认 paper.qmd）；投稿资源约定 `assets/`（references.bib / style.csl / template.docx，样例项目已迁移；style.csl 为 Zotero elsevier-with-titles，CC-BY-SA 3.0，出处见文件内 rights 元素）；`weft render`（quarto 子进程封装，docx 默认目标，`--to` 透传）。卡片→叙事→生成→组装→Quarto 全闭环打通。M4 打磨进行中：`weft init` 项目模板已交付（2026-09-04）。
 
 ## M1 数据层 ✅（2026-09-02 合入 main）
 
@@ -34,10 +34,11 @@
 - 投稿资源约定 ✅：`assets/`（references.bib / style.csl / template.docx），`_quarto.yml` 固定路径引用；样例项目已迁移。
 - `render.py` ✅：quarto 子进程封装 + CLI `weft render`（docx 默认目标；不重复校验闸门）；打通 卡片→叙事→生成→组装→Quarto 全闭环。
 
-## M4 打磨 ⬜
+## M4 打磨 🔨
 
+- `weft init` 项目模板 ✅（2026-09-04）：最小合法骨架（init 后 `weft validate` 0 错 0 提醒；六类卡片目录、figures.yaml/weft.yaml 全注释模板、起步 part）；非空目录拒绝（`E-INIT-COLLISION`，零写入 fail-closed）。骨架文件内注释即格式参考，计划与设计决策见 `docs/superpowers/plans/2026-09-04-weft-init.md`。
 - 断点续跑/回滚接入 CLI（复用 SpecModule 原生能力）。
-- 溯源注释完善、`weft init` 项目模板与文档。
+- 溯源注释完善与用户文档。
 
 ## 扩展场景（M4 后，架构已预留）
 
