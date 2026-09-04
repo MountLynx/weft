@@ -136,3 +136,23 @@ def test_run_draft_passes_preceding_paragraph_to_successor():
     run_draft(_project(), _section(n_approved=2), client=client, align=False)
     assert len(client.prompts) == 2
     assert "（mock 段落）正文。" in client.prompts[1]
+
+
+def test_draft_harnesses_raise_max_tokens():
+    """推理模型思考 token 会耗尽默认 4096 输出上限（e2e 实测 finish=length
+    且 content 空）；draft/align harness 均须经 api_params 抬高 max_tokens。"""
+    from weft.engine import run as draft_run
+
+    recorded = {}
+
+    class StubReg:
+        def harness(self, name, cfg):
+            recorded[name] = cfg
+
+        def script(self, name):
+            return lambda fn: None
+
+    draft_run._register_harnesses(StubReg(), {"prompt_core": "", "temperature": 0.5}, align=True)
+    assert "draft_para" in recorded and "align_check" in recorded
+    for name in ("draft_para", "align_check"):
+        assert recorded[name].api_params == {"max_tokens": 32768}

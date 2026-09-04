@@ -6,9 +6,10 @@ SpecModule 不落盘；产物由 weft.engine.drafts 白名单写入 drafts/。
 """
 import asyncio
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from module_harness import (
+    ALIGN_CHECK_CONFIG,
     EventBus,
     HarnessConfig,
     HarnessRegistry,
@@ -65,6 +66,27 @@ def _make_validate_script(part: NarrativePart, tick_by_node: dict[str, str],
     return validate_draft
 
 
+def _register_harnesses(reg, workflow_spec: dict, align: bool) -> None:
+    """注册 draft/align harness；api_params 抬高输出上限。
+
+    SpecModule 硬编码默认 max_tokens=4096 且 config.json 不可达；推理型模型
+    思考 token 即可耗尽 4096、content 为空（finish=length，e2e 实测——inspire
+    管线同因同修，见 2026-09-04-weft-inspire.md 计划 D13）。
+    """
+    reg.harness("draft_para", HarnessConfig(
+        prompt_core=workflow_spec["prompt_core"],
+        output_format=OutputFormat(type="json_object"),
+        notdo=["不要输出 JSON 以外的任何文本", "不得使用 Markdown 标题或列表"],
+        temperature=workflow_spec["temperature"],
+        api_params={"max_tokens": 32768},
+    ))
+    if align:
+        register_align_check_harness(reg)
+        # 内置 align 配置原样保留，仅叠加 api_params（同名注册即覆盖）
+        reg.harness("align_check", replace(
+            ALIGN_CHECK_CONFIG, api_params={"max_tokens": 32768}))
+
+
 def run_draft(project: Project, part: NarrativePart, *, client,
               align: bool = True, workflow: str = "results") -> DraftResult:
     """同步入口；内部自持事件循环（weft CLI 无既有 loop）。
@@ -81,14 +103,7 @@ def run_draft(project: Project, part: NarrativePart, *, client,
 
     bus = EventBus()
     reg = HarnessRegistry(llm_client=client, event_bus=bus)
-    reg.harness("draft_para", HarnessConfig(
-        prompt_core=workflow_spec["prompt_core"],
-        output_format=OutputFormat(type="json_object"),
-        notdo=["不要输出 JSON 以外的任何文本", "不得使用 Markdown 标题或列表"],
-        temperature=workflow_spec["temperature"],
-    ))
-    if align:
-        register_align_check_harness(reg)
+    _register_harnesses(reg, workflow_spec, align)
     reg.script("weft_validate_draft")(
         _make_validate_script(part, tick_by_node, project, workflow))
 
