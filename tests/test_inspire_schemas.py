@@ -65,3 +65,17 @@ def test_match_output_rejects_bad_claim_type():
     with pytest.raises(ValidationError):
         MatchOutput.model_validate_json(
             '{"claim_cites": [{"key": "c1", "claim_type": "quoted"}]}')
+
+
+def test_coverage_output_parses_entries():
+    from weft.engine.inspire.schemas import CoverageOutput
+
+    out = CoverageOutput.model_validate_json(
+        '{"coverage": ['
+        '{"sentence": "de novo 颗粒化 SVI30 150-200", "card_keys": ["c2"],'
+        ' "covered": true},'
+        '{"sentence": "某未被成卡的对比", "card_keys": [], "covered": false,'
+        ' "suggestion": "应成 cited claim（对比文献值）"}]}')
+    assert out.coverage[0].covered is True
+    assert out.coverage[1].covered is False
+    assert "cited claim" in out.coverage[1].suggestion

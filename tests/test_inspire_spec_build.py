@@ -10,9 +10,9 @@ def _tasklist():
 
 def test_chain_flow_single_edge_per_line():
     tl = _tasklist()
-    assert list(tl.tasks) == ["t01", "t02", "t03", "t04"]
+    assert list(tl.tasks) == ["t01", "t02", "t03", "t04", "t05"]
     lines = tl.flow.splitlines()
-    assert lines == ["[t01] --> t02", "t02 --> t03", "t03 --> t04"]
+    assert lines == ["[t01] --> t02", "t02 --> t03", "t03 --> t04", "t04 --> t05"]
 
 
 def test_inputs_inject_predecessor_outputs():
@@ -37,3 +37,15 @@ def test_prompts_carry_markers_content_and_json_format():
     for t in tl.tasks.values():
         assert t.type == "harness"
         assert t.outputformat == {"type": "json_object"}
+
+
+def test_five_tick_chain_with_coverage_node():
+    """T5 成卡覆盖审查：逐句对账原文与草案；对比论断规则进 T2。"""
+    tl = _tasklist()
+    assert list(tl.tasks) == ["t01", "t02", "t03", "t04", "t05"]
+    assert tl.flow.splitlines() == ["[t01] --> t02", "t02 --> t03",
+                                    "t03 --> t04", "t04 --> t05"]
+    assert tl.tasks["t05"].inputs == {"t02": "t02"}
+    p2, p5 = tl.tasks["t02"].prompt, tl.tasks["t05"].prompt
+    assert "对比" in p2          # 对比论断 → cited claim 的拆解规则
+    assert "【灵感·成卡覆盖】" in p5 and TEXT in p5 and "{t02}" in p5

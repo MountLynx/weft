@@ -281,7 +281,7 @@ def inspire(
                              source=source.name)
         outcome = apply_inspiration(project, source=source, logic=result.logic,
                                     extract=result.extract, review=result.review,
-                                    match=result.match)
+                                    match=result.match, coverage=result.coverage)
     except (InspireError, DraftError, ValueError, OSError) as exc:
         typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc

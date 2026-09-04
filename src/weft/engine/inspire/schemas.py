@@ -79,3 +79,16 @@ class MatchOutput(BaseModel):
     fact_data: list[FactMatch] = []
     claim_cites: list[ClaimMatch] = []
     placeholders: list[PlaceholderMatch] = []
+
+
+class CoverageEntry(BaseModel):
+    sentence: str              # 原文要点（摘录）
+    card_keys: list[str] = []  # 覆盖该要点的草案卡 key
+    covered: bool = True
+    suggestion: str = ""       # covered=False 时：处理建议（补卡/补 data/弃置理由）
+
+
+class CoverageOutput(BaseModel):
+    """T5 成卡覆盖审查：逐句对账灵感原文与草案卡，漏卡可见。"""
+
+    coverage: list[CoverageEntry] = []

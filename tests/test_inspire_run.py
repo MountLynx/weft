@@ -16,6 +16,9 @@ REVIEW_JSON = ('{"classifications": [{"key": "f1", "verdict": "new"},'
 MATCH_JSON = ('{"fact_data": [{"key": "f1", "data_ids": ["data-01"]}],'
               ' "claim_cites": [{"key": "c1", "claim_type": "cited",'
               ' "cites": []}], "placeholders": []}')
+COVER_JSON = ('{"coverage": [{"sentence": "升温加速", "card_keys": ["f1"],'
+              ' "covered": true}, {"sentence": "未成卡的对比", "card_keys": [],'
+              ' "covered": false, "suggestion": "应成 cited claim"}]}')
 
 
 class FakeInspireClient:
@@ -42,7 +45,8 @@ def _client(**overrides) -> FakeInspireClient:
     responses = {"【灵感·逻辑核查】": LOGIC_JSON,
                  "【灵感·卡片拆解】": EXTRACT_JSON,
                  "【灵感·现有卡审查】": REVIEW_JSON,
-                 "【灵感·匹配】": MATCH_JSON}
+                 "【灵感·匹配】": MATCH_JSON,
+                 "【灵感·成卡覆盖】": COVER_JSON}
     responses.update(overrides)
     return FakeInspireClient(responses)
 
@@ -101,7 +105,8 @@ def test_run_inspire_infra_failure_maps_to_failed():
 
 def test_run_inspire_missing_node_output_is_failed():
     responses = {"【灵感·逻辑核查】": LOGIC_JSON, "【灵感·卡片拆解】": EXTRACT_JSON,
-                 "【灵感·现有卡审查】": REVIEW_JSON, "【灵感·匹配】": MATCH_JSON}
+                 "【灵感·现有卡审查】": REVIEW_JSON, "【灵感·匹配】": MATCH_JSON,
+                 "【灵感·成卡覆盖】": COVER_JSON}
     client = FakeInspireClient({k: v for k, v in responses.items()
                                 if k != "【灵感·匹配】"})
     with pytest.raises(InspireError, match="E-INSPIRE-FAILED"):
@@ -130,7 +135,8 @@ def test_run_persists_checkpoints_and_no_root_residue(tmp_path):
 def test_run_resumes_from_checkpoint_after_failure(tmp_path):
     """t04 失败后重跑同一灵感：只补跑失败节点，已完成节点不重算。"""
     project = _project(tmp_path)
-    flaky = _client(**{"【灵感·匹配】": "这不是 JSON"})
+    flaky = _client(**{"【灵感·匹配】": "这不是 JSON",
+                       "【灵感·成卡覆盖】": "这不是 JSON"})
     with pytest.raises(InspireError):
         run_inspire(project, "随手记", client=flaky, source="idea.md")
 
@@ -150,4 +156,4 @@ def test_run_fresh_after_completed_run(tmp_path):
     second = _client()
     result = run_inspire(project, "随手记", client=second, source="idea.md")
     assert result.resumed is False
-    assert len([p for p in second.prompts]) == 4
+    assert len([p for p in second.prompts]) == 5

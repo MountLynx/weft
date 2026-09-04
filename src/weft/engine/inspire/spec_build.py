@@ -10,6 +10,7 @@ _TICK_HARNESS = {
     "t02": "inspire_extract",
     "t03": "inspire_review",
     "t04": "inspire_match",
+    "t05": "inspire_cover",
 }
 
 _TEMPERATURE = 0.2   # 拆解/审查/匹配都要收敛，不用创作温度
@@ -18,7 +19,10 @@ _EXTRACT_SCHEMA = (
     '输出 JSON：{"cards": [{"key": "f1/c1/…临时编号", "kind": "fact|claim",'
     ' "statement": "原子陈述", "placeholder": false, "needs_citation": false}],'
     ' "links": [{"from": "f1", "to": "c1"}]}。'
-    "规则：数据表述→fact，观点/论断→claim；\"xxx/某值\"类占位数据置 placeholder=true；"
+    "规则：数据表述→fact，观点/论断→claim；"
+    "本研究数据与文献值的对比→claim（needs_citation=true），"
+    "其中本研究自己的数据表述另拆一张 fact 卡并用 link 支持该对比 claim；"
+    "\"xxx/某值\"类占位数据置 placeholder=true；"
     "needs_citation=该论断语义上是否需要文献支撑；links 只表达新 fact 支持新 claim。"
 )
 
@@ -86,12 +90,33 @@ def _match_prompt(inspiration_text: str, digest: str) -> str:
     )
 
 
+_COVER_SCHEMA = (
+    '输出 JSON：{"coverage": [{"sentence": "原文要点摘录", "card_keys": ["覆盖它的草案卡 key"],'
+    ' "covered": true|false, "suggestion": ""}]}。'
+    "规则：把灵感全文逐要点对账（每个数据点、论断、对比、引用都要核对）；"
+    "被至少一张草案卡覆盖→covered=true 并填 card_keys；"
+    "没有任何卡覆盖→covered=false 且 suggestion 必填（该补什么卡 / 需补 data / 为何弃置）。"
+)
+
+
+def _cover_prompt(inspiration_text: str) -> str:
+    return (
+        "【灵感·成卡覆盖】\n"
+        "任务：审查拆卡覆盖情况——逐要点核对灵感原文是否都被草案卡覆盖，"
+        "宁可多报不可漏报。\n"
+        f"灵感全文：\n{inspiration_text}\n"
+        "卡片草案（JSON）：\n{t02}\n"
+        + _COVER_SCHEMA
+    )
+
+
 def build_inspire_tasklist(inspiration_text: str, digest: str) -> Tasklist:
     prompts = {
         "t01": _logic_prompt(inspiration_text),
         "t02": _extract_prompt(inspiration_text),
         "t03": _review_prompt(digest),
         "t04": _match_prompt(inspiration_text, digest),
+        "t05": _cover_prompt(inspiration_text),
     }
     tasks: dict[str, TaskDefinition] = {}
     for tick, prompt in prompts.items():
@@ -105,6 +130,8 @@ def build_inspire_tasklist(inspiration_text: str, digest: str) -> Tasklist:
             kwargs["inputs"] = {"t02": "t02"}
         elif tick == "t04":
             kwargs["inputs"] = {"t02": "t02", "t03": "t03"}
+        elif tick == "t05":
+            kwargs["inputs"] = {"t02": "t02"}
         tasks[tick] = TaskDefinition(**kwargs)
-    flow = "[t01] --> t02\nt02 --> t03\nt03 --> t04"
+    flow = "[t01] --> t02\nt02 --> t03\nt03 --> t04\nt04 --> t05"
     return Tasklist(tasks=tasks, flow=flow)

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from weft.engine.inspire.cards import write_proposal, write_proposed_cards
 from weft.engine.inspire.schemas import (
+    CoverageOutput,
     ExtractOutput,
     LogicOutput,
     MatchOutput,
@@ -50,7 +51,8 @@ def _all_ids(project: Project) -> set[str]:
 
 def apply_inspiration(project: Project, *, source: Path, logic: LogicOutput,
                       extract: ExtractOutput, review: ReviewOutput,
-                      match: MatchOutput) -> ApplyOutcome:
+                      match: MatchOutput,
+                      coverage: CoverageOutput | None = None) -> ApplyOutcome:
     root = project.root
     inspirations = root / "inspirations"
     if source.parent != inspirations or not source.is_file():
@@ -179,14 +181,15 @@ def apply_inspiration(project: Project, *, source: Path, logic: LogicOutput,
     report = root / "generated" / "inspirations" / f"{source.stem}-report.md"
     outcome.report = _write_report(report, source, logic, contradictions,
                                    outcome.written_cards, outcome.proposals,
-                                   match, outcome.notes)
+                                   match, outcome.notes, coverage)
     return outcome
 
 
 def _write_report(report: Path, source: Path, logic: LogicOutput,
                   contradictions: list[str], cards: list[Path],
                   proposals: list[Path], match: MatchOutput,
-                  notes: list[str]) -> Path:
+                  notes: list[str],
+                  coverage: CoverageOutput | None = None) -> Path:
     lines = [f"# 灵感处理报告：{source.name}", ""]
     lines += ["## 逻辑核查（建议性）", ""]
     lines += [f"- {issue}" for issue in logic.issues] or ["- （无）"]
@@ -210,6 +213,13 @@ def _write_report(report: Path, source: Path, logic: LogicOutput,
     if not any(m.claim_type == "cited" and not m.cites for m in match.claim_cites) \
             and not match.placeholders:
         lines.append("- （无）")
+    if coverage is not None:
+        lines += ["", "## 成卡覆盖审查", ""]
+        missed = [c for c in coverage.coverage if not c.covered]
+        lines.append(f"- 覆盖 {len(coverage.coverage) - len(missed)}"
+                     f"/{len(coverage.coverage)} 个要点")
+        for c in missed:
+            lines.append(f"- 未成卡：“{c.sentence}”——{c.suggestion}")
     lines += ["", "## 丢弃与提示", ""]
     lines += [f"- {n}" for n in notes] or ["- （无）"]
     lines.append("")

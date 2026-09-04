@@ -28,6 +28,7 @@ from pydantic import ValidationError
 
 from weft.digest import build_digest
 from weft.engine.inspire.schemas import (
+    CoverageOutput,
     ExtractOutput,
     LogicOutput,
     MatchOutput,
@@ -41,10 +42,11 @@ _HARNESS_CORES = {
     "inspire_extract": "你是学术写作引擎的卡片拆解器，只输出 JSON。",
     "inspire_review": "你是元数据卡审查器，必须对照现有卡索引穷举比对，只输出 JSON。",
     "inspire_match": "你是文献与数据匹配器，只准使用索引中出现的 key，只输出 JSON。",
+    "inspire_cover": "你是成卡覆盖审查器，逐要点对账原文与草案卡，宁可多报不可漏报，只输出 JSON。",
 }
 _TICK_MODELS = {"t01": LogicOutput, "t02": ExtractOutput,
-                "t03": ReviewOutput, "t04": MatchOutput}
-_MAX_TICKS = 12   # 4 节点链 + 余量（M2 决策 14d）
+                "t03": ReviewOutput, "t04": MatchOutput, "t05": CoverageOutput}
+_MAX_TICKS = 14   # 5 节点链 + 余量（M2 决策 14d）
 
 
 class InspireError(Exception):
@@ -58,6 +60,7 @@ class InspireResult:
     extract: ExtractOutput
     review: ReviewOutput
     match: MatchOutput
+    coverage: CoverageOutput
     module_id: str = ""
     resumed: bool = False
 
@@ -192,5 +195,5 @@ def run_inspire(project: Project, text: str, *, client,
                 f"{exc.errors()[0]['msg']}") from exc
     return InspireResult(run_id=module_id, logic=parsed["t01"],
                          extract=parsed["t02"], review=parsed["t03"],
-                         match=parsed["t04"], module_id=module_id,
-                         resumed=resumed)
+                         match=parsed["t04"], coverage=parsed["t05"],
+                         module_id=module_id, resumed=resumed)
