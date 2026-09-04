@@ -11,14 +11,15 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 - `docs/superpowers/specs/2026-09-02-weft-v1.1-design.md` — 设计 v1.1 增补（method/param、目录树、workflow、assemble）；与 v1 冲突处以 v1.1 为准
 - `docs/superpowers/plans/2026-09-02-weft-v1.1-implementation.md` — v1.1 实现计划，其"设计决策 1-23"为执行期定案（workflow 判定、前文传递、assemble heading 映射等语义）
 - `docs/superpowers/specs/2026-09-02-weft-m3-render-design.md` — M3 渲染层设计定案（paper.qmd 拼接、References refs div、Figures/Tables 字面编号、assets 资源约定）
+- `docs/superpowers/specs/2026-09-04-weft-inspire-design.md` — 灵感式写作→卡片管线设计定案（摘要索引、T1–T4 节点、落盘闭包、replace 替换归档）；其计划文档 `2026-09-04-weft-inspire.md` 含执行期决策 D1–D10
 
 ## 常用命令（Windows + Git Bash）
 
 ```bash
 .venv/Scripts/python.exe -m pip install -e ".[dev]"     # 安装（含 pytest）
-.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（约 247 passed, 1 deselected）
+.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（约 287 passed, 1 deselected）
 .venv/Scripts/python.exe -m pytest tests/test_xxx.py -v # 聚焦测试
-.venv/Scripts/weft.exe --help                           # CLI：init / validate / graph / review / draft / assemble / render
+.venv/Scripts/weft.exe --help                           # CLI：init / validate / graph / review / draft / assemble / render / inspire / replace / missing-cites
 WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实 LLM 冒烟（默认排除，双保险门）
 ```
 
@@ -31,8 +32,8 @@ WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实
 1. **分层**：`src/weft/engine/` 是全项目唯一允许 import `module_harness` / `llm`（PyPI 包 `specmodule[openai]==0.1.4`，版本锁定）的 src 层。违规会被 `tests/test_engine_layering.py` 抓住。tests/ 豁免（可 import llm.client 造假响应）。
 2. **数据结构 v1 冻结**：卡片 schema（`src/weft/models/`，pydantic `extra="forbid"`）不改；schema 变更走设计文档 §3 迁移流程。
 3. **加载永不中断**：store 加载对单卡解析/编码/IO 失败一律转 `E-PARSE` 诊断后继续（宁可一次看全所有问题）。
-4. **路径白名单**：AI 产物唯一落盘点是 `engine/drafts.py::write_draft` 的 `drafts/<part_id>.md`（固定 LF，写入前归一化 CRLF）；SpecModule 以零残留模式运行（`persist/status_file/keep_records/stream_log` 全 False），磁盘上不得出现 `.specmodule/` 残留。
-5. **诊断码是稳定标识**：`E-*`（错误，阻断）/`W-*`（提醒，不阻断），总表见 M1/M2/v1.1 计划文档及 `2026-09-04-weft-init.md`（E-INIT-COLLISION）；新增码必须进表。生成时诊断 path=`drafts/<part>.md`、field=`<节点id>.<字段>`。
+4. **路径白名单**：AI 产物唯一落盘点是 `engine/drafts.py::write_draft` 的 `drafts/<part_id>.md` 与 `engine/inspire/cards.py` 的 `metadata/` 草稿卡 + `inspirations/proposals/` 提案（均固定 LF，写入前归一化 CRLF）；SpecModule 以零残留模式运行（`persist/status_file/keep_records/stream_log` 全 False），磁盘上不得出现 `.specmodule/` 残留。
+5. **诊断码是稳定标识**：`E-*`（错误，阻断）/`W-*`（提醒，不阻断），总表见 M1/M2/v1.1 计划文档及 `2026-09-04-weft-init.md`（E-INIT-COLLISION）、`2026-09-04-weft-inspire.md`（E-INSPIRE-SHAPE / E-INSPIRE-FAILED）；新增码必须进表。生成时诊断 path=`drafts/<part>.md`、field=`<节点id>.<字段>`。
 6. **生成闸门**：`weft draft` 先跑 `validate_project`，有任何 error 即拒绝生成；生成时硬规则（引文必须在 bib——正文 `[@key]` 与结构化 cites 双通道、uses 越界）在 run 内抛 `DraftRuleError` → 退出码 1 且不写 drafts。
 
 ## SpecModule 嵌入要点（实测语义，勿凭直觉改）
