@@ -1,4 +1,4 @@
-"""weft draft 命令：校验闸门、节查找、mock 端到端。"""
+"""weft draft 命令：校验闸门、节查找、mock 端到端（v2 六节点管线）。"""
 from typer.testing import CliRunner
 
 from weft.cli import app
@@ -16,11 +16,11 @@ def test_draft_section_not_found(tmp_path):
 
 def test_draft_nothing_approved(tmp_path):
     make_minimal_project(tmp_path)
-    write_card(tmp_path / "narrative" / "02-intro", "part-01",
-               {"id": "sec-02", "section": "Intro",
-                "nodes": [{"id": "para-02-01", "purpose": "describe",
+    write_card(tmp_path / "narrative" / "01-results", "part-01",
+               {"id": "sec-01", "section": "Results",
+                "nodes": [{"id": "para-01-01", "purpose": "describe",
                            "uses": [], "status": "draft"}]})
-    result = runner.invoke(app, ["draft", "sec-02", str(tmp_path)])
+    result = runner.invoke(app, ["draft", "sec-01", str(tmp_path)])
     assert result.exit_code == 1
     assert "E-NOTHING-TO-DRAFT" in result.output
 
@@ -43,15 +43,11 @@ def test_draft_mock_writes_traceable_file(tmp_path):
     out = (tmp_path / "drafts" / "sec-01.md").read_text(encoding="utf-8")
     assert "<!-- weft:run=" in out
     assert "<!-- weft:node=para-01-01 uses=fact-01 -->" in out
-    assert "（mock 段落）正文。" in out
+    assert "（mock 段落）" in out
+    assert "Fig. 1a" in out                        # 占位符已确定性填充
+    assert "{{" not in out
     assert "已写入 drafts/sec-01.md" in result.output
-
-
-def test_draft_mock_no_align_flag(tmp_path):
-    make_minimal_project(tmp_path)
-    result = runner.invoke(app, ["draft", "sec-01", "--mock", "--no-align",
-                                 str(tmp_path)])
-    assert result.exit_code == 0, result.output
+    assert "1 段" in result.output
 
 
 def test_draft_skips_non_approved_nodes(tmp_path):
@@ -73,6 +69,21 @@ def test_draft_skips_non_approved_nodes(tmp_path):
     assert "para-01-02" not in out
 
 
+def test_draft_check_fix_overrides_paragraph(tmp_path, monkeypatch):
+    import weft.engine
+    from weft.engine.clients import ScriptedLLMClient
+
+    make_minimal_project(tmp_path)
+    monkeypatch.setattr(
+        weft.engine, "make_client",
+        lambda mock, project_root=None: ScriptedLLMClient(
+            check_fix="复核修正 {{fact-01}}。"))
+    result = runner.invoke(app, ["draft", "sec-01", "--mock", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    out = (tmp_path / "drafts" / "sec-01.md").read_text(encoding="utf-8")
+    assert "复核修正" in out and "Fig. 1a" in out
+
+
 def test_draft_run_failure_prints_error_and_writes_nothing(tmp_path, monkeypatch):
     import weft.engine
     from weft.engine.clients import ScriptedLLMClient
@@ -84,15 +95,3 @@ def test_draft_run_failure_prints_error_and_writes_nothing(tmp_path, monkeypatch
     assert result.exit_code == 1
     assert "E-DRAFT-SHAPE" in result.output
     assert not (tmp_path / "drafts" / "sec-01.md").exists()
-
-
-def test_draft_prints_soft_reminders_as_warn(tmp_path, monkeypatch):
-    import weft.engine
-    from weft.engine.clients import ScriptedLLMClient
-
-    make_minimal_project(tmp_path)
-    monkeypatch.setattr(weft.engine, "make_client",
-                        lambda mock, project_root=None: ScriptedLLMClient(cites=["key2020"]))
-    result = runner.invoke(app, ["draft", "sec-01", "--mock", str(tmp_path)])
-    assert result.exit_code == 0, result.output
-    assert "WARN W-CITE-NOT-IN-CLAIM" in result.output

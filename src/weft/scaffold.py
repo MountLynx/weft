@@ -77,8 +77,17 @@ nodes: []
 part id（sec-01）是 `weft draft` 的寻址单位；正文由生成与拼装流水线产出，不手写在这里。
 """
 
+_OVERVIEW_MD = """# 研究总述（overview）
+
+<!-- weft draft 的 g 节点会把本文件作为全文背景注入生成提示；
+写清研究问题、体系、核心贡献与章节逻辑即可，不必写成正文。 -->
+
+（在此撰写研究总述……）
+"""
+
 SCAFFOLD_FILES: dict[str, str] = {
     "_quarto.yml": _QUARTO_YML,
+    "overview.md": _OVERVIEW_MD,
     "weft.yaml": _WEFT_YAML,
     "index.qmd": _INDEX_QMD,
     "assets/references.bib": _REFERENCES_BIB,

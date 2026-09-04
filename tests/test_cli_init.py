@@ -11,7 +11,7 @@ def test_cli_init_then_validate(tmp_path):
     result = runner.invoke(app, ["init", str(target)])
     assert result.exit_code == 0, result.output
     assert "已创建" in result.output
-    assert result.output.count("已创建 ") == 6  # 6 个骨架文件，目录不逐行打印
+    assert result.output.count("已创建 ") == 7  # 7 个骨架文件，目录不逐行打印
     validate_result = runner.invoke(app, ["validate", str(target)])
     assert validate_result.exit_code == 0, validate_result.output
     assert "0 个错误，0 个提醒" in validate_result.output

@@ -131,9 +131,8 @@ def draft(
     part_id: str = typer.Argument(..., help="part id，如 part-startup-01"),
     project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
     mock: bool = typer.Option(False, "--mock", help="免 key 假客户端（管线冒烟）"),
-    no_align: bool = typer.Option(False, "--no-align", help="跳过对齐检查节点"),
 ) -> None:
-    """对指定叙事 part 执行生成（SpecModule run），产物写入 drafts/<part>.md。"""
+    """对指定叙事 part 逐节点执行六节点生成管线，产物写入 drafts/<part>.md。"""
     from weft.engine import DraftError, DraftRuleError, make_client, run_draft
     from weft.engine.drafts import render_draft_markdown, write_draft
     from weft.workflow import resolve_workflow
@@ -151,7 +150,8 @@ def draft(
             Level.ERROR, "E-PART-NOT-FOUND", ".", None,
             f"叙事 part {part_id} 不存在")])
         raise typer.Exit(code=1)
-    if not any(n.status == "approved" for n in part.nodes):
+    approved = [n for n in part.nodes if n.status == "approved"]
+    if not approved:
         _print_diagnostics([Diagnostic(
             Level.ERROR, "E-NOTHING-TO-DRAFT",
             project.part_paths[part.id].as_posix(), None,
@@ -159,28 +159,49 @@ def draft(
         raise typer.Exit(code=1)
 
     warnings = [d for d in diagnostics if not d.is_error]
+    overview_path = project.root / "overview.md"
+    overview = overview_path.read_text(encoding="utf-8") if overview_path.exists() else ""
+    workflow = resolve_workflow(part, project.part_chapters[part.id])
+    client = make_client(mock, project_root=project.root)
 
+    paragraphs: dict[str, str] = {}
+    all_reminders: list[str] = []
+    run_id = ""
     try:
-        client = make_client(mock, project_root=project.root)
-        result = run_draft(project, part, client=client, align=not no_align,
-                           workflow=resolve_workflow(part,
-                                                     project.part_chapters[part.id]))
+        for node in approved:
+            tail = None
+            for other in project.parts:
+                if other.id == part_id:
+                    break
+                draft_file = project.root / "drafts" / f"{other.id}.md"
+                if draft_file.exists():
+                    blocks = [ln for ln in draft_file.read_text(encoding="utf-8").splitlines()
+                              if ln.strip() and not ln.startswith("<!--")]
+                    if blocks:
+                        tail = blocks[-1]
+            result = run_draft(project, part, node, client=client,
+                               workflow=workflow, overview=overview,
+                               prior_paragraphs=[paragraphs[n.id] for n in approved
+                                                 if n.id in paragraphs],
+                               prev_tail=tail)
+            paragraphs[node.id] = result.paragraph
+            all_reminders.extend(result.reminders)
+            run_id = result.run_id
     except (DraftRuleError, DraftError) as exc:
         typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc
 
-    paragraphs = {nid: d["paragraph"] for nid, d in result.drafts_by_node.items()}
-    content = render_draft_markdown(part, paragraphs, result.run_id)
+    content = render_draft_markdown(part, paragraphs, run_id)
     try:
         path = write_draft(project, part.id, content)
     except OSError as exc:
         typer.echo(f"ERROR 无法写入 drafts/：{exc}")
         raise typer.Exit(code=1) from exc
-    for reminder in result.reminders:
+    for reminder in all_reminders:
         typer.echo(f"WARN {reminder}")
     typer.echo(
         f"已写入 {path.relative_to(project.root).as_posix()}"
-        f"（{len(paragraphs)} 段，run={result.run_id}）")
+        f"（{len(paragraphs)} 段，run={run_id}）")
     if warnings:
         _print_diagnostics(warnings)
 

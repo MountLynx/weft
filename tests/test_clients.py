@@ -12,44 +12,43 @@ def _complete(client, **kwargs):
     return asyncio.run(client.complete(**kwargs))
 
 
-def test_scripted_returns_draft_shape_and_records_prompt():
+def test_scripted_gen_extracts_ids_and_emits_placeholders():
     client = ScriptedLLMClient(paragraph="_mock_段。")
-    resp = _complete(client, prompt="你是学术写作引擎 weft 的行文器。任务提示",
-                     output_format={"type": "json_object"})
-    assert json.loads(resp.content) == {"paragraph": "_mock_段。", "uses": [], "cites": []}
-    assert client.prompts == ["你是学术写作引擎 weft 的行文器。任务提示"]
+    prompt = ('【draft·起草】\nuses：\n[{"id": "fact-01", "kind": "fact"},'
+              '{"id": "claim-01", "kind": "claim"}]')
+    resp = _complete(client, prompt=prompt)
+    assert resp.content == "_mock_段。{{fact-01}}{{claim-01}}"   # v2：g 输出纯文本
 
 
-def test_scripted_aligned_for_align_prompt():
+def test_scripted_check_pass_and_fix():
     client = ScriptedLLMClient()
-    resp = _complete(client, prompt="你是对齐检查器。判断当前节点产出是否偏离 spec 目标。")
-    assert json.loads(resp.content)["aligned"] is True
+    assert json.loads(_complete(
+        client, prompt="【draft·校验】审查")["content"]
+        if False else _complete(client, prompt="【draft·校验】审查").content
+    ) == {"verdict": "pass"}
+    fixer = ScriptedLLMClient(check_fix="修正 {{fact-01}}。")
+    payload = json.loads(_complete(fixer, prompt="【draft·校验】").content)
+    assert payload["verdict"] == "fix" and "fact-01" in payload["paragraph"]
 
 
-def test_scripted_custom_uses_and_cites():
-    client = ScriptedLLMClient(uses=["claim-99"], cites=["keyother"])
-    resp = _complete(client, prompt="行文器")
-    assert json.loads(resp.content)["uses"] == ["claim-99"]
+def test_scripted_link_and_polish_echo_delimited_text():
+    client = ScriptedLLMClient()
+    prompt = "【draft·衔接】\n当前工作文本：\n<<<PARAGRAPH\n工作文本。\nPARAGRAPH>>>"
+    assert _complete(client, prompt=prompt).content == "工作文本。"
+    prompt2 = "【draft·润色】\n<<<PARAGRAPH\n润色前。\nPARAGRAPH>>>"
+    assert _complete(client, prompt=prompt2).content == "润色前。"
 
 
-def test_scripted_broken_flag_returns_non_json():
-    client = ScriptedLLMClient(broken=True)
-    with pytest.raises(json.JSONDecodeError):
-        json.loads(_complete(client, prompt="行文器").content)
+def test_scripted_inspire_branches_still_work():
+    client = ScriptedLLMClient(logic_issues=["x"])
+    assert json.loads(_complete(client, prompt="【灵感·逻辑核查】y").content) == \
+        {"issues": ["x"]}
+    assert "cards" in _complete(client, prompt="【灵感·卡片拆解】y").content
+    assert json.loads(_complete(client, prompt="【灵感·成卡覆盖】y").content) == \
+        {"coverage": []}
 
 
-def test_make_client_mock_returns_scripted():
-    assert isinstance(make_client(mock=True), ScriptedLLMClient)
-
-
-def test_make_client_real_failure_wraps_draft_error(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)   # 空目录：无 config.json → from_env 报 ValueError
-    with pytest.raises(DraftError) as excinfo:
-        make_client(mock=False)
-    assert "真实 LLM 客户端构造失败" in str(excinfo.value)
-
-
-def test_align_routing_keyword_matches_builtin_prompt():
-    from module_harness.align import ALIGN_CHECK_CONFIG
-
-    assert "你是对齐检查器" in ALIGN_CHECK_CONFIG.prompt_core
+def test_make_client_mock_and_real_error(tmp_path):
+    assert isinstance(make_client(True), ScriptedLLMClient)
+    with pytest.raises(DraftError, match="真实 LLM 客户端构造失败"):
+        make_client(False, project_root=tmp_path)

@@ -9,6 +9,7 @@ from weft.validation import validate_project
 
 SCAFFOLD_FILES = (
     "_quarto.yml",
+    "overview.md",
     "weft.yaml",
     "index.qmd",
     "assets/references.bib",

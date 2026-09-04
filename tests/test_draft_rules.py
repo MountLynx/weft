@@ -1,189 +1,84 @@
-"""生成时校验三规则（spec §4 生成时行）+ harness 输出形状解析。"""
+"""f 脚本核心：占位符确定性填充（图表字面编号 / [@cites]）与越界硬规则。"""
+import pytest
+
 from tests.helpers import build_project
 from weft.diagnostics import Level
 from weft.engine.draft_rules import (
-    DraftError,
     DraftRuleError,
-    check_node_draft,
-    parse_node_draft,
+    CheckOutput,
+    GenOutput,
+    fill_placeholders,
+    parse_output,
 )
-from weft.models.cards import ClaimCard, ParamCard
+from weft.models.cards import ClaimCard, DataCard, FactCard
+from weft.models.figures import FigureEntry
 from weft.models.narrative import Node, Use
 
-SEC = "sec-01"
-NODE_ID = "para-01-01"
 
-
-def _node(uses=("fact-01", "claim-01")):
-    # claim-01 须在 uses 内：规则 2 的允许集 = 节点所用 claim 的 cites 并集
-    # （与 run 层测试 test_engine_run.py 的节点接线一致）
-    return Node(id=NODE_ID, purpose="describe",
-                uses=[Use(id=u, role="evidence") for u in uses], status="approved")
-
-
-def _project(bib=("key2020",), claim_cites=("key2020",)):
+def _project():
     return build_project(
-        bib_keys=set(bib),
-        claims=[ClaimCard(id="claim-01", claim_type="cited", statement="s",
-                          cites=list(claim_cites), status="approved")],
+        data=[DataCard(id="data-01", refs=["fig-01a", "fig-01b"],
+                       description="速率", status="approved"),
+              DataCard(id="data-02", refs=["tbl-01"], description="汇总",
+                       status="approved")],
+        facts=[FactCard(id="fact-01", data=["data-01"], statement="s1",
+                        supports=["claim-01"], status="approved"),
+               FactCard(id="fact-02", data=["data-02"], statement="s2",
+                        status="approved")],
+        claims=[ClaimCard(id="claim-01", claim_type="cited", statement="c1",
+                          cites=["key2020"], status="approved"),
+                ClaimCard(id="claim-02", claim_type="cited", statement="c2",
+                          cites=[], status="approved")],
+        figures={"fig-01": FigureEntry(caption="速率曲线"),
+                 "tbl-01": FigureEntry(caption="汇总表")},
+        bib_keys={"key2020"},
     )
 
 
-def test_parse_ok():
-    draft, diag = parse_node_draft(
-        {"paragraph": "正文。", "uses": ["fact-01"], "cites": []}, NODE_ID, SEC)
-    assert diag is None
-    assert draft["paragraph"] == "正文。"
+def _node(*uses):
+    return Node(id="para-01-01", purpose="describe",
+                uses=[Use(id=u, role="evidence") for u in uses],
+                status="approved")
 
 
-def test_parse_non_dict():
-    draft, diag = parse_node_draft("not json", NODE_ID, SEC)
-    assert draft is None
-    assert diag.code == "E-DRAFT-SHAPE"
-    assert diag.path == f"drafts/{SEC}.md"
-    assert diag.field == f"{NODE_ID}.output"
+def test_fill_fact_label_and_claim_cites():
+    text, reminders = fill_placeholders(
+        "速率见图 {{fact-01}}；汇总见 {{fact-02}}；结论成立 {{claim-01}}。",
+        _node("fact-01", "fact-02", "claim-01"), "sec-01", _project())
+    assert "Fig. 1a；Fig. 1b" in text
+    assert "Table 1" in text
+    assert "（[@key2020]）" in text
+    assert reminders == []
 
 
-def test_parse_empty_paragraph():
-    _, diag = parse_node_draft({"paragraph": "  ", "uses": [], "cites": []}, NODE_ID, SEC)
-    assert diag.code == "E-DRAFT-SHAPE"
+def test_fill_empty_cites_warns():
+    text, reminders = fill_placeholders(
+        "图 {{fact-01}} 文献 {{claim-02}}。",
+        _node("fact-01", "claim-02"), "sec-01", _project())
+    assert "{{" not in text and "（[" not in text
+    assert any("W-CITES-EMPTY" in r for r in reminders)
 
 
-def test_parse_bad_uses_type():
-    _, diag = parse_node_draft({"paragraph": "p", "uses": "fact-01", "cites": []}, NODE_ID, SEC)
-    assert diag.code == "E-DRAFT-SHAPE"
+def test_fill_placeholder_outside_uses_raises():
+    with pytest.raises(DraftRuleError) as exc:
+        fill_placeholders("越界 {{fact-02}}。", _node("fact-01"),
+                          "sec-01", _project())
+    assert exc.value.diagnostic.code == "E-DRAFT-USES"
 
 
-def test_rule3_uses_beyond_node():
-    diags = check_node_draft({"paragraph": "p", "uses": ["claim-99"], "cites": []},
-                             _node(), _project(), SEC)
-    assert [d.code for d in diags] == ["E-USES-BEYOND-NODE"]
-    assert diags[0].level is Level.ERROR
+def test_fill_bad_bib_raises():
+    proj = _project()
+    with pytest.raises(DraftRuleError) as exc:
+        fill_placeholders("引 [@ghost2020] {{claim-01}}。",
+                          _node("claim-01"), "sec-01", proj)
+    assert exc.value.diagnostic.code == "E-CITE-NOT-IN-BIB"
 
 
-def test_rule1_cite_not_in_bib():
-    diags = check_node_draft({"paragraph": "p", "uses": [], "cites": ["nokey"]},
-                             _node(), _project(), SEC)
-    assert [d.code for d in diags] == ["E-CITE-NOT-IN-BIB"]
-
-
-def test_rule2_cite_not_in_claim_cites_is_warning():
-    # keyother 在 bib 内但不属于 claim-01 的 cites → 纯提醒不阻断
-    diags = check_node_draft({"paragraph": "p", "uses": [], "cites": ["keyother"]},
-                             _node(), _project(bib=("key2020", "keyother")), SEC)
-    assert [d.code for d in diags] == ["W-CITE-NOT-IN-CLAIM"]
-    assert diags[0].level is Level.WARNING
-
-
-def test_rule2_pass_when_cite_belongs_to_claim():
-    diags = check_node_draft({"paragraph": "p", "uses": [], "cites": ["key2020"]},
-                             _node(), _project(), SEC)
-    assert diags == []
-
-
-def test_error_types():
-    _, diag = parse_node_draft(42, NODE_ID, SEC)
-    assert isinstance(DraftRuleError(diag), RuntimeError)
-    assert isinstance(DraftError("x"), RuntimeError)
-
-
-def test_missing_uses_cites_keys_do_not_raise():
-    draft, _ = parse_node_draft({"paragraph": "p"}, NODE_ID, SEC)
-    assert check_node_draft(draft, _node(), _project(), SEC) == []
-
-
-def test_multiple_violations_accumulate():
-    diags = check_node_draft({"paragraph": "p", "uses": ["claim-99"], "cites": ["nokey"]},
-                             _node(), _project(), SEC)
-    assert [d.code for d in diags] == ["E-USES-BEYOND-NODE", "E-CITE-NOT-IN-BIB"]
-
-
-def test_rule3_message_uses_kong_when_node_has_no_uses():
-    node = _node(uses=())
-    diags = check_node_draft({"paragraph": "p", "uses": ["claim-99"], "cites": []},
-                             node, _project(), SEC)
-    assert "（空）" in diags[0].message
-
-
-def test_draft_rule_error_str_and_diagnostic():
-    _, diag = parse_node_draft(42, NODE_ID, SEC)
-    err = DraftRuleError(diag)
-    assert err.diagnostic is diag
-    assert str(err) == f"[{diag.code}] {diag.path} 字段 {diag.field}: {diag.message}"
-
-
-def test_rule1_prose_cite_not_in_bib():
-    diags = check_node_draft(
-        {"paragraph": "结果 [@fact-01] 支持……", "uses": [], "cites": ["key2020"]},
-        _node(), _project(), SEC)
-    assert [d.code for d in diags] == ["E-CITE-NOT-IN-BIB"]
-    assert diags[0].field.endswith("paragraph")
-
-
-def test_rule2_prose_cite_not_in_claim_cites_is_warning():
-    diags = check_node_draft(
-        {"paragraph": "如 [@keyother] 所示。", "uses": [], "cites": []},
-        _node(), _project(bib=("key2020", "keyother")), SEC)
-    assert [d.code for d in diags] == ["W-CITE-NOT-IN-CLAIM"]
-    assert diags[0].field.endswith("paragraph")
-
-
-def test_prose_and_structured_cite_dedup():
-    diags = check_node_draft(
-        {"paragraph": "见 [@nokey]。", "uses": [], "cites": ["nokey"]},
-        _node(), _project(), SEC)
-    assert [d.code for d in diags] == ["E-CITE-NOT-IN-BIB"]   # 单条诊断
-
-
-def test_multi_cite_bracket_form_supported():
-    diags = check_node_draft(
-        {"paragraph": "见 [@key2020; @keyother]。", "uses": [], "cites": []},
-        _node(), _project(bib=("key2020", "keyother")), SEC)
-    # key2020 ∈ claim-01.cites → 静默通过；仅 keyother 触发 W（正文通道）
-    assert [d.code for d in diags] == ["W-CITE-NOT-IN-CLAIM"]
-    assert "keyother" in diags[0].message
-    assert diags[0].field.endswith("paragraph")
-
-
-def test_bare_crossref_not_flagged():
-    diags = check_node_draft(
-        {"paragraph": "如图 @fig-01a 所示。", "uses": [], "cites": []},
-        _node(), _project(), SEC)
-    assert diags == []
-
-
-def test_methods_workflow_skips_citation_rules():
-    # §4.3：methods 裁剪规则 1/2；正文里的 [@ghost] 也不拦
-    diags = check_node_draft(
-        {"paragraph": "p [@ghost2020]", "uses": [], "cites": ["nokey"]},
-        _node(), _project(), SEC, workflow="methods")
-    assert diags == []
-
-
-def test_results_workflow_keeps_citation_rules():
-    diags = check_node_draft({"paragraph": "p", "uses": [], "cites": ["nokey"]},
-                             _node(), _project(), SEC, workflow="results")
-    assert [d.code for d in diags] == ["E-CITE-NOT-IN-BIB"]
-
-
-def test_used_param_without_values_is_error():
-    # §4.3 校验裁剪保留项：参数存在性（全工作流）
-    project = build_project(
-        claims=[ClaimCard(id="claim-01", claim_type="cited", statement="s",
-                          cites=["key2020"], status="approved")],
-        params=[ParamCard(id="qpcr-main", method="qpcr", values={},
-                          status="approved")],
-        bib_keys={"key2020"})
-    diags = check_node_draft({"paragraph": "p", "uses": [], "cites": []},
-                             _node(uses=("qpcr-main",)), project, SEC)
-    assert [d.code for d in diags] == ["E-PARAM-NO-VALUES"]
-    assert diags[0].level is Level.ERROR
-
-
-def test_used_param_with_values_passes():
-    project = build_project(
-        params=[ParamCard(id="qpcr-main", method="qpcr",
-                          values={"instrument": "QS5"}, status="approved")])
-    diags = check_node_draft({"paragraph": "p", "uses": [], "cites": []},
-                             _node(uses=("qpcr-main",)), project, SEC)
-    assert diags == []
+def test_parse_output_shapes():
+    ok, diag = parse_output({"paragraph": "x"}, GenOutput, "n", "s")
+    assert ok.paragraph == "x" and diag is None
+    bad, diag = parse_output({"verdict": "fix"}, CheckOutput, "n", "s")
+    assert bad is None and diag.code == "E-DRAFT-SHAPE"
+    assert diag.level == Level.ERROR
+    ok, _ = parse_output({"verdict": "pass"}, CheckOutput, "n", "s")
+    assert ok.verdict == "pass"
