@@ -30,8 +30,24 @@ _CLAIM_CLASS_EXPLAIN = (
 )
 
 
+def _ref_view(label: str, project: Project) -> dict:
+    """ref label → 图注视图（设计 §6.1 实体全文含 caption）：figures.yaml 顺
+    fact→data→refs 取 caption/子图说明；悬空 ref 只留 label，不造空字段。"""
+    view: dict = {"label": label}
+    for key, entry in project.figures.items():
+        if label.startswith(key):
+            if entry.caption:
+                view["caption"] = entry.caption
+            suffix = label[len(key):]
+            if suffix and suffix in entry.subfigs:
+                view["subfig"] = entry.subfigs[suffix]
+            break
+    return view
+
+
 def build_node_spec(project: Project, node: Node) -> dict:
-    """单节点 → uses 实体全文 bundle（只收 approved；claim 带分类与 note 摘要）。"""
+    """单节点 → uses 实体全文 bundle（只收 approved；fact 附 data 描述与图注，
+    claim 带分类与 note 摘要）。"""
     uses = []
     for u in node.uses:
         if u.id in project.facts:
@@ -41,7 +57,9 @@ def build_node_spec(project: Project, node: Node) -> dict:
             uses.append({
                 "id": u.id, "role": u.role, "kind": "fact",
                 "statement": card.statement,
-                "data": [{"id": d, "description": project.data_cards[d].description}
+                "data": [{"id": d, "description": project.data_cards[d].description,
+                          "refs": [_ref_view(r, project)
+                                   for r in project.data_cards[d].refs]}
                          for d in card.data if d in project.data_cards],
             })
         elif u.id in project.claims:

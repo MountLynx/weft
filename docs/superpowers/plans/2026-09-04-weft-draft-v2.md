@@ -36,6 +36,7 @@ c2 --> f
 | D3 | `--no-align` 移除（c1/c2 恒运行，语义取代 align）；旧 V/align/uses-自报校验被 c1/c2/f 取代 |
 | D4 | fill 后仍跑 `[@key] ∈ bib` 硬校验（双保险） |
 | D5 | mock 客户端：gen 从 prompt JSON 提取 uses 发占位符；check 恒 pass；link/polish 回显定界符内文本 |
+| D7 | g 的 uses bundle 中 fact.data 条目带 refs 图注视图 `{label, caption?, subfig?}`（figures.yaml 顺 fact→data→refs 取，悬空 ref 只留 label）。动机：data.description 只描述数据集合、不含图形形式（如"长期运行的 MLVSS/MLSS 数据"），模型写 `{{fact-xx}}` 落点句需要知道图的内容与形式——这正是设计 §6.1 实体全文清单里 caption 项的落地；c1/c2 共用同一 spec JSON 同步受益 |
 
 ## 任务分解（TDD）
 
@@ -54,3 +55,4 @@ c2 --> f
 - 全量 256 passed, 1 deselected（重写口径：旧 draft/spec/clients/rules 测试整体替换，inspire 全部保留）。
 - e2e：/tmp/weft-inspire-real sec-03 真实 LLM 三节点连跑（结果见提交说明）。
 - D6（执行期新增）：g 与 l/p 均为纯文本输出，工作文本以 <<<PARAGRAPH…>>> 定界符在链上直传——JSON 包裹会让 mock 与模型都要二次解析，纯文本直传更稳。
+- D7 落地（2026-09-04）：新增 2 测试（图注视图 + 降级路径），全量 259 passed, 1 deselected。

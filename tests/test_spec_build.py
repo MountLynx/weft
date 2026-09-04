@@ -26,6 +26,35 @@ def test_six_tick_chain(tmp_path):
                                     "p": "p", "c2": "c2"}
 
 
+def test_node_spec_fact_data_carries_figure_captions(tmp_path):
+    """设计 §6.1 实体全文含 caption：data 条目带 refs 图注（label+caption+子图说明）。"""
+    project, part, node, spec = _spec(tmp_path)
+    data_entry = spec["uses"][0]["data"][0]
+    assert data_entry["refs"] == [
+        {"label": "fig-01a", "caption": "速率曲线", "subfig": "60°C"}]
+    p = build_tasklist(project, node, spec, "", "", {}).tasks["g"].prompt
+    assert "速率曲线" in p and "60°C" in p
+
+
+def test_node_spec_ref_caption_degrades_gracefully(tmp_path):
+    """悬空 ref 只给 label；整图 ref（无子图后缀）不造 subfig 键。"""
+    from tests.helpers import write_card
+    root = make_minimal_project(tmp_path)
+    write_card(root / "metadata" / "data", "data-02",
+               {"id": "data-02", "refs": ["tbl-09", "fig-01"], "status": "approved"})
+    write_card(root / "metadata" / "facts", "fact-02",
+               {"id": "fact-02", "data": ["data-02"], "statement": "产率不变。",
+                "status": "approved"})
+    project, _ = load_project(root)
+    part = project.parts[0]
+    node = part.nodes[0]
+    node.uses.append(type(node.uses[0])(id="fact-02", role="evidence"))
+    spec = build_node_spec(project, node)
+    refs = spec["uses"][1]["data"][0]["refs"]
+    assert refs[0] == {"label": "tbl-09"}
+    assert refs[1] == {"label": "fig-01", "caption": "速率曲线"}
+
+
 def test_gen_prompt_carries_overview_uses_and_rules(tmp_path):
     project, part, node, spec = _spec(tmp_path)
     p = build_tasklist(project, node, spec, "研究总述全文", "core 指令", {}) \
