@@ -236,3 +236,150 @@ def render(
         typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc
     typer.echo(f"已生成 {out_path.relative_to(project.root).as_posix()}")
+
+
+@app.command()
+def inspire(
+    target: Path = typer.Argument(
+        None, help="灵感 md（须在 inspirations/ 下）或项目根目录；缺省取当前项目收件箱最旧一个"),
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+    mock: bool = typer.Option(False, "--mock", help="免 key 假客户端（管线冒烟）"),
+) -> None:
+    """处理一个灵感 md → 草稿卡 + 替换提案 + 处理报告（inspire 管线，fail-closed）。"""
+    from weft.engine import DraftError, make_client
+    from weft.engine.inspire.apply import apply_inspiration
+    from weft.engine.inspire.run import InspireError, run_inspire
+
+    file: Path | None = target
+    if target is not None and target.is_dir():
+        # 单位置用法：weft inspire <项目根>（同 validate 等命令的习惯）
+        project_dir, file = target, None
+
+    project, load_diags = load_project(project_dir)
+    diagnostics = load_diags + validate_project(project)
+    if any(d.is_error for d in diagnostics):
+        _print_diagnostics(diagnostics)
+        typer.echo("—— 校验存在错误，拒绝处理灵感")
+        raise typer.Exit(code=1)
+
+    inbox = project.root / "inspirations"
+    if file is None:
+        candidates = sorted(inbox.glob("*.md")) if inbox.is_dir() else []
+        if not candidates:
+            typer.echo(f"ERROR 灵感收件箱为空：{inbox}")
+            raise typer.Exit(code=1)
+        source = min(candidates, key=lambda p: p.stat().st_mtime)
+    else:
+        source = file if file.is_absolute() else Path.cwd() / file
+        if not source.is_file() or source.resolve().parent != inbox.resolve():
+            typer.echo(f"ERROR 灵感文件必须存在于 {inbox} 下：{file}")
+            raise typer.Exit(code=1)
+
+    text = source.read_text(encoding="utf-8")
+    try:
+        result = run_inspire(project, text, client=make_client(mock, project_root=project.root))
+        outcome = apply_inspiration(project, source=source, logic=result.logic,
+                                    extract=result.extract, review=result.review,
+                                    match=result.match)
+    except (InspireError, DraftError, ValueError, OSError) as exc:
+        typer.echo(f"ERROR {exc}")
+        raise typer.Exit(code=1) from exc
+    for path in outcome.written_cards:
+        typer.echo(f"已写入 {path.relative_to(project.root).as_posix()}")
+    for path in outcome.proposals:
+        typer.echo(f"已生成替换提案 {path.relative_to(project.root).as_posix()}"
+                   "（审后 weft replace 应用）")
+    typer.echo(f"报告 {outcome.report.relative_to(project.root).as_posix()}")
+    for note in outcome.notes:
+        typer.echo(f"WARN {note}")
+    warnings = [d for d in diagnostics if not d.is_error]
+    if warnings:
+        _print_diagnostics(warnings)
+
+
+@app.command(name="replace")
+def replace_proposal(
+    card_id: str = typer.Argument(..., help="目标卡 id（对应 inspirations/proposals/<id>.md）"),
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+) -> None:
+    """应用替换提案：新卡替换旧卡，旧卡归档 archive/cards/<类型>/。"""
+    import frontmatter
+
+    from weft.engine.inspire.cards import _normalize
+    from weft.models.cards import ClaimCard, FactCard
+
+
+    project, load_diags = load_project(project_dir)
+    if any(d.is_error for d in load_diags):
+        _print_diagnostics(load_diags)
+        raise typer.Exit(code=1)
+
+    proposal_path = project.root / "inspirations" / "proposals" / f"{card_id}.md"
+    if card_id not in project.card_paths:
+        typer.echo(f"ERROR 目标卡不存在：{card_id}")
+        raise typer.Exit(code=1)
+    if not proposal_path.is_file():
+        typer.echo(f"ERROR 替换提案不存在：{proposal_path}")
+        raise typer.Exit(code=1)
+    old_rel = project.card_paths[card_id]
+    old_path = project.root / old_rel
+    is_fact = "facts" in old_rel.parts
+    model = FactCard if is_fact else ClaimCard
+    try:
+        post = frontmatter.load(proposal_path)
+        new_card = model.model_validate(post.metadata)
+    except Exception as exc:
+        typer.echo(f"ERROR 提案卡解析失败：{exc}")
+        raise typer.Exit(code=1) from exc
+    if new_card.id != card_id:
+        typer.echo(f"ERROR 提案卡 id {new_card.id} 与目标 {card_id} 不一致")
+        raise typer.Exit(code=1)
+
+    # 闸门：内存替换后全量校验，有 error 即拒绝（磁盘零改动）
+    table = project.facts if is_fact else project.claims
+    table[card_id] = new_card
+    gate = validate_project(project)
+    gate_errors = [d for d in gate if d.is_error]
+    if gate_errors:
+        _print_diagnostics(gate_errors)
+        typer.echo("—— 替换被校验闸门拒绝，磁盘未改动")
+        raise typer.Exit(code=1)
+
+    archive_dir = project.root / "archive" / "cards" / old_rel.parent.name
+    archive_path = archive_dir / old_rel.name
+    if archive_path.exists():
+        typer.echo(f"ERROR 归档重名，拒绝覆盖：{archive_path}")
+        raise typer.Exit(code=1)
+    try:
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        old_path.rename(archive_path)
+        old_path.write_text(
+            _normalize(proposal_path.read_text(encoding="utf-8")),
+            encoding="utf-8", newline="\n")
+        proposal_path.unlink()
+    except OSError as exc:
+        typer.echo(f"ERROR 替换落盘失败：{exc}")
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"已替换 {old_rel.as_posix()}")
+    typer.echo(f"旧卡归档 {archive_path.relative_to(project.root).as_posix()}")
+
+
+@app.command(name="missing-cites")
+def missing_cites(
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+) -> None:
+    """列出 cites 为空的 cited 卡（缺文献清单）；纯数据层报告，不阻断。"""
+    project, load_diags = load_project(project_dir)
+    if any(d.is_error for d in load_diags):
+        _print_diagnostics(load_diags)
+        raise typer.Exit(code=1)
+    hits = [(cid, c) for cid, c in project.claims.items()
+            if c.claim_type == "cited" and not c.cites and c.status != "rejected"]
+    if not hits:
+        typer.echo("（无缺文献的 cited 卡）")
+        return
+    for cid, claim in hits:
+        statement = claim.statement if len(claim.statement) <= 40 \
+            else claim.statement[:39] + "…"
+        typer.echo(f"{cid}  {project.card_paths[cid].as_posix()}  {statement}")
+    typer.echo(f"—— {len(hits)} 张 cited 卡缺文献")

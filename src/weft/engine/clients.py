@@ -15,25 +15,52 @@ from weft.engine.draft_rules import DraftError
 class ScriptedLLMClient:
     """按 prompt 关键词分流的假客户端（与 embed_minimal 的 mock 同一模式）：
 
-    - prompt 以"你是对齐检查器"开头（align_check 内置 prompt_core 标识）→ aligned=true
+    - prompt 含"你是对齐检查器"（align_check 内置 prompt_core 标识）→ aligned=true
+    - prompt 以【灵感·…】开头（inspire 管线标记）→ 对应节点的默认 JSON
     - 否则视为 draft_para → {"paragraph", "uses", "cites"}
     broken=True 时 draft 通道返回非 JSON（测 E-DRAFT-SHAPE 路径）。
     """
 
+    # inspire 默认响应与 helpers.make_minimal_project 自洽：f1→data-01，c1 uncited。
+    _INSPIRE_EXTRACT = json.dumps(
+        {"cards": [{"key": "f1", "kind": "fact", "statement": "（mock 事实）搅拌加速溶解。",
+                    "placeholder": False, "needs_citation": False},
+                   {"key": "c1", "kind": "claim", "statement": "（mock 观点）搅拌是主要因素。",
+                    "placeholder": False, "needs_citation": False}],
+         "links": [{"from": "f1", "to": "c1"}]}, ensure_ascii=False)
+    _INSPIRE_REVIEW = json.dumps(
+        {"classifications": [{"key": "f1", "verdict": "new"},
+                             {"key": "c1", "verdict": "new"}]}, ensure_ascii=False)
+    _INSPIRE_MATCH = json.dumps(
+        {"fact_data": [{"key": "f1", "data_ids": ["data-01"]}],
+         "claim_cites": [{"key": "c1", "claim_type": "uncited", "cites": [],
+                          "reason": "（mock）无需文献"}],
+         "placeholders": []}, ensure_ascii=False)
+
     def __init__(self, paragraph: str = "（mock 段落）正文。",
                  uses: list[str] | None = None, cites: list[str] | None = None,
-                 broken: bool = False, aligned: bool = True) -> None:
+                 broken: bool = False, aligned: bool = True,
+                 logic_issues: list[str] | None = None) -> None:
         self.paragraph = paragraph
         self.uses = list(uses or [])
         self.cites = list(cites or [])
         self.broken = broken
         self.aligned = aligned
+        self.logic_issues = list(logic_issues or [])
         self.prompts: list[str] = []   # 测试断言 prompt 注入用
 
     async def complete(self, **kwargs) -> LLMResponse:
         prompt = kwargs.get("prompt") or ""
         self.prompts.append(prompt)
-        if "你是对齐检查器" in prompt:
+        if "【灵感·逻辑核查】" in prompt:
+            content = json.dumps({"issues": self.logic_issues}, ensure_ascii=False)
+        elif "【灵感·卡片拆解】" in prompt:
+            content = self._INSPIRE_EXTRACT
+        elif "【灵感·现有卡审查】" in prompt:
+            content = self._INSPIRE_REVIEW
+        elif "【灵感·匹配】" in prompt:
+            content = self._INSPIRE_MATCH
+        elif "你是对齐检查器" in prompt:
             content = json.dumps(
                 {"aligned": self.aligned,
                  "suggestions": "" if self.aligned else "段落偏离已审观点"})

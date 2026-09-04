@@ -19,6 +19,7 @@ SCAFFOLD_FILES = (
 SCAFFOLD_DIRS = (
     "assets",
     "figures",
+    "inspirations",
     "metadata",
     "metadata/data",
     "metadata/facts",
