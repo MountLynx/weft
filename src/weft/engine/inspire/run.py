@@ -22,8 +22,8 @@ from module_harness import (
     Module,
     OutputFormat,
 )
-from module_harness.query import load_snapshot_summary, run_db_path
-from module_harness.status import query_run_status
+from module_harness.infra.query import load_snapshot_summary, run_db_path
+from module_harness.infra.status import query_run_status
 from pydantic import ValidationError
 
 from weft.digest import build_digest

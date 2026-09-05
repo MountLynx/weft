@@ -114,13 +114,13 @@ def test_run_inspire_missing_node_output_is_failed():
 
 
 def _runs_dir(project: Project):
-    from module_harness.query import load_snapshot_summary
+    from module_harness.infra.query import load_snapshot_summary
     return project.root / "generated" / "inspirations" / ".runs"
 
 
 def test_run_persists_checkpoints_and_no_root_residue(tmp_path):
     """persist 接入：快照落 generated/inspirations/.runs/，项目根零 .specmodule。"""
-    from module_harness.query import load_snapshot_summary
+    from module_harness.infra.query import load_snapshot_summary
 
     project = _project(tmp_path)
     result = run_inspire(project, "随手记", client=_client(), source="idea.md")
