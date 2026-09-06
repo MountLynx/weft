@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ pid }} 不可用{% endblock %}
+{% block content %}
+<h2>项目 {{ pid }} 无法加载</h2>
+<ul>
+{% for d in diagnostics %}<li>{{ "ERROR" if d.is_error else "WARN" }} {{ d.path }} [{{ d.code }}] {{ d.message }}</li>{% endfor %}
+</ul>
+<p><a href="/">返回项目列表</a></p>
+{% endblock %}

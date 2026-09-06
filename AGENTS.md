@@ -17,9 +17,9 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 
 ```bash
 .venv/Scripts/python.exe -m pip install -e ".[dev]"     # 安装（含 pytest）
-.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（约 287 passed, 1 deselected）
+.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（314 passed, 1 deselected）
 .venv/Scripts/python.exe -m pytest tests/test_xxx.py -v # 聚焦测试
-.venv/Scripts/weft.exe --help                           # CLI：init / validate / graph / review / draft / assemble / render / inspire / replace / missing-cites
+.venv/Scripts/weft.exe --help                           # CLI：init / validate / graph / review / draft / assemble / render / inspire / replace / missing-cites / serve
 WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实 LLM 冒烟（默认排除，双保险门）
 ```
 
@@ -29,7 +29,7 @@ WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实
 
 ## 架构红线（有守卫测试强制）
 
-1. **分层**：`src/weft/engine/` 是全项目唯一允许 import `module_harness` / `llm`（PyPI 包 `specmodule[openai]==0.1.4`，版本锁定）的 src 层。违规会被 `tests/test_engine_layering.py` 抓住。tests/ 豁免（可 import llm.client 造假响应）。
+1. **分层**：`src/weft/engine/` 是全项目唯一允许 import `module_harness` / `llm`（PyPI 包 `specmodule[openai]>=0.2.0,<0.3`，版本锁定）的 src 层。违规会被 `tests/test_engine_layering.py` 抓住。tests/ 豁免（可 import llm.client 造假响应）。
 2. **数据结构 v1 冻结**：卡片 schema（`src/weft/models/`，pydantic `extra="forbid"`）不改；schema 变更走设计文档 §3 迁移流程。
 3. **加载永不中断**：store 加载对单卡解析/编码/IO 失败一律转 `E-PARSE` 诊断后继续（宁可一次看全所有问题）。
 4. **路径白名单**：AI 产物唯一落盘点是 `engine/drafts.py::write_draft` 的 `drafts/<part_id>.md` 与 `engine/inspire/cards.py` 的 `metadata/` 草稿卡 + `inspirations/proposals/` 提案（均固定 LF，写入前归一化 CRLF）。draft 管线的 SpecModule 以零残留模式运行（`persist/status_file/keep_records/stream_log` 全 False）；inspire 管线例外——开启 persist 断点续跑，运行快照只落 `generated/inspirations/.runs/`（weft 受管目录），其余任何位置不得出现 `.specmodule/` 残留。

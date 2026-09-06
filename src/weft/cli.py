@@ -133,9 +133,8 @@ def draft(
     mock: bool = typer.Option(False, "--mock", help="免 key 假客户端（管线冒烟）"),
 ) -> None:
     """对指定叙事 part 逐节点执行六节点生成管线，产物写入 drafts/<part>.md。"""
-    from weft.engine import DraftError, DraftRuleError, make_client, run_draft
-    from weft.engine.drafts import render_draft_markdown, write_draft
-    from weft.workflow import resolve_workflow
+    from weft.engine import DraftError, DraftRuleError, make_client
+    from weft.engine.part_draft import run_part_draft
 
     project, load_diags = load_project(project_dir)
     diagnostics = load_diags + validate_project(project)
@@ -159,49 +158,17 @@ def draft(
         raise typer.Exit(code=1)
 
     warnings = [d for d in diagnostics if not d.is_error]
-    overview_path = project.root / "overview.md"
-    overview = overview_path.read_text(encoding="utf-8") if overview_path.exists() else ""
-    workflow = resolve_workflow(part, project.part_chapters[part.id])
     client = make_client(mock, project_root=project.root)
-
-    paragraphs: dict[str, str] = {}
-    all_reminders: list[str] = []
-    run_id = ""
     try:
-        for node in approved:
-            tail = None
-            for other in project.parts:
-                if other.id == part_id:
-                    break
-                draft_file = project.root / "drafts" / f"{other.id}.md"
-                if draft_file.exists():
-                    blocks = [ln for ln in draft_file.read_text(encoding="utf-8").splitlines()
-                              if ln.strip() and not ln.startswith("<!--")]
-                    if blocks:
-                        tail = blocks[-1]
-            result = run_draft(project, part, node, client=client,
-                               workflow=workflow, overview=overview,
-                               prior_paragraphs=[paragraphs[n.id] for n in approved
-                                                 if n.id in paragraphs],
-                               prev_tail=tail)
-            paragraphs[node.id] = result.paragraph
-            all_reminders.extend(result.reminders)
-            run_id = result.run_id
+        result = run_part_draft(project, part, client=client)
     except (DraftRuleError, DraftError) as exc:
         typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc
-
-    content = render_draft_markdown(part, paragraphs, run_id)
-    try:
-        path = write_draft(project, part.id, content)
-    except OSError as exc:
-        typer.echo(f"ERROR 无法写入 drafts/：{exc}")
-        raise typer.Exit(code=1) from exc
-    for reminder in all_reminders:
+    for reminder in result.reminders:
         typer.echo(f"WARN {reminder}")
     typer.echo(
-        f"已写入 {path.relative_to(project.root).as_posix()}"
-        f"（{len(paragraphs)} 段，run={run_id}）")
+        f"已写入 {result.path.relative_to(project.root).as_posix()}"
+        f"（{len(result.paragraphs)} 段，run={result.run_id}）")
     if warnings:
         _print_diagnostics(warnings)
 
@@ -327,64 +294,18 @@ def replace_proposal(
     project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
 ) -> None:
     """应用替换提案：新卡替换旧卡，旧卡归档 archive/cards/<类型>/。"""
-    import frontmatter
-
-    from weft.engine.inspire.cards import _normalize
-    from weft.models.cards import ClaimCard, FactCard
-
+    from weft.engine.inspire.apply import apply_proposal
 
     project, load_diags = load_project(project_dir)
     if any(d.is_error for d in load_diags):
         _print_diagnostics(load_diags)
         raise typer.Exit(code=1)
-
-    proposal_path = project.root / "inspirations" / "proposals" / f"{card_id}.md"
-    if card_id not in project.card_paths:
-        typer.echo(f"ERROR 目标卡不存在：{card_id}")
-        raise typer.Exit(code=1)
-    if not proposal_path.is_file():
-        typer.echo(f"ERROR 替换提案不存在：{proposal_path}")
-        raise typer.Exit(code=1)
-    old_rel = project.card_paths[card_id]
-    old_path = project.root / old_rel
-    is_fact = "facts" in old_rel.parts
-    model = FactCard if is_fact else ClaimCard
     try:
-        post = frontmatter.load(proposal_path)
-        new_card = model.model_validate(post.metadata)
-    except Exception as exc:
-        typer.echo(f"ERROR 提案卡解析失败：{exc}")
+        new_path, archive_path = apply_proposal(project, card_id)
+    except ValueError as exc:
+        typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc
-    if new_card.id != card_id:
-        typer.echo(f"ERROR 提案卡 id {new_card.id} 与目标 {card_id} 不一致")
-        raise typer.Exit(code=1)
-
-    # 闸门：内存替换后全量校验，有 error 即拒绝（磁盘零改动）
-    table = project.facts if is_fact else project.claims
-    table[card_id] = new_card
-    gate = validate_project(project)
-    gate_errors = [d for d in gate if d.is_error]
-    if gate_errors:
-        _print_diagnostics(gate_errors)
-        typer.echo("—— 替换被校验闸门拒绝，磁盘未改动")
-        raise typer.Exit(code=1)
-
-    archive_dir = project.root / "archive" / "cards" / old_rel.parent.name
-    archive_path = archive_dir / old_rel.name
-    if archive_path.exists():
-        typer.echo(f"ERROR 归档重名，拒绝覆盖：{archive_path}")
-        raise typer.Exit(code=1)
-    try:
-        archive_dir.mkdir(parents=True, exist_ok=True)
-        old_path.rename(archive_path)
-        old_path.write_text(
-            _normalize(proposal_path.read_text(encoding="utf-8")),
-            encoding="utf-8", newline="\n")
-        proposal_path.unlink()
-    except OSError as exc:
-        typer.echo(f"ERROR 替换落盘失败：{exc}")
-        raise typer.Exit(code=1) from exc
-    typer.echo(f"已替换 {old_rel.as_posix()}")
+    typer.echo(f"已替换 {new_path.relative_to(project.root).as_posix()}")
     typer.echo(f"旧卡归档 {archive_path.relative_to(project.root).as_posix()}")
 
 
@@ -407,3 +328,23 @@ def missing_cites(
             else claim.statement[:39] + "…"
         typer.echo(f"{cid}  {project.card_paths[cid].as_posix()}  {statement}")
     typer.echo(f"—— {len(hits)} 张 cited 卡缺文献")
+
+
+@app.command()
+def serve(
+    projects_root: Path = typer.Argument(..., help="weft 论文项目根目录（扫描一级子目录）"),
+    host: str = typer.Option("127.0.0.1", "--host", help="监听地址；部署用 0.0.0.0"),
+    port: int = typer.Option(8000, "--port", help="监听端口"),
+) -> None:
+    """启动 WebUI（webui 设计 §10）：weft serve <projects_root> --host 0.0.0.0 --port 8000。"""
+    try:
+        import uvicorn
+    except ImportError as exc:
+        typer.echo("ERROR WebUI 依赖未安装：pip install 'weft[web]'")
+        raise typer.Exit(code=1) from exc
+    from weft.web import create_app
+
+    if not projects_root.is_dir():
+        typer.echo(f"ERROR 项目根目录不存在：{projects_root}")
+        raise typer.Exit(code=1)
+    uvicorn.run(create_app(projects_root), host=host, port=port)

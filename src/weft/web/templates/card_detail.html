@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}{{ card.id }}{% endblock %}
+{% block content %}
+<h2>{{ kind }} 卡 {{ card.id }}
+  <span class="badge {{ card.status }}">{{ card.status }}</span></h2>
+<p><code>{{ rel }}</code></p>
+<table class="list">
+  {% for k, v in fields.items() %}
+  <tr><th>{{ k }}</th><td><code>{{ v }}</code></td></tr>
+  {% endfor %}
+  <tr><th>comment</th><td>{{ card.comment or "（无）" }}</td></tr>
+</table>
+<h3>审阅</h3>
+<form method="post" action="/p/{{ entry.pid }}/cards/{{ kind }}/{{ card.id }}/status">
+  <button class="ok" type="submit" name="status" value="approved">✅ 批准</button>
+  <button class="bad" type="submit" name="status" value="rejected">❌ 否决</button>
+  <button type="submit" name="status" value="draft">↩ 退回 draft</button>
+  <label>comment<input name="comment" value="{{ card.comment }}"></label>
+</form>
+<p><a href="/p/{{ entry.pid }}/cards/{{ kind }}/{{ card.id }}/edit">✏️ 编辑</a> ·
+   <a href="/p/{{ entry.pid }}/cards/{{ kind }}">返回列表</a></p>
+{% endblock %}

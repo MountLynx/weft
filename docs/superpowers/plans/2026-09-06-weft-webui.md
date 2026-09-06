@@ -63,24 +63,26 @@ tests/test_web_inspire.py
 
 ## 精确测试计数登记
 
-| 任务 | 新增测试数 |
-|---|---|
-| T1 依赖+app 骨架+serve | 2 |
-| T2 store/writer | 6 |
-| T3 engine runner | 2 |
-| T4 discovery | 3 |
-| T5 首页+仪表盘 | 3 |
-| T6 卡片列表/详情/审阅 | 5 |
-| T7 卡片编辑 | 4 |
-| T8 卡片新建 | 3 |
-| T9 叙事工作台 | 5 |
-| T10 节点编辑(uses) | 2 |
-| T11 生成+SSE | 3 |
-| T12 graph/诊断/files | 4 |
-| T13 inspire | 4 |
-| **合计** | **46** |
+| 任务 | 登记数 | 实际数 | 差额来源 |
+|---|---|---|---|
+| T1 骨架 | 2 | 3 | +1 test_serve_rejects_missing_root（D13 审查） |
+| T2 store/writer | 6 | 7 | +1 param 回归（D14 Critical 修复） |
+| T3 runner | 2 | 2 | — |
+| T4 discovery | 3 | 3 | — |
+| T5 首页/仪表盘 | 3 | 3 | — |
+| T6 卡片列表/审阅 | 5 | 5 | — |
+| T7 卡片编辑 | 4 | 5 | +1 None 归一回归（D16） |
+| T8 卡片新建 | 3 | 5 | +2 id 守卫回归（D17） |
+| T9 叙事工作台 | 5 | 7 | +2 htmx 分流/comment 保留（D18） |
+| T10 节点编辑 | 3 | 3 | — |
+| T11 生成 SSE | 3 | 4 | +1 409 路由（D19） |
+| T12 graph/诊断/files | 3 | 3 | — |
+| T13 inspire | 4 | 4 | — |
+| **合计** | **46** | **54** | +8（修复期回归，已计入实际数列） |
 
-基线 260 passed（AGENTS.md 记录，1 deselected）；全部完成预期 **306 passed**。若基线已漂移，以执行时实测为准并在本表回填。
+回填说明（T14）：实际数按 pytest 逐文件清点核实（T13 含 `tests/test_inspire_apply.py` 补的 apply_proposal 回归 1 例）；登记数按计划正文各 Task 实列测试清点——原登记表 T10 误记 2、T12 误记 4，正文实列均为 3，合计 46 不变；修复期新增 +8 已计入实际数列。
+
+基线 260 passed, 1 deselected（执行时主工作区复测无漂移，与 AGENTS.md 记录一致）；全部完成实测 **314 passed, 1 deselected**（260 + 54）。
 
 ---
 
@@ -394,7 +396,7 @@ from weft.store.project import Project
 
 _CARD_DIRS = [(DataCard, "metadata/data"), (FactCard, "metadata/facts"),
               (NoteCard, "metadata/notes"), (MethodCard, "metadata/methods"),
-              (ParamCard, "metadata/params")]
+              (ParamCard, "metadata/methods/params")]
 
 
 def card_relpath(card) -> str:
@@ -3248,6 +3250,17 @@ git worktree remove .worktrees/weft-webui && git branch -d weft-webui
 | D7 | discovery 每请求重扫根目录 | 项目小、单用户；保证编辑后立即可见，无缓存失效问题 |
 | D8 | `node_review` 用 `part.nodes.index(node)` 定位 | part 内 node id 唯一（loader 校验），pydantic 按字段等值安全 |
 | D9 | graph.json 顶层结构在 Task 4 执行时以实际输出核对一次，graph.html 只留一行适配 | 计划编写时示例项目无 graph.json 实物 |
+| D10 | worktree 内新建独立 `.venv`（pip install -e ".[dev,web]"），不复用主区 venv | 主区 venv 的 editable 指向主区源码，复用会互相污染；worktree 自包含 |
+| D11 | 携带主区未提交的 specmodule 0.2.0 升级 3 处单行改动入分支（T0 setup 提交 8f10f4b） | HEAD 代码已 import `module_harness.infra`（0.2.0 才有），0.1.4 无法收集测试；该改动是运行前提 |
+| D12 | 测试导入用 `from tests.helpers import …`（计划原文写 `from helpers import …` 有误） | tests/ 是包（有 `__init__.py`），现有测试均为 `tests.helpers` 风格；实施者实验验证（T1） |
+| D13 | `weft serve` 增加启动前 `projects_root.is_dir()` 校验（T4 落地），替换原"构建即校验"的错误注释 | `create_app` 不校验根目录存在性；拼错路径应显式报错而非起空服务（T1 质量审查） |
+| D14 | ParamCard 规范目录为 metadata/methods/params（v1.1 §3.2），计划原文误写 metadata/params；save_card old_rel 比较统一 Path(...).as_posix() | loader.py:101 只从 methods/params 读 param；错目录会导致每次保存视作迁移、静默丢卡（T2 质量审查 Critical） |
+| D15 | python-frontmatter 1.3.0 正文属性是 .content（无 .body）；writer 与相关测试用 .content | 1.3.0 实测 API（T2 实施期） |
+| D16 | values_for_template 将 model_dump 的 None 归一为空串；可选字段（source/pdf）不再以字面 "None" 进表单 | None 会被 Jinja 渲染为 "None" 且不是 YAML null 关键字，保存即损坏字段（T7 质量审查 Important） |
+| D17 | card_new_post 对用户可控 id 增加正则守卫（字母/数字开头，仅 . _ : -，禁 '..'） | 模型层 id 无约束（schema 冻结）；空 id 写出隐藏 .md 使全项目不可用，../ 可路径逃逸写任意文件（T8 质量审查 Important×2） |
+| D18 | parts 写路由对 HX-Request 返回 part_panel 局部、否则 303 回整页 /parts；快捷审阅不带 comment 时保留原值 | 303 指向的 /parts/{part_id} 是无 base.html 的局部页，普通表单提交会落到无样式片段；快捷 ✅/❌ 原实现会清空已有 comment（T9 质量审查） |
+| D19 | worker except 分支补发 run_failed 终态事件（runner pre-try 异常如 make_client 无 key 时原实现 SSE 静默挂死）；run_console 的 data-panel-url 移至 part_panel 根元素（原实现完成后把整个面板换进日志框）；闸门 banner 用 html.escape | T11 质量审查 Important×2+Minor |
+| D20 | graph.html 为 referenced_by.nodes 中的叙事节点 id 生成灰色桩节点（仅卡片实体进 entities）；graph_page 对损坏 graph.json 回退 None | build_index 只收卡片实体，叙事节点仅作为边源出现；原 JS 对每个真实项目都抛 nonexistant source（T12 质量审查 Important） |
 
 ## Self-Review 记录
 

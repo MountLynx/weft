@@ -22,6 +22,7 @@ from weft.engine.inspire.schemas import (
     ReviewOutput,
 )
 from weft.store.project import Project
+from weft.validation import validate_project
 
 
 @dataclass
@@ -226,3 +227,56 @@ def _write_report(report: Path, source: Path, logic: LogicOutput,
     report.parent.mkdir(parents=True, exist_ok=True)
     report.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     return report
+
+
+def apply_proposal(project: Project, card_id: str) -> tuple[Path, Path]:
+    """应用替换提案 inspirations/proposals/<card_id>.md：新卡替换旧卡，旧卡归档 archive/。
+
+    返回 (旧卡路径=新内容落点, 归档路径)。目标/提案不存在、id 不一致、校验闸门拒绝、
+    归档重名、落盘失败一律 raise ValueError（磁盘零改动语义由调用方呈现）。
+    CLI（cli.replace_proposal）与 WebUI 共用本函数（webui 设计 §3）。
+    """
+    import frontmatter
+
+    from weft.engine.inspire.cards import _normalize
+    from weft.models.cards import ClaimCard, FactCard
+
+    proposal_path = project.root / "inspirations" / "proposals" / f"{card_id}.md"
+    if card_id not in project.card_paths:
+        raise ValueError(f"目标卡不存在：{card_id}")
+    if not proposal_path.is_file():
+        raise ValueError(f"替换提案不存在：{proposal_path}")
+    old_rel = project.card_paths[card_id]
+    old_path = project.root / old_rel
+    is_fact = "facts" in old_rel.parts
+    model = FactCard if is_fact else ClaimCard
+    try:
+        post = frontmatter.load(proposal_path)
+        new_card = model.model_validate(post.metadata)
+    except Exception as exc:
+        raise ValueError(f"提案卡解析失败：{exc}") from exc
+    if new_card.id != card_id:
+        raise ValueError(f"提案卡 id {new_card.id} 与目标 {card_id} 不一致")
+
+    # 闸门：内存替换后全量校验，有 error 即拒绝（磁盘零改动）
+    table = project.facts if is_fact else project.claims
+    table[card_id] = new_card
+    gate_errors = [d for d in validate_project(project) if d.is_error]
+    if gate_errors:
+        raise ValueError("替换被校验闸门拒绝，磁盘未改动：" + "；".join(
+            f"{d.code} {d.path} {d.message}" for d in gate_errors[:3]))
+
+    archive_dir = project.root / "archive" / "cards" / old_rel.parent.name
+    archive_path = archive_dir / old_rel.name
+    if archive_path.exists():
+        raise ValueError(f"归档重名，拒绝覆盖：{archive_path}")
+    try:
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        old_path.rename(archive_path)
+        old_path.write_text(
+            _normalize(proposal_path.read_text(encoding="utf-8")),
+            encoding="utf-8", newline="\n")
+        proposal_path.unlink()
+    except OSError as exc:
+        raise ValueError(f"替换落盘失败：{exc}") from exc
+    return old_path, archive_path

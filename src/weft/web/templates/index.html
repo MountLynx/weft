@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}项目列表{% endblock %}
+{% block content %}
+<h2>weft 论文项目</h2>
+<p class="subtitle">根目录：{{ projects_root }}</p>
+{% if entries %}
+<table class="list">
+  <thead><tr><th>项目</th><th>状态</th><th>卡片</th><th>诊断</th><th></th></tr></thead>
+  <tbody>
+  {% for e in entries %}
+    <tr>
+      <td>{{ e.pid }}</td>
+      <td>{% if e.available %}<span class="badge approved">可用</span>
+          {% else %}<span class="badge rejected">不可用</span>{% endif %}</td>
+      <td>{{ e.n_cards }}</td>
+      <td>E: {{ e.n_errors }} · W: {{ e.n_warnings }}</td>
+      <td><a href="/p/{{ e.pid }}/">打开</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p>未发现 weft 项目——根目录下需存在含 <code>metadata/</code> 的子目录。</p>
+{% endif %}
+{% endblock %}

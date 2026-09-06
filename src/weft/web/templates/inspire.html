@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}灵感 · {{ entry.pid }}{% endblock %}
+{% block content %}
+<h2>灵感（inspire）· {{ entry.pid }}</h2>
+<div class="cols">
+  <div>
+    <form method="post" action="/p/{{ entry.pid }}/inspire/run"
+          hx-post="/p/{{ entry.pid }}/inspire/run" hx-target="#run-log" hx-swap="innerHTML">
+      <label>灵感文本段（粘一段读到的东西，AI 提炼为卡片并生成替换提案）
+        <textarea name="text" rows="8" placeholder="粘贴文本…"></textarea>
+      </label>
+      <label class="check"><input type="checkbox" name="mock" value="1"> mock 模式（免 key）</label>
+      <button type="submit">▶ 处理灵感</button>
+    </form>
+    <div id="run-log" class="run-log"></div>
+  </div>
+  <div>
+    <div class="label">待应用替换提案</div>
+    {% if proposals %}
+    <table class="list">
+      <thead><tr><th>目标卡</th><th></th></tr></thead>
+      <tbody>
+      {% for p in proposals %}
+      <tr>
+        <td>{{ p.id }}</td>
+        <td>
+          <form method="post" action="/p/{{ entry.pid }}/inspire/proposals/{{ p.id }}/apply">
+            <button type="submit">应用（旧卡归档）</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<p>（无提案——处理后生成）</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

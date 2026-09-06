@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}weft{% endblock %} · weft WebUI</title>
+<link rel="stylesheet" href="/static/webui.css">
+<script src="/static/htmx.min.js" defer></script>
+<script src="/static/webui.js" defer></script>
+</head>
+<body>
+<nav class="topnav">
+  <a class="brand" href="/">weft · AI 学术写作引擎</a>
+  {% block nav %}{% endblock %}
+</nav>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>

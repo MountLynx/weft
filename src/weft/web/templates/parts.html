@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}叙事工作台 · {{ pid }}{% endblock %}
+{% block content %}
+<h2>叙事工作台 · {{ pid }}</h2>
+<div class="tabs">
+{% for p in parts %}
+  <a class="tab {% if p.id == current %}active{% endif %}"
+     href="/p/{{ pid }}/parts/{{ p.id }}"
+     hx-get="/p/{{ pid }}/parts/{{ p.id }}" hx-target="#panel" hx-swap="innerHTML">{{ p.id }}</a>
+{% endfor %}
+</div>
+<div id="panel">{% include "part_panel.html" %}</div>
+{% endblock %}
