@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.pid }} 卡片{% endblock %}
+{% block nav %}
+{% for k, c in counts.items() %}<a href="/p/{{ entry.pid }}/cards/{{ k }}">{{ labels[k] }}（{{ c }}）</a>{% endfor %}
+{% endblock %}
+{% block content %}
+<h2>{{ labels.get(kind, "卡片") if kind is defined else "卡片总览" }} · {{ entry.pid }}</h2>
+{% if kind is defined %}
+<table class="list">
+  <thead><tr><th>id</th><th>status</th><th>关键字段</th><th>位置</th><th></th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+    <tr>
+      <td>{{ r.id }}</td>
+      <td><span class="badge {{ r.status }}">{{ r.status }}</span></td>
+      <td>{{ r.key | truncate(60) }}</td>
+      <td><code>{{ r.rel }}</code></td>
+      <td><a href="/p/{{ entry.pid }}/cards/{{ kind }}/{{ r.id }}">详情</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p><a href="/p/{{ entry.pid }}/cards/{{ kind }}/new">＋ 新建{{ labels[kind] }}</a></p>
+{% endif %}
+{% endblock %}

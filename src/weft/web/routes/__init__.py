@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 
 def register_all(app: FastAPI) -> None:
-    from weft.web.routes import core
+    from weft.web.routes import cards, core
 
     core.register(app)
+    cards.register(app)
