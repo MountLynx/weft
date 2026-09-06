@@ -3248,6 +3248,8 @@ git worktree remove .worktrees/weft-webui && git branch -d weft-webui
 | D7 | discovery 每请求重扫根目录 | 项目小、单用户；保证编辑后立即可见，无缓存失效问题 |
 | D8 | `node_review` 用 `part.nodes.index(node)` 定位 | part 内 node id 唯一（loader 校验），pydantic 按字段等值安全 |
 | D9 | graph.json 顶层结构在 Task 4 执行时以实际输出核对一次，graph.html 只留一行适配 | 计划编写时示例项目无 graph.json 实物 |
+| D10 | worktree 内新建独立 `.venv`（pip install -e ".[dev,web]"），不复用主区 venv | 主区 venv 的 editable 指向主区源码，复用会互相污染；worktree 自包含 |
+| D11 | 携带主区未提交的 specmodule 0.2.0 升级 3 处单行改动入分支（T0 setup 提交 8f10f4b） | HEAD 代码已 import `module_harness.infra`（0.2.0 才有），0.1.4 无法收集测试；该改动是运行前提 |
 
 ## Self-Review 记录
 
