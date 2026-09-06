@@ -1,0 +1,58 @@
+<div class="part-panel">
+  <h3>{{ part.id }}（{{ part.section }}）</h3>
+  <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/workflow" class="wf-form">
+    <label>workflow 覆盖（空 = 按章节自动路由）：
+      <select name="workflow">
+        <option value="" {% if not part.workflow %}selected{% endif %}>（自动）</option>
+        {% for w in workflow_vocab %}
+        <option value="{{ w }}" {% if part.workflow == w %}selected{% endif %}>{{ w }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">设置</button>
+  </form>
+  <div class="cols">
+    <div>
+      <table class="list">
+        <thead><tr><th>#</th><th>节点</th><th>purpose</th><th>status</th><th>uses</th><th>审阅</th></tr></thead>
+        <tbody>
+        {% for node in nodes %}
+        <tr>
+          <td>{{ loop.index }}</td>
+          <td><a href="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}">{{ node.id }}</a></td>
+          <td>{{ node.purpose }}</td>
+          <td><span class="badge {{ node.status }}">{{ node.status }}</span></td>
+          <td>{% for u in node.uses %}{{ u.id }}({{ u.role }}) {% endfor %}</td>
+          <td>
+            <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status">
+              <input type="hidden" name="status" value="approved">
+              <button class="ok" type="submit">✅</button>
+            </form>
+            <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status">
+              <input type="hidden" name="status" value="rejected">
+              <button class="bad" type="submit">❌</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="console">
+      <div class="label">生成控制台（仅此 part）</div>
+      <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/generate"
+            hx-post="/p/{{ pid }}/parts/{{ part.id }}/generate"
+            hx-target="#run-log" hx-swap="innerHTML">
+        <label class="check"><input type="checkbox" name="mock" value="1"> mock 模式（免 key）</label>
+        <button type="submit">▶ 生成本 part</button>
+      </form>
+      <div id="run-log" class="run-log"></div>
+    </div>
+  </div>
+  {% if draft_text is not none %}
+  <div class="draft-preview">
+    <div class="label">当前草稿 drafts/{{ part.id }}.md</div>
+    <pre>{{ draft_text }}</pre>
+  </div>
+  {% endif %}
+</div>
