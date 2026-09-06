@@ -133,9 +133,8 @@ def draft(
     mock: bool = typer.Option(False, "--mock", help="免 key 假客户端（管线冒烟）"),
 ) -> None:
     """对指定叙事 part 逐节点执行六节点生成管线，产物写入 drafts/<part>.md。"""
-    from weft.engine import DraftError, DraftRuleError, make_client, run_draft
-    from weft.engine.drafts import render_draft_markdown, write_draft
-    from weft.workflow import resolve_workflow
+    from weft.engine import DraftError, DraftRuleError, make_client
+    from weft.engine.part_draft import run_part_draft
 
     project, load_diags = load_project(project_dir)
     diagnostics = load_diags + validate_project(project)
@@ -159,49 +158,17 @@ def draft(
         raise typer.Exit(code=1)
 
     warnings = [d for d in diagnostics if not d.is_error]
-    overview_path = project.root / "overview.md"
-    overview = overview_path.read_text(encoding="utf-8") if overview_path.exists() else ""
-    workflow = resolve_workflow(part, project.part_chapters[part.id])
     client = make_client(mock, project_root=project.root)
-
-    paragraphs: dict[str, str] = {}
-    all_reminders: list[str] = []
-    run_id = ""
     try:
-        for node in approved:
-            tail = None
-            for other in project.parts:
-                if other.id == part_id:
-                    break
-                draft_file = project.root / "drafts" / f"{other.id}.md"
-                if draft_file.exists():
-                    blocks = [ln for ln in draft_file.read_text(encoding="utf-8").splitlines()
-                              if ln.strip() and not ln.startswith("<!--")]
-                    if blocks:
-                        tail = blocks[-1]
-            result = run_draft(project, part, node, client=client,
-                               workflow=workflow, overview=overview,
-                               prior_paragraphs=[paragraphs[n.id] for n in approved
-                                                 if n.id in paragraphs],
-                               prev_tail=tail)
-            paragraphs[node.id] = result.paragraph
-            all_reminders.extend(result.reminders)
-            run_id = result.run_id
+        result = run_part_draft(project, part, client=client)
     except (DraftRuleError, DraftError) as exc:
         typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc
-
-    content = render_draft_markdown(part, paragraphs, run_id)
-    try:
-        path = write_draft(project, part.id, content)
-    except OSError as exc:
-        typer.echo(f"ERROR 无法写入 drafts/：{exc}")
-        raise typer.Exit(code=1) from exc
-    for reminder in all_reminders:
+    for reminder in result.reminders:
         typer.echo(f"WARN {reminder}")
     typer.echo(
-        f"已写入 {path.relative_to(project.root).as_posix()}"
-        f"（{len(paragraphs)} 段，run={run_id}）")
+        f"已写入 {result.path.relative_to(project.root).as_posix()}"
+        f"（{len(result.paragraphs)} 段，run={result.run_id}）")
     if warnings:
         _print_diagnostics(warnings)
 
