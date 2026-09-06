@@ -4,6 +4,8 @@
 """
 from __future__ import annotations
 
+import re
+
 from pydantic import ValidationError
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
@@ -26,6 +28,8 @@ from weft.web.common import KIND_ATTRS, KIND_LABELS, load_project_or_404, templa
 router = APIRouter()
 
 _STATUSES = ("draft", "approved", "rejected")
+# 新建卡的 id 是用户可控的落盘路径组件（模型层 id 无约束且 schema 冻结，只能在此守卫）
+_CARD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 # 列表页展示的"关键字段"（有则显示），按卡种
 _KEY_FIELD = {"data": "description", "fact": "statement", "claim": "statement",
               "note": "summary", "method": "statement", "param": "method"}
@@ -120,6 +124,10 @@ async def card_new_post(request: Request, pid: str, kind: str):
             card = KIND_MODELS[kind].model_validate(meta)
         except ValidationError as exc:
             errors = validation_errors(exc)
+    if card is not None and (".." in card.id or not _CARD_ID_RE.match(card.id)):
+        # id 是用户可控的落盘路径组件：拒绝空串/路径片段（模型层 id 无约束且 schema 冻结）
+        errors = {"id": "id 非法：须以字母或数字开头，仅含 A-Z a-z 0-9 . _ : -，且不含 '..'"}
+        card = None
     if card is not None:
         try:
             create_card(entry.project.root, card)

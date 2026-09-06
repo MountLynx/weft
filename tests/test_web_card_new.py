@@ -34,3 +34,27 @@ def test_create_duplicate_id_rejected(tmp_path):
     assert "fact-01" in resp.text
     project, _ = load_project(root / "demo")
     assert project.facts["fact-01"].statement == "温度提高速率。"
+
+
+def test_create_empty_id_rejected(tmp_path):
+    client, root = make_client(tmp_path)
+    resp = client.post("/p/demo/cards/method/new", data={
+        "id": "", "statement": "空 id。", "protocol": "步骤", "derived_from": [],
+        "status": "draft", "comment": ""})
+    assert resp.status_code == 200
+    assert "id 非法" in resp.text
+    assert not (root / "demo" / "metadata" / "methods" / ".md").exists()
+    project, diags = load_project(root / "demo")
+    assert not any(d.is_error for d in diags)   # 项目仍然可用
+
+
+def test_create_traversal_id_rejected(tmp_path):
+    client, root = make_client(tmp_path)
+    resp = client.post("/p/demo/cards/method/new", data={
+        "id": "../evil", "statement": "逃逸。", "protocol": "步骤",
+        "derived_from": [], "status": "draft", "comment": ""})
+    assert resp.status_code == 200
+    assert "id 非法" in resp.text
+    assert not (root / "demo" / "metadata" / "evil.md").exists()
+    project, diags = load_project(root / "demo")
+    assert not any(d.is_error for d in diags)

@@ -3255,6 +3255,7 @@ git worktree remove .worktrees/weft-webui && git branch -d weft-webui
 | D14 | ParamCard 规范目录为 metadata/methods/params（v1.1 §3.2），计划原文误写 metadata/params；save_card old_rel 比较统一 Path(...).as_posix() | loader.py:101 只从 methods/params 读 param；错目录会导致每次保存视作迁移、静默丢卡（T2 质量审查 Critical） |
 | D15 | python-frontmatter 1.3.0 正文属性是 .content（无 .body）；writer 与相关测试用 .content | 1.3.0 实测 API（T2 实施期） |
 | D16 | values_for_template 将 model_dump 的 None 归一为空串；可选字段（source/pdf）不再以字面 "None" 进表单 | None 会被 Jinja 渲染为 "None" 且不是 YAML null 关键字，保存即损坏字段（T7 质量审查 Important） |
+| D17 | card_new_post 对用户可控 id 增加正则守卫（字母/数字开头，仅 . _ : -，禁 '..'） | 模型层 id 无约束（schema 冻结）；空 id 写出隐藏 .md 使全项目不可用，../ 可路径逃逸写任意文件（T8 质量审查 Important×2） |
 
 ## Self-Review 记录
 
