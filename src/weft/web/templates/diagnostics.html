@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}诊断 · {{ entry.pid }}{% endblock %}
+{% block content %}
+<h2>诊断 · {{ entry.pid }}（{{ entry.n_errors }} 错误 / {{ entry.n_warnings }} 提醒）</h2>
+{% if entry.diagnostics %}
+<table class="list">
+  <thead><tr><th>级别</th><th>码</th><th>位置</th><th>字段</th><th>消息</th></tr></thead>
+  <tbody>
+  {% for d in entry.diagnostics %}
+  <tr>
+    <td>{% if d.is_error %}<span class="badge rejected">ERROR</span>
+        {% else %}<span class="badge draft">WARN</span>{% endif %}</td>
+    <td><code>{{ d.code }}</code></td><td><code>{{ d.path }}</code></td>
+    <td>{{ d.field or "" }}</td><td>{{ d.message }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p>（无诊断消息，项目校验干净）</p>{% endif %}
+<p><a href="/p/{{ entry.pid }}/">返回总览</a></p>
+{% endblock %}

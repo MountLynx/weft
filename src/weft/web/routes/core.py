@@ -1,11 +1,20 @@
-"""核心页面路由：项目列表 / 项目总览仪表盘（graph、诊断、文件预览在 Task 12 扩充）。"""
+"""核心页面路由：项目列表 / 项目总览仪表盘 / 诊断表 / 元数据图谱 / 文件预览。"""
 from __future__ import annotations
 
+import json
 from collections import Counter
+from pathlib import Path
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI, HTTPException, Request
+from fastapi.responses import RedirectResponse
 
-from weft.web.common import KIND_ATTRS, load_entry_or_404, templates
+from weft.graphgen.writer import write_outputs
+from weft.web.common import (
+    KIND_ATTRS,
+    load_entry_or_404,
+    load_project_or_404,
+    templates,
+)
 
 router = APIRouter()
 
@@ -52,6 +61,54 @@ def dashboard(request: Request, pid: str):
         request, "dashboard.html",
         {"entry": entry, "project": project, "review_queue": review_queue,
          "status_counts": status_counts})
+
+
+@router.get("/p/{pid}/diagnostics")
+def diagnostics_page(request: Request, pid: str):
+    # 故意用 load_entry_or_404：损坏项目也要能看诊断——诊断页正是看错误的地方（设计 §2/§7）。
+    entry = load_entry_or_404(request, pid)
+    return templates.TemplateResponse(
+        request, "diagnostics.html", {"entry": entry})
+
+
+@router.get("/p/{pid}/graph")
+def graph_page(request: Request, pid: str):
+    entry = load_project_or_404(request, pid)
+    graph_path = entry.project.root / "generated" / "graph.json"
+    graph = json.loads(graph_path.read_text(encoding="utf-8")) if graph_path.exists() else None
+    return templates.TemplateResponse(
+        request, "graph.html", {"entry": entry, "graph": graph})
+
+
+@router.post("/p/{pid}/graph/regenerate")
+def graph_regenerate(request: Request, pid: str):
+    entry = load_project_or_404(request, pid)
+    project = entry.project
+    if any(d.is_error for d in entry.diagnostics):
+        # 与 CLI graph 同闸门：校验有 error 拒绝生成，引导去看诊断。
+        return RedirectResponse(f"/p/{pid}/diagnostics", status_code=303)
+    write_outputs(project, project.root / "generated")
+    return RedirectResponse(f"/p/{pid}/graph", status_code=303)
+
+
+_SAFE_ROOTS = ("drafts", "generated")
+
+
+@router.get("/p/{pid}/files/{relpath:path}")
+def file_view(request: Request, pid: str, relpath: str):
+    entry = load_project_or_404(request, pid)
+    root = entry.project.root.resolve()
+    target = (root / relpath).resolve()
+    parts = Path(relpath).parts
+    allowed = (bool(parts) and parts[0] in _SAFE_ROOTS
+               and (target == root or root in target.parents)
+               and target.is_file())
+    if not allowed:
+        raise HTTPException(status_code=404, detail="文件不存在或不在白名单目录")
+    return templates.TemplateResponse(
+        request, "file_view.html",
+        {"entry": entry, "rel": relpath,
+         "text": target.read_text(encoding="utf-8", errors="replace")})
 
 
 def register(app: FastAPI) -> None:

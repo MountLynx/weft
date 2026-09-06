@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ rel }}{% endblock %}
+{% block content %}
+<h2><code>{{ rel }}</code></h2>
+<pre style="border: 1px solid #d0d7de; border-radius: 6px; padding: 12px; white-space: pre-wrap;">{{ text }}</pre>
+<p><a href="/p/{{ entry.pid }}/">返回总览</a></p>
+{% endblock %}
