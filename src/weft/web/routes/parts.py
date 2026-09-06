@@ -68,10 +68,15 @@ async def node_review(request: Request, pid: str, part_id: str, node_id: str):
     status = str(form.get("status", ""))
     if status not in _STATUSES:
         raise HTTPException(status_code=400, detail="非法 status")
-    part.nodes[part.nodes.index(node)] = node.model_copy(
-        update={"status": status, "comment": str(form.get("comment", ""))})
+    updates: dict = {"status": status}
+    if "comment" in form:          # 快捷 ✅/❌ 不携带 comment 时保留原值
+        updates["comment"] = str(form.get("comment", ""))
+    part.nodes[part.nodes.index(node)] = node.model_copy(update=updates)
     save_part(entry.project, part)
-    return RedirectResponse(f"/p/{pid}/parts/{part_id}", status_code=303)
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(request, "part_panel.html",
+                                          _panel_ctx(entry, part))
+    return RedirectResponse(f"/p/{pid}/parts", status_code=303)
 
 
 @router.post("/p/{pid}/parts/{part_id}/workflow")
@@ -85,7 +90,10 @@ async def part_workflow(request: Request, pid: str, part_id: str):
         raise HTTPException(status_code=400, detail="未知 workflow（词表见 E-WORKFLOW-UNKNOWN）")
     part.workflow = workflow or None
     save_part(entry.project, part)
-    return RedirectResponse(f"/p/{pid}/parts/{part_id}", status_code=303)
+    if request.headers.get("HX-Request"):
+        return templates.TemplateResponse(request, "part_panel.html",
+                                          _panel_ctx(entry, part))
+    return RedirectResponse(f"/p/{pid}/parts", status_code=303)
 
 
 def register(app: FastAPI) -> None:

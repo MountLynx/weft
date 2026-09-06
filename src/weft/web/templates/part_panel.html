@@ -1,6 +1,7 @@
 <div class="part-panel">
   <h3>{{ part.id }}（{{ part.section }}）</h3>
-  <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/workflow" class="wf-form">
+  <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/workflow" class="wf-form"
+        hx-post="/p/{{ pid }}/parts/{{ part.id }}/workflow" hx-target="#panel" hx-swap="innerHTML">
     <label>workflow 覆盖（空 = 按章节自动路由）：
       <select name="workflow">
         <option value="" {% if not part.workflow %}selected{% endif %}>（自动）</option>
@@ -24,11 +25,15 @@
           <td><span class="badge {{ node.status }}">{{ node.status }}</span></td>
           <td>{% for u in node.uses %}{{ u.id }}({{ u.role }}) {% endfor %}</td>
           <td>
-            <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status">
+            <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status"
+                  hx-post="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status"
+                  hx-target="#panel" hx-swap="innerHTML">
               <input type="hidden" name="status" value="approved">
               <button class="ok" type="submit">✅</button>
             </form>
-            <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status">
+            <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status"
+                  hx-post="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status"
+                  hx-target="#panel" hx-swap="innerHTML">
               <input type="hidden" name="status" value="rejected">
               <button class="bad" type="submit">❌</button>
             </form>
