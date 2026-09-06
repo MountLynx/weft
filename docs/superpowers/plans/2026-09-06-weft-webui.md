@@ -3257,6 +3257,7 @@ git worktree remove .worktrees/weft-webui && git branch -d weft-webui
 | D16 | values_for_template 将 model_dump 的 None 归一为空串；可选字段（source/pdf）不再以字面 "None" 进表单 | None 会被 Jinja 渲染为 "None" 且不是 YAML null 关键字，保存即损坏字段（T7 质量审查 Important） |
 | D17 | card_new_post 对用户可控 id 增加正则守卫（字母/数字开头，仅 . _ : -，禁 '..'） | 模型层 id 无约束（schema 冻结）；空 id 写出隐藏 .md 使全项目不可用，../ 可路径逃逸写任意文件（T8 质量审查 Important×2） |
 | D18 | parts 写路由对 HX-Request 返回 part_panel 局部、否则 303 回整页 /parts；快捷审阅不带 comment 时保留原值 | 303 指向的 /parts/{part_id} 是无 base.html 的局部页，普通表单提交会落到无样式片段；快捷 ✅/❌ 原实现会清空已有 comment（T9 质量审查） |
+| D19 | worker except 分支补发 run_failed 终态事件（runner pre-try 异常如 make_client 无 key 时原实现 SSE 静默挂死）；run_console 的 data-panel-url 移至 part_panel 根元素（原实现完成后把整个面板换进日志框）；闸门 banner 用 html.escape | T11 质量审查 Important×2+Minor |
 
 ## Self-Review 记录
 

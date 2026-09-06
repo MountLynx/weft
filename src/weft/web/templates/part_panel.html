@@ -1,4 +1,4 @@
-<div class="part-panel">
+<div class="part-panel" data-panel-url="/p/{{ pid }}/parts/{{ part.id }}">
   <h3>{{ part.id }}（{{ part.section }}）</h3>
   <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/workflow" class="wf-form"
         hx-post="/p/{{ pid }}/parts/{{ part.id }}/workflow" hx-target="#panel" hx-swap="innerHTML">

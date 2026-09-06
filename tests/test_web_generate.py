@@ -48,3 +48,17 @@ def test_generate_gate_rejects_with_errors(tmp_path):
     assert resp.status_code == 200
     assert "校验存在错误" in resp.text
     assert 'data-run-id' not in resp.text
+
+
+def test_generate_second_run_409(tmp_path):
+    client, root = make_client(tmp_path)
+    # 直接占住锁：绕过真实生成线程，构造并发场景
+    mgr = client.app.state.runs
+    run = mgr.try_start("demo")
+    assert run is not None
+    try:
+        resp = client.post("/p/demo/parts/sec-01/generate", data={"mock": "1"})
+        assert resp.status_code == 409
+        assert "已有生成任务在运行" in resp.text
+    finally:
+        mgr.finish("demo", run)

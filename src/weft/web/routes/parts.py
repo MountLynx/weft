@@ -1,6 +1,7 @@
 """叙事工作台（webui 设计 §5）：part 页签、节点审阅、节点编辑（Task 10）、生成（Task 11）。"""
 from __future__ import annotations
 
+import html as _html
 import threading
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
@@ -194,9 +195,10 @@ async def generate(request: Request, pid: str, part_id: str):
     project, load_diags = load_project(entry.path)
     diagnostics = load_diags + validate_project(project)
     if any(d.is_error for d in diagnostics):
+        # HTMLResponse 不经模板 autoescape，诊断字段（源自卡内容）必须手工转义
         banner = "".join(
-            f'<div class="field-error">{"ERROR" if d.is_error else "WARN"} '
-            f'{d.path} [{d.code}] {d.message}</div>'
+            f'<div class="field-error">{_html.escape(d.path)} '
+            f'[{_html.escape(d.code)}] {_html.escape(d.message)}</div>'
             for d in diagnostics if d.is_error)
         html = (f'<div class="banner error"><div>校验存在错误，拒绝生成</div>{banner}</div>'
                 f'<div id="run-log" class="run-log"></div>')
@@ -213,8 +215,11 @@ async def generate(request: Request, pid: str, part_id: str):
             client = make_client(mock, project_root=project.root)
             run_part_draft(project, part, client=client, on_event=lambda e: run.emit(
                 RunEvent(e.kind, e.node_id, e.message)))
-        except Exception as exc:            # runner 已发过 run_failed 事件（D1）
+        except Exception as exc:
+            # runner 自身失败时已发过 run_failed（D1）；pre-try 异常（如 make_client 无 key）
+            # 需在此补发终态事件，否则 SSE 静默挂死到超时
             run.error = str(exc)
+            run.emit(RunEvent("run_failed", message=str(exc)))
         finally:
             request.app.state.runs.finish(pid, run)
 
