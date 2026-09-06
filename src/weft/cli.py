@@ -407,3 +407,21 @@ def missing_cites(
             else claim.statement[:39] + "…"
         typer.echo(f"{cid}  {project.card_paths[cid].as_posix()}  {statement}")
     typer.echo(f"—— {len(hits)} 张 cited 卡缺文献")
+
+
+@app.command()
+def serve(
+    projects_root: Path = typer.Argument(..., help="weft 论文项目根目录（扫描一级子目录）"),
+    host: str = typer.Option("127.0.0.1", "--host", help="监听地址；部署用 0.0.0.0"),
+    port: int = typer.Option(8000, "--port", help="监听端口"),
+) -> None:
+    """启动 WebUI（webui 设计 §10）：weft serve <projects_root> --host 0.0.0.0 --port 8000。"""
+    try:
+        import uvicorn
+    except ImportError as exc:
+        typer.echo("ERROR WebUI 依赖未安装：pip install 'weft[web]'")
+        raise typer.Exit(code=1) from exc
+    from weft.web import create_app
+
+    create_app(projects_root)   # 启动前构建一次：根目录非法立刻失败
+    uvicorn.run(create_app(projects_root), host=host, port=port)
