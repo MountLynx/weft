@@ -4,10 +4,21 @@
 """
 from __future__ import annotations
 
+from pydantic import ValidationError
+
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
 from weft.store.writer import save_card
+from weft.web.card_forms import (
+    FIELD_SPECS,
+    KIND_MODELS,
+    build_choices,
+    form_to_meta,
+    form_to_values,
+    validation_errors,
+    values_for_template,
+)
 from weft.web.common import KIND_ATTRS, KIND_LABELS, load_project_or_404, templates
 
 router = APIRouter()
@@ -78,6 +89,57 @@ async def card_review(request: Request, pid: str, kind: str, card_id: str):
     new_card = card.model_copy(update={"status": status,
                                        "comment": str(form.get("comment", ""))})
     save_card(entry.project.root, new_card,
+              old_rel=entry.project.card_paths[card_id].as_posix())
+    return RedirectResponse(f"/p/{pid}/cards/{kind}/{card_id}", status_code=303)
+
+
+@router.get("/p/{pid}/cards/{kind}/{card_id}/edit")
+def card_edit_get(request: Request, pid: str, kind: str, card_id: str):
+    entry, table = _table(request, pid, kind)
+    card = table.get(card_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="卡片不存在")
+    return templates.TemplateResponse(
+        request, "card_form.html",
+        {"pid": pid, "kind": kind, "form_title": f"编辑 {KIND_LABELS[kind]} {card_id}",
+         "action": f"/p/{pid}/cards/{kind}/{card_id}/edit",
+         "cancel_url": f"/p/{pid}/cards/{kind}/{card_id}",
+         "is_new": False, "id_widget": None, "prefilled_id": "", "id_choices": [],
+         "specs": FIELD_SPECS[kind],
+         "values": values_for_template(kind, card),
+         "choices": build_choices(kind, entry.project), "errors": {}})
+
+
+@router.post("/p/{pid}/cards/{kind}/{card_id}/edit")
+async def card_edit_post(request: Request, pid: str, kind: str, card_id: str):
+    entry, table = _table(request, pid, kind)
+    old_card = table.get(card_id)
+    if old_card is None:
+        raise HTTPException(status_code=404, detail="卡片不存在")
+    form = await request.form()
+
+    def rerender(errors: dict[str, str]):
+        return templates.TemplateResponse(
+            request, "card_form.html",
+            {"pid": pid, "kind": kind,
+             "form_title": f"编辑 {KIND_LABELS[kind]} {card_id}",
+             "action": f"/p/{pid}/cards/{kind}/{card_id}/edit",
+             "cancel_url": f"/p/{pid}/cards/{kind}/{card_id}",
+             "is_new": False, "id_widget": None, "prefilled_id": "", "id_choices": [],
+             "specs": FIELD_SPECS[kind], "values": form_to_values(kind, form),
+             "choices": build_choices(kind, entry.project), "errors": errors})
+
+    meta, errors = form_to_meta(kind, form, is_new=False, card_id=card_id)
+    card = None
+    if not errors:
+        try:
+            card = KIND_MODELS[kind].model_validate(meta)
+        except ValidationError as exc:
+            errors = validation_errors(exc)
+            card = None
+    if card is None:
+        return rerender(errors)
+    save_card(entry.project.root, card,
               old_rel=entry.project.card_paths[card_id].as_posix())
     return RedirectResponse(f"/p/{pid}/cards/{kind}/{card_id}", status_code=303)
 
