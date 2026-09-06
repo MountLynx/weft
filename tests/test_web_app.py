@@ -1,4 +1,8 @@
 """WebUI 骨架与 serve 子命令。"""
+import pytest
+
+pytest.importorskip("fastapi")
+
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -30,3 +34,14 @@ def test_serve_invokes_uvicorn(tmp_path: Path, monkeypatch):
     assert result.exit_code == 0
     assert captured["port"] == 8123 and captured["host"] == "127.0.0.1"
     assert captured["app"].state.projects_root == projects.resolve()
+
+
+def test_serve_rejects_missing_root(tmp_path: Path, monkeypatch):
+    import uvicorn
+
+    monkeypatch.setattr(uvicorn, "run", lambda *a, **k: (_ for _ in ()).throw(
+        AssertionError("uvicorn.run 不应被调用")))
+    result = CliRunner().invoke(
+        cli_mod.app, ["serve", str(tmp_path / "nope")])
+    assert result.exit_code == 1
+    assert "项目根目录不存在" in result.output

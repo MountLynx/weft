@@ -390,5 +390,7 @@ def serve(
         raise typer.Exit(code=1) from exc
     from weft.web import create_app
 
-    create_app(projects_root)   # 启动前构建一次：根目录非法立刻失败
+    if not projects_root.is_dir():
+        typer.echo(f"ERROR 项目根目录不存在：{projects_root}")
+        raise typer.Exit(code=1)
     uvicorn.run(create_app(projects_root), host=host, port=port)
