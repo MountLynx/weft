@@ -3,6 +3,7 @@ function addUseRow() {
   const rows = document.getElementById("use-rows");
   if (!rows) return;
   const tpl = rows.querySelector(".use-row");
+  if (!tpl) return;                    // 全部行被移除后克隆源不存在：静默返回（刷新恢复）
   const clone = tpl.cloneNode(true);
   clone.querySelectorAll("input").forEach(function (el) { el.value = ""; });
   rows.appendChild(clone);
@@ -14,7 +15,8 @@ function connectRunStream(scope) {
     el.dataset.streamBound = "1";
     const src = new EventSource(el.dataset.eventsUrl);
     src.onmessage = function (m) {
-      const ev = JSON.parse(m.data);
+      let ev;
+      try { ev = JSON.parse(m.data); } catch (err) { return; }
       const line = document.createElement("div");
       line.className = "log-" + ev.kind;
       line.textContent = (ev.node_id ? ev.node_id + " · " : "") +
@@ -28,6 +30,7 @@ function connectRunStream(scope) {
         }
       }
     };
+    src.onerror = function () { src.close(); };
   });
 }
 
