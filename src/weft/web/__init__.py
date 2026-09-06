@@ -15,6 +15,9 @@ _STATIC_DIR = Path(__file__).parent / "static"
 def create_app(projects_root: Path) -> FastAPI:
     app = FastAPI(title="weft WebUI", docs_url=None, redoc_url=None)
     app.state.projects_root = Path(projects_root).resolve()
+    from weft.web.runs import RunManager
+
+    app.state.runs = RunManager()
     from weft.web.routes import register_all
 
     register_all(app)

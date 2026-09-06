@@ -1,14 +1,21 @@
 """叙事工作台（webui 设计 §5）：part 页签、节点审阅、节点编辑（Task 10）、生成（Task 11）。"""
 from __future__ import annotations
 
+import threading
+
 from fastapi import APIRouter, FastAPI, HTTPException, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from pydantic import ValidationError
 
+from weft.engine import make_client
+from weft.engine.part_draft import run_part_draft
 from weft.models.narrative import Node, Use
+from weft.store.loader import load_project
 from weft.store.writer import save_part
+from weft.validation import validate_project
 from weft.validation.rules import PURPOSE_VOCAB, ROLE_VOCAB
-from weft.web.common import load_project_or_404, templates
+from weft.web.common import load_entry_or_404, load_project_or_404, templates
+from weft.web.runs import RunEvent
 from weft.workflow import WORKFLOW_VOCAB
 
 router = APIRouter()
@@ -166,6 +173,65 @@ async def node_edit_post(request: Request, pid: str, part_id: str, node_id: str)
         return templates.TemplateResponse(request, "part_panel.html",
                                           _panel_ctx(entry, part))
     return RedirectResponse(f"/p/{pid}/parts/{part_id}", status_code=303)
+
+
+def _find_part_by_project(project, part_id: str):
+    for part in project.parts:
+        if part.id == part_id:
+            return part
+    raise HTTPException(status_code=404, detail="叙事 part 不存在")
+
+
+@router.post("/p/{pid}/parts/{part_id}/generate")
+async def generate(request: Request, pid: str, part_id: str):
+    # 只校验 pid 存在，不要求扫描快照 available：闸门（红线 6）才是唯一裁决者，
+    # 校验错误必须在 banner 里展示而非 404（设计 §6）。
+    entry = load_entry_or_404(request, pid)
+    form = await request.form()
+    mock = str(form.get("mock", "")) == "1"
+
+    # 闸门（红线 6）：新生成快照，load + validate，有 error 即拒绝
+    project, load_diags = load_project(entry.path)
+    diagnostics = load_diags + validate_project(project)
+    if any(d.is_error for d in diagnostics):
+        banner = "".join(
+            f'<div class="field-error">{"ERROR" if d.is_error else "WARN"} '
+            f'{d.path} [{d.code}] {d.message}</div>'
+            for d in diagnostics if d.is_error)
+        html = (f'<div class="banner error"><div>校验存在错误，拒绝生成</div>{banner}</div>'
+                f'<div id="run-log" class="run-log"></div>')
+        return HTMLResponse(html)
+    part = _find_part_by_project(project, part_id)
+    run = request.app.state.runs.try_start(pid)
+    if run is None:
+        return HTMLResponse(
+            '<div class="banner error">已有生成任务在运行，请等待完成</div>'
+            '<div id="run-log" class="run-log"></div>', status_code=409)
+
+    def worker() -> None:
+        try:
+            client = make_client(mock, project_root=project.root)
+            run_part_draft(project, part, client=client, on_event=lambda e: run.emit(
+                RunEvent(e.kind, e.node_id, e.message)))
+        except Exception as exc:            # runner 已发过 run_failed 事件（D1）
+            run.error = str(exc)
+        finally:
+            request.app.state.runs.finish(pid, run)
+
+    threading.Thread(target=worker, daemon=True).start()
+    return templates.TemplateResponse(
+        request, "run_console.html",
+        {"pid": pid, "part_id": part_id, "run_id": run.id})
+
+
+@router.get("/p/{pid}/runs/{run_id}/events")
+def sse_events(request: Request, pid: str, run_id: str):
+    run = request.app.state.runs.get(run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="运行不存在")
+    return StreamingResponse(run.stream_sse(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "X-Accel-Buffering": "no"})
 
 
 def register(app: FastAPI) -> None:
