@@ -184,3 +184,26 @@ def test_apply_duplicate_supplement_targets_keeps_first(tmp_path):
     assert any("降级" in n for n in outcome.notes)
     # 后者（c1）降级为新建草稿卡
     assert (tmp_path / "metadata" / "claims" / "uncited" / "claim-02.md").is_file()
+
+
+def test_apply_proposal_replaces_and_archives(tmp_path):
+    """提炼后的 apply_proposal（CLI 与 WebUI 共用）：新卡替换旧卡，旧卡归档。"""
+    import frontmatter as fm
+
+    from weft.engine.inspire.apply import apply_proposal
+
+    root = make_minimal_project(tmp_path)
+    project, diags = load_project(root)
+    assert not any(d.is_error for d in diags)
+    proposals = root / "inspirations" / "proposals"
+    proposals.mkdir(parents=True)
+    proposals.joinpath("claim-01.md").write_text(fm.dumps(fm.Post("", **{
+        "id": "claim-01", "claim_type": "uncited",
+        "statement": "搅拌是溶解的主要因素（提案版）。", "status": "draft"})),
+        encoding="utf-8")
+    old_path, archive_path = apply_proposal(project, "claim-01")
+    assert old_path == root / "metadata" / "claims" / "uncited" / "claim-01.md"
+    assert "搅拌是溶解的主要因素（提案版）" in old_path.read_text(encoding="utf-8")
+    assert (root / "archive" / "cards" / "uncited" / "claim-01.md").exists()
+    assert archive_path == root / "archive" / "cards" / "uncited" / "claim-01.md"
+    assert not proposals.joinpath("claim-01.md").exists()

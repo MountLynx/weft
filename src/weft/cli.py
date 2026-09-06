@@ -294,64 +294,18 @@ def replace_proposal(
     project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
 ) -> None:
     """应用替换提案：新卡替换旧卡，旧卡归档 archive/cards/<类型>/。"""
-    import frontmatter
-
-    from weft.engine.inspire.cards import _normalize
-    from weft.models.cards import ClaimCard, FactCard
-
+    from weft.engine.inspire.apply import apply_proposal
 
     project, load_diags = load_project(project_dir)
     if any(d.is_error for d in load_diags):
         _print_diagnostics(load_diags)
         raise typer.Exit(code=1)
-
-    proposal_path = project.root / "inspirations" / "proposals" / f"{card_id}.md"
-    if card_id not in project.card_paths:
-        typer.echo(f"ERROR 目标卡不存在：{card_id}")
-        raise typer.Exit(code=1)
-    if not proposal_path.is_file():
-        typer.echo(f"ERROR 替换提案不存在：{proposal_path}")
-        raise typer.Exit(code=1)
-    old_rel = project.card_paths[card_id]
-    old_path = project.root / old_rel
-    is_fact = "facts" in old_rel.parts
-    model = FactCard if is_fact else ClaimCard
     try:
-        post = frontmatter.load(proposal_path)
-        new_card = model.model_validate(post.metadata)
-    except Exception as exc:
-        typer.echo(f"ERROR 提案卡解析失败：{exc}")
+        new_path, archive_path = apply_proposal(project, card_id)
+    except ValueError as exc:
+        typer.echo(f"ERROR {exc}")
         raise typer.Exit(code=1) from exc
-    if new_card.id != card_id:
-        typer.echo(f"ERROR 提案卡 id {new_card.id} 与目标 {card_id} 不一致")
-        raise typer.Exit(code=1)
-
-    # 闸门：内存替换后全量校验，有 error 即拒绝（磁盘零改动）
-    table = project.facts if is_fact else project.claims
-    table[card_id] = new_card
-    gate = validate_project(project)
-    gate_errors = [d for d in gate if d.is_error]
-    if gate_errors:
-        _print_diagnostics(gate_errors)
-        typer.echo("—— 替换被校验闸门拒绝，磁盘未改动")
-        raise typer.Exit(code=1)
-
-    archive_dir = project.root / "archive" / "cards" / old_rel.parent.name
-    archive_path = archive_dir / old_rel.name
-    if archive_path.exists():
-        typer.echo(f"ERROR 归档重名，拒绝覆盖：{archive_path}")
-        raise typer.Exit(code=1)
-    try:
-        archive_dir.mkdir(parents=True, exist_ok=True)
-        old_path.rename(archive_path)
-        old_path.write_text(
-            _normalize(proposal_path.read_text(encoding="utf-8")),
-            encoding="utf-8", newline="\n")
-        proposal_path.unlink()
-    except OSError as exc:
-        typer.echo(f"ERROR 替换落盘失败：{exc}")
-        raise typer.Exit(code=1) from exc
-    typer.echo(f"已替换 {old_rel.as_posix()}")
+    typer.echo(f"已替换 {new_path.relative_to(project.root).as_posix()}")
     typer.echo(f"旧卡归档 {archive_path.relative_to(project.root).as_posix()}")
 
 
