@@ -89,7 +89,7 @@ def _make_fill_script(node: Node, part_id: str, project: Project):
         out = {}
         for tick in ("g", "c1", "l", "p", "c2"):
             try:
-                out[tick] = view[tick].value
+                out[tick] = view.field(tick)
             except (KeyError, AttributeError, TypeError) as exc:
                 raise DraftRuleError(_diag(
                     "E-DRAFT-SHAPE", node.id, part_id, "output",

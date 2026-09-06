@@ -12,7 +12,7 @@ dependencies = [
     "python-frontmatter>=1.1",
     "typer>=0.12",
     "pyyaml>=6",
-    "specmodule[openai]==0.1.4",
+    "specmodule[openai]>=0.2.0,<0.3",
 ]
 
 [project.optional-dependencies]
