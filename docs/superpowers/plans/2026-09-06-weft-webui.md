@@ -394,7 +394,7 @@ from weft.store.project import Project
 
 _CARD_DIRS = [(DataCard, "metadata/data"), (FactCard, "metadata/facts"),
               (NoteCard, "metadata/notes"), (MethodCard, "metadata/methods"),
-              (ParamCard, "metadata/params")]
+              (ParamCard, "metadata/methods/params")]
 
 
 def card_relpath(card) -> str:
@@ -3252,6 +3252,8 @@ git worktree remove .worktrees/weft-webui && git branch -d weft-webui
 | D11 | 携带主区未提交的 specmodule 0.2.0 升级 3 处单行改动入分支（T0 setup 提交 8f10f4b） | HEAD 代码已 import `module_harness.infra`（0.2.0 才有），0.1.4 无法收集测试；该改动是运行前提 |
 | D12 | 测试导入用 `from tests.helpers import …`（计划原文写 `from helpers import …` 有误） | tests/ 是包（有 `__init__.py`），现有测试均为 `tests.helpers` 风格；实施者实验验证（T1） |
 | D13 | `weft serve` 增加启动前 `projects_root.is_dir()` 校验（T4 落地），替换原"构建即校验"的错误注释 | `create_app` 不校验根目录存在性；拼错路径应显式报错而非起空服务（T1 质量审查） |
+| D14 | ParamCard 规范目录为 metadata/methods/params（v1.1 §3.2），计划原文误写 metadata/params；save_card old_rel 比较统一 Path(...).as_posix() | loader.py:101 只从 methods/params 读 param；错目录会导致每次保存视作迁移、静默丢卡（T2 质量审查 Critical） |
+| D15 | python-frontmatter 1.3.0 正文属性是 .content（无 .body）；writer 与相关测试用 .content | 1.3.0 实测 API（T2 实施期） |
 
 ## Self-Review 记录
 

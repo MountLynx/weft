@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.helpers import make_minimal_project
+from tests.helpers import make_minimal_project, write_card
 from weft.models.cards import DataCard
 from weft.store.loader import load_project
 from weft.store.writer import create_card, next_card_id, save_card, save_part
@@ -89,3 +89,18 @@ def test_save_part_round_trip(tmp_path: Path):
     part2 = next(p for p in project2.parts if p.id == "sec-01")
     assert part2.nodes[0].comment == "改过 comment"
     assert "审阅备注" in part_path.read_text(encoding="utf-8")
+
+
+def test_save_param_card_no_spurious_migration(tmp_path: Path):
+    project = _load(tmp_path)
+    write_card(project.root / "metadata" / "methods" / "params", "stir-01",
+               {"id": "stir-01", "method": "m-stir-01", "status": "approved"})
+    project, diags = load_project(project.root)
+    assert not any(d.is_error for d in diags)
+    param = project.params["stir-01"]
+    old_rel = project.card_paths["stir-01"].as_posix()
+    saved = save_card(project.root, param.model_copy(update={"comment": "改"}), old_rel=old_rel)
+    assert saved == project.root / "metadata" / "methods" / "params" / "stir-01.md"
+    assert (project.root / old_rel).exists()          # 未被当作迁移删除
+    project2, _ = load_project(project.root)
+    assert project2.params["stir-01"].comment == "改"

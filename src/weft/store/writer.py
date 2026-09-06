@@ -23,7 +23,7 @@ from weft.store.project import Project
 
 _CARD_DIRS = [(DataCard, "metadata/data"), (FactCard, "metadata/facts"),
               (NoteCard, "metadata/notes"), (MethodCard, "metadata/methods"),
-              (ParamCard, "metadata/params")]
+              (ParamCard, "metadata/methods/params")]
 
 
 def card_relpath(card) -> str:
@@ -47,7 +47,7 @@ def save_card(root: Path, card, *, old_rel: str | None = None) -> Path:
     path = root / rel
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_dump(card), encoding="utf-8", newline="\n")
-    if old_rel is not None and old_rel != rel:
+    if old_rel is not None and Path(old_rel).as_posix() != rel:
         (root / old_rel).unlink()
     return path
 
