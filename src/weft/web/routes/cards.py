@@ -9,10 +9,12 @@ from pydantic import ValidationError
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
-from weft.store.writer import save_card
+from weft.store.writer import create_card, next_card_id, save_card
 from weft.web.card_forms import (
     FIELD_SPECS,
+    KIND_ID_WIDGET,
     KIND_MODELS,
+    KIND_PREFIX,
     build_choices,
     form_to_meta,
     form_to_values,
@@ -60,6 +62,73 @@ def card_list(request: Request, pid: str, kind: str):
         {"entry": entry, "kind": kind, "rows": rows, "labels": KIND_LABELS,
          "counts": {k: len(getattr(entry.project, a))
                     for k, a in KIND_ATTRS.items()}})
+
+
+@router.get("/p/{pid}/cards/{kind}/new")
+def card_new_get(request: Request, pid: str, kind: str):
+    if kind not in KIND_ATTRS:
+        raise HTTPException(status_code=404, detail="未知卡种")
+    entry = load_project_or_404(request, pid)
+    widget = KIND_ID_WIDGET[kind]
+    prefilled = ""
+    id_choices: list[str] = []
+    if widget == "auto":
+        prefilled = next_card_id(entry.project, KIND_PREFIX[kind])
+    elif widget == "bibkey":
+        id_choices = sorted(entry.project.bib_keys)
+    blank = {"status": "draft", "comment": ""}
+    if kind == "param":
+        blank["values"] = ""
+    return templates.TemplateResponse(
+        request, "card_form.html",
+        {"pid": pid, "kind": kind,
+         "form_title": f"新建 {KIND_LABELS[kind]}",
+         "action": f"/p/{pid}/cards/{kind}/new",
+         "cancel_url": f"/p/{pid}/cards/{kind}",
+         "is_new": True, "id_widget": widget, "prefilled_id": prefilled,
+         "id_choices": id_choices, "specs": FIELD_SPECS[kind],
+         "values": blank, "choices": build_choices(kind, entry.project),
+         "errors": {}})
+
+
+@router.post("/p/{pid}/cards/{kind}/new")
+async def card_new_post(request: Request, pid: str, kind: str):
+    if kind not in KIND_ATTRS:
+        raise HTTPException(status_code=404, detail="未知卡种")
+    entry = load_project_or_404(request, pid)
+    form = await request.form()
+
+    def rerender(errors: dict[str, str]):
+        widget = KIND_ID_WIDGET[kind]
+        prefilled = (next_card_id(entry.project, KIND_PREFIX[kind])
+                     if widget == "auto" else "")
+        id_choices = sorted(entry.project.bib_keys) if widget == "bibkey" else []
+        return templates.TemplateResponse(
+            request, "card_form.html",
+            {"pid": pid, "kind": kind, "form_title": f"新建 {KIND_LABELS[kind]}",
+             "action": f"/p/{pid}/cards/{kind}/new",
+             "cancel_url": f"/p/{pid}/cards/{kind}",
+             "is_new": True, "id_widget": widget, "prefilled_id": prefilled,
+             "id_choices": id_choices, "specs": FIELD_SPECS[kind],
+             "values": form_to_values(kind, form),
+             "choices": build_choices(kind, entry.project), "errors": errors})
+
+    meta, errors = form_to_meta(kind, form, is_new=True, card_id=None)
+    card = None
+    if not errors:
+        try:
+            card = KIND_MODELS[kind].model_validate(meta)
+        except ValidationError as exc:
+            errors = validation_errors(exc)
+    if card is not None:
+        try:
+            create_card(entry.project.root, card)
+        except FileExistsError as exc:
+            errors = {"id": str(exc)}
+            card = None
+    if card is None:
+        return rerender(errors)
+    return RedirectResponse(f"/p/{pid}/cards/{kind}/{card.id}", status_code=303)
 
 
 @router.get("/p/{pid}/cards/{kind}/{card_id}")
