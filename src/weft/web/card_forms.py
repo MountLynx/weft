@@ -104,8 +104,9 @@ def validation_errors(exc) -> dict[str, str]:
 
 
 def values_for_template(kind: str, card) -> dict:
-    """model_dump → 模板渲染值；param.values 字典转 YAML 文本。"""
-    values = card.model_dump()
+    """model_dump → 模板渲染值：None 归一为空串（防字面 "None" 进表单再写回）；
+    param.values 字典转 YAML 文本。"""
+    values = {k: ("" if v is None else v) for k, v in card.model_dump().items()}
     if kind == "param":
         values["values"] = yaml.safe_dump(values.get("values") or {},
                                           allow_unicode=True, sort_keys=False)

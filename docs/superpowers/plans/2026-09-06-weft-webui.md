@@ -3254,6 +3254,7 @@ git worktree remove .worktrees/weft-webui && git branch -d weft-webui
 | D13 | `weft serve` 增加启动前 `projects_root.is_dir()` 校验（T4 落地），替换原"构建即校验"的错误注释 | `create_app` 不校验根目录存在性；拼错路径应显式报错而非起空服务（T1 质量审查） |
 | D14 | ParamCard 规范目录为 metadata/methods/params（v1.1 §3.2），计划原文误写 metadata/params；save_card old_rel 比较统一 Path(...).as_posix() | loader.py:101 只从 methods/params 读 param；错目录会导致每次保存视作迁移、静默丢卡（T2 质量审查 Critical） |
 | D15 | python-frontmatter 1.3.0 正文属性是 .content（无 .body）；writer 与相关测试用 .content | 1.3.0 实测 API（T2 实施期） |
+| D16 | values_for_template 将 model_dump 的 None 归一为空串；可选字段（source/pdf）不再以字面 "None" 进表单 | None 会被 Jinja 渲染为 "None" 且不是 YAML null 关键字，保存即损坏字段（T7 质量审查 Important） |
 
 ## Self-Review 记录
 

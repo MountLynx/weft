@@ -31,9 +31,23 @@ def test_edit_validation_error_rerenders(tmp_path):
         "data": [], "statement": "", "supports": [],   # data 空违反 min_length=1
         "status": "approved", "comment": ""})
     assert resp.status_code == 200
-    assert "data" in resp.text and "1" in resp.text   # 错误回显
+    assert "field-error" in resp.text   # 错误回显
     project, _ = load_project(root / "demo")
     assert project.facts["fact-01"].statement == "温度提高速率。"   # 未落盘
+
+
+def test_edit_optional_none_field_round_trip(tmp_path):
+    client, root = make_client(tmp_path)
+    resp = client.get("/p/demo/cards/data/data-01/edit")
+    assert resp.status_code == 200
+    assert 'value="None"' not in resp.text          # None 不渲染为字面字符串
+    resp = client.post("/p/demo/cards/data/data-01/edit", data={
+        "refs": ["fig-01a"], "source": "", "description": "",
+        "status": "approved", "comment": ""}, follow_redirects=False)
+    assert resp.status_code == 303
+    project, diags = load_project(root / "demo")
+    assert not any(d.is_error for d in diags)
+    assert project.data_cards["data-01"].source in (None, "")   # 空串不损坏为字面 "None"
 
 
 def test_claim_type_edit_moves_file(tmp_path):
