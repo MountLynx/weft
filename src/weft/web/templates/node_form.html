@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}节点 {{ node.id }}{% endblock %}
+{% block content %}
+<h2>节点 {{ node.id }}（{{ part.id }}）
+  <span class="badge {{ node.status }}">{{ node.status }}</span></h2>
+{% if errors %}<div class="banner error">
+  {% for k, v in errors.items() %}<div><b>{{ k }}</b>: {{ v }}</div>{% endfor %}
+</div>{% endif %}
+<form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}">
+  <label>purpose（词表可选，允许自定义）
+    <input name="purpose" value="{{ values.get('purpose', '') }}" list="purpose-vocab">
+  </label>
+  <datalist id="purpose-vocab">{% for p in purpose_vocab %}<option value="{{ p }}">{% endfor %}</datalist>
+  <label>logic（写作逻辑说明）
+    <textarea name="logic" rows="4">{{ values.get('logic', '') }}</textarea>
+  </label>
+  <div class="label">uses（本节点使用的实体：id + role 成对）</div>
+  <div id="use-rows">
+    {% for i in range(values.get('use_id', []) | length) %}
+    <div class="use-row">
+      <input name="use_id" value="{{ values['use_id'][i] }}" list="entity-ids" placeholder="实体 id">
+      <input name="use_role" value="{{ values['use_role'][i] }}" list="role-vocab" placeholder="role">
+      <button type="button" onclick="this.parentNode.remove()">移除</button>
+    </div>
+    {% endfor %}
+    <div class="use-row">
+      <input name="use_id" value="" list="entity-ids" placeholder="实体 id">
+      <input name="use_role" value="" list="role-vocab" placeholder="role">
+      <button type="button" onclick="this.parentNode.remove()">移除</button>
+    </div>
+  </div>
+  <button type="button" onclick="addUseRow()">＋ 添加 use</button>
+  <datalist id="entity-ids">{% for eid in entity_ids %}<option value="{{ eid }}">{% endfor %}</datalist>
+  <datalist id="role-vocab">{% for r in role_vocab %}<option value="{{ r }}">{% endfor %}</datalist>
+  <label>status
+    <select name="status">
+      {% for s in ["draft", "approved", "rejected"] %}
+      <option value="{{ s }}" {% if values.get('status', 'draft') == s %}selected{% endif %}>{{ s }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>comment<textarea name="comment" rows="2">{{ values.get('comment', '') }}</textarea></label>
+  <button type="submit">保存节点</button>
+  <a href="/p/{{ pid }}/parts/{{ part.id }}">返回工作台</a>
+</form>
+{% endblock %}
