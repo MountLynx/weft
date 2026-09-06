@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}{{ entry.pid }} 总览{% endblock %}
+{% block content %}
+<h2>项目：{{ entry.pid }}
+  {% if not entry.available %}<span class="badge rejected">不可用</span>{% endif %}</h2>
+<div class="stats">
+  <div class="stat"><b>{{ entry.n_cards }}</b><span>卡片</span></div>
+  <div class="stat"><b>{{ entry.project.parts | length }}</b><span>叙事 part</span></div>
+  <div class="stat"><b>{{ status_counts["approved"] }}</b><span>approved</span></div>
+  <div class="stat"><b>{{ status_counts["draft"] }}</b><span>draft 待审</span></div>
+  <div class="stat {% if entry.n_errors %}bad{% endif %}"><b>{{ entry.n_errors }}</b><span>错误</span></div>
+  <div class="stat"><b>{{ entry.n_warnings }}</b><span>提醒</span></div>
+</div>
+<h3>待审阅队列</h3>
+{% if review_queue %}
+<table class="list">
+  <thead><tr><th>类型</th><th>id</th><th>位置</th><th>操作</th></tr></thead>
+  <tbody>
+  {% for item in review_queue %}
+    <tr>
+      <td>{{ item.kind }}</td><td>{{ item.id }}</td><td><code>{{ item.rel }}</code></td>
+      <td><a href="{{ item.url }}">审阅</a></td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p>（无待审阅项）</p>{% endif %}
+<h3>快捷入口</h3>
+<p>
+  <a href="/p/{{ entry.pid }}/parts">叙事工作台</a> ·
+  <a href="/p/{{ entry.pid }}/cards">卡片</a> ·
+  <a href="/p/{{ entry.pid }}/graph">元数据图谱</a> ·
+  <a href="/p/{{ entry.pid }}/inspire">灵感</a> ·
+  <a href="/p/{{ entry.pid }}/diagnostics">诊断（{{ entry.n_errors }} E / {{ entry.n_warnings }} W）</a>
+</p>
+{% endblock %}
