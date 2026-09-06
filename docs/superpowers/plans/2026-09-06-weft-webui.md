@@ -63,24 +63,26 @@ tests/test_web_inspire.py
 
 ## 精确测试计数登记
 
-| 任务 | 新增测试数 |
-|---|---|
-| T1 依赖+app 骨架+serve | 2 |
-| T2 store/writer | 6 |
-| T3 engine runner | 2 |
-| T4 discovery | 3 |
-| T5 首页+仪表盘 | 3 |
-| T6 卡片列表/详情/审阅 | 5 |
-| T7 卡片编辑 | 4 |
-| T8 卡片新建 | 3 |
-| T9 叙事工作台 | 5 |
-| T10 节点编辑(uses) | 2 |
-| T11 生成+SSE | 3 |
-| T12 graph/诊断/files | 4 |
-| T13 inspire | 4 |
-| **合计** | **46** |
+| 任务 | 登记数 | 实际数 | 差额来源 |
+|---|---|---|---|
+| T1 骨架 | 2 | 3 | +1 test_serve_rejects_missing_root（D13 审查） |
+| T2 store/writer | 6 | 7 | +1 param 回归（D14 Critical 修复） |
+| T3 runner | 2 | 2 | — |
+| T4 discovery | 3 | 3 | — |
+| T5 首页/仪表盘 | 3 | 3 | — |
+| T6 卡片列表/审阅 | 5 | 5 | — |
+| T7 卡片编辑 | 4 | 5 | +1 None 归一回归（D16） |
+| T8 卡片新建 | 3 | 5 | +2 id 守卫回归（D17） |
+| T9 叙事工作台 | 5 | 7 | +2 htmx 分流/comment 保留（D18） |
+| T10 节点编辑 | 3 | 3 | — |
+| T11 生成 SSE | 3 | 4 | +1 409 路由（D19） |
+| T12 graph/诊断/files | 3 | 3 | — |
+| T13 inspire | 4 | 4 | — |
+| **合计** | **46** | **54** | +8（修复期回归，已计入实际数列） |
 
-基线 260 passed（AGENTS.md 记录，1 deselected）；全部完成预期 **306 passed**。若基线已漂移，以执行时实测为准并在本表回填。
+回填说明（T14）：实际数按 pytest 逐文件清点核实（T13 含 `tests/test_inspire_apply.py` 补的 apply_proposal 回归 1 例）；登记数按计划正文各 Task 实列测试清点——原登记表 T10 误记 2、T12 误记 4，正文实列均为 3，合计 46 不变；修复期新增 +8 已计入实际数列。
+
+基线 260 passed, 1 deselected（执行时主工作区复测无漂移，与 AGENTS.md 记录一致）；全部完成实测 **314 passed, 1 deselected**（260 + 54）。
 
 ---
 

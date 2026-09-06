@@ -31,3 +31,4 @@ form label { display: block; margin: 8px 0; }
 form textarea { width: 100%; }
 .multi { display: flex; flex-wrap: wrap; gap: 8px; }
 .check { margin-right: 10px; font-size: 14px; }
+.subtitle { color: #57606a; font-size: 13px; }

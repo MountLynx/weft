@@ -149,7 +149,8 @@ def card_detail(request: Request, pid: str, kind: str, card_id: str):
         request, "card_detail.html",
         {"entry": entry, "kind": kind, "card": card,
          "rel": entry.project.card_paths[card_id].as_posix(),
-         "fields": {k: v for k, v in card.model_dump().items()
+         "fields": {k: ("" if v is None else v)
+                    for k, v in card.model_dump().items()
                     if k not in ("id", "status", "comment")}})
 
 

@@ -28,8 +28,6 @@ def inspire_page(request: Request, pid: str):
     proposals_dir = entry.project.root / "inspirations" / "proposals"
     proposals = []
     if proposals_dir.is_dir():
-        import frontmatter
-
         for path in sorted(proposals_dir.glob("*.md")):
             proposals.append({"id": path.stem})
     return templates.TemplateResponse(
