@@ -3258,6 +3258,7 @@ git worktree remove .worktrees/weft-webui && git branch -d weft-webui
 | D17 | card_new_post 对用户可控 id 增加正则守卫（字母/数字开头，仅 . _ : -，禁 '..'） | 模型层 id 无约束（schema 冻结）；空 id 写出隐藏 .md 使全项目不可用，../ 可路径逃逸写任意文件（T8 质量审查 Important×2） |
 | D18 | parts 写路由对 HX-Request 返回 part_panel 局部、否则 303 回整页 /parts；快捷审阅不带 comment 时保留原值 | 303 指向的 /parts/{part_id} 是无 base.html 的局部页，普通表单提交会落到无样式片段；快捷 ✅/❌ 原实现会清空已有 comment（T9 质量审查） |
 | D19 | worker except 分支补发 run_failed 终态事件（runner pre-try 异常如 make_client 无 key 时原实现 SSE 静默挂死）；run_console 的 data-panel-url 移至 part_panel 根元素（原实现完成后把整个面板换进日志框）；闸门 banner 用 html.escape | T11 质量审查 Important×2+Minor |
+| D20 | graph.html 为 referenced_by.nodes 中的叙事节点 id 生成灰色桩节点（仅卡片实体进 entities）；graph_page 对损坏 graph.json 回退 None | build_index 只收卡片实体，叙事节点仅作为边源出现；原 JS 对每个真实项目都抛 nonexistant source（T12 质量审查 Important） |
 
 ## Self-Review 记录
 

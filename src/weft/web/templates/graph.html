@@ -12,10 +12,18 @@
   const palette = {data: "#8250df", fact: "#0969da", claim: "#1a7f37",
                    note: "#bf8700", method: "#cf222e", param: "#57606a"};
   const els = [];
+  const seen = new Set();
   for (const [id, e] of Object.entries(ents)) {
+    seen.add(id);
     els.push({data: {id: id, label: id, kind: e.kind, color: palette[e.kind] || "#57606a"}});
+  }
+  for (const [id, e] of Object.entries(ents)) {
     for (const [field, ids] of Object.entries(e.referenced_by || {})) {
       for (const src of ids) {
+        if (!seen.has(src)) {          // 叙事节点 id 只出现在 referenced_by.nodes（非实体卡）
+          seen.add(src);
+          els.push({data: {id: src, label: src, kind: "node", color: "#8a8f98"}});
+        }
         els.push({data: {id: src + "->" + id + ":" + field, source: src, target: id}});
       }
     }

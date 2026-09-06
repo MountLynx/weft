@@ -75,7 +75,12 @@ def diagnostics_page(request: Request, pid: str):
 def graph_page(request: Request, pid: str):
     entry = load_project_or_404(request, pid)
     graph_path = entry.project.root / "generated" / "graph.json"
-    graph = json.loads(graph_path.read_text(encoding="utf-8")) if graph_path.exists() else None
+    graph = None
+    if graph_path.exists():
+        try:
+            graph = json.loads(graph_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            graph = None   # 手工损坏的 graph.json → 回退到"生成图谱"按钮自愈
     return templates.TemplateResponse(
         request, "graph.html", {"entry": entry, "graph": graph})
 
