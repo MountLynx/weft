@@ -58,7 +58,7 @@
 | `/p/{pid}/diagnostics` | GET | validate 全量诊断表（E-*/W-*，可按 code/path 过滤） |
 | `/p/{pid}/files/{path}` | GET | `drafts/` 与 `generated/` 产物只读预览 |
 
-注：`/cards/{kind}/new` 必须先于 `/cards/{kind}/{card_id}` 注册（避免 "new" 被吞进 card_id）。
+注：`/cards/{kind}/new` 必须先于 `/cards/{kind}/{card_id}` 注册（避免 "new" 被吞进 card_id）。执行期路由偏差（D21）：`/inspire` 的触发拆分为 `/inspire/run`（表单语义更清晰）；新增 `/graph/regenerate`（图谱一键生成按钮，设计 §6）。
 
 ## 4. 卡片浏览与编辑
 
