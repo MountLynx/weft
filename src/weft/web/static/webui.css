@@ -32,3 +32,6 @@ form textarea { width: 100%; }
 .multi { display: flex; flex-wrap: wrap; gap: 8px; }
 .check { margin-right: 10px; font-size: 14px; }
 .subtitle { color: #57606a; font-size: 13px; }
+.new-project { display: flex; gap: 10px; align-items: center; margin: 10px 0; }
+.new-project label { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 14px; }
+.new-project input { width: 300px; padding: 4px 8px; }

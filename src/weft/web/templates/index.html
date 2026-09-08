@@ -3,6 +3,13 @@
 {% block content %}
 <h2>weft 论文项目</h2>
 <p class="subtitle">根目录：{{ projects_root }}</p>
+{% if new_error %}<div class="banner error">新建失败：{{ new_error }}</div>{% endif %}
+<form method="post" action="/projects/new" class="new-project">
+  <label>项目名
+    <input name="name" value="{{ new_name }}" placeholder="如 paper-demo 或 我的论文" required>
+  </label>
+  <button type="submit">新建项目</button>
+</form>
 {% if entries %}
 <table class="list">
   <thead><tr><th>项目</th><th>状态</th><th>卡片</th><th>诊断</th><th></th></tr></thead>
