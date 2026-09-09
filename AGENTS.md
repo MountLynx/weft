@@ -12,12 +12,13 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 - `docs/superpowers/plans/2026-09-02-weft-v1.1-implementation.md` — v1.1 实现计划，其"设计决策 1-23"为执行期定案（workflow 判定、前文传递、assemble heading 映射等语义）
 - `docs/superpowers/specs/2026-09-02-weft-m3-render-design.md` — M3 渲染层设计定案（paper.qmd 拼接、References refs div、Figures/Tables 字面编号、assets 资源约定）
 - `docs/superpowers/specs/2026-09-04-weft-inspire-design.md` — 灵感式写作→卡片管线设计定案（摘要索引、T1–T4 节点、落盘闭包、replace 替换归档）；其计划文档 `2026-09-04-weft-inspire.md` 含执行期决策 D1–D10
+- `docs/superpowers/specs/2026-09-09-weft-webui-style-design.md` — WebUI 样式令牌化主题架构定案（webui.css 令牌 + themes/*.css 纯令牌覆盖、导航切换/localStorage/防闪脚本；主题文件只许含令牌声明，有守卫测试）
 
 ## 常用命令（Windows + Git Bash）
 
 ```bash
 .venv/Scripts/python.exe -m pip install -e ".[dev]"     # 安装（含 pytest）
-.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（334 passed, 1 deselected）
+.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（337 passed, 1 deselected）
 .venv/Scripts/python.exe -m pytest tests/test_xxx.py -v # 聚焦测试
 .venv/Scripts/weft.exe --help                           # CLI：init / validate / graph / review / draft / assemble / render / inspire / replace / missing-cites / serve
 WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实 LLM 冒烟（默认排除，双保险门）
