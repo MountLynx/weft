@@ -18,12 +18,31 @@ try {
 <body>
 <nav class="topnav">
   <a class="brand" href="/">weft · AI 学术写作引擎</a>
-  {% block nav %}{% endblock %}
   <span class="theme-toggle" id="theme-toggle">
     <button type="button" data-theme-id="">☀ 默认</button>
     <button type="button" data-theme-id="academic">📜 学术</button>
   </span>
 </nav>
+{% if entry is defined %}
+{% set pid_root = "/p/" + entry.pid %}
+{% set page_path = request.url.path %}
+<nav class="subnav">
+  <span class="subnav-pid">{{ entry.pid }}</span>
+  {% for slug, label, avail in [
+        ("", "总览", true),
+        ("parts", "叙事", entry.project.parts | length > 0),
+        ("cards", "卡片", true),
+        ("graph", "图谱", true),
+        ("inspire", "灵感", true),
+        ("diagnostics", "诊断", true)] %}
+    {% if avail %}
+    {% set href = pid_root + "/" + slug %}
+    {% set active = (page_path == href) if slug == "" else page_path.startswith(href) %}
+    <a class="subnav-link{{ ' active' if active else '' }}" href="{{ href }}"{% if active %} aria-current="page"{% endif %}>{{ label }}</a>
+    {% endif %}
+  {% endfor %}
+</nav>
+{% endif %}
 <main>
 {% block content %}{% endblock %}
 </main>

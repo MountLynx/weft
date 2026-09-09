@@ -97,6 +97,26 @@ code {
 
 main { max-width: 1100px; margin: 0 auto; padding: var(--space-4) var(--space-5) var(--space-6); }
 
+/* ── 项目子导航（GitHub repo-tab 式，活动项 accent 下划线压底边） ── */
+.subnav {
+  display: flex;
+  gap: var(--space-4);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0 var(--space-5);
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+.subnav-pid { font-weight: 650; }
+.subnav a.subnav-link {
+  color: var(--fg-muted);
+  padding: var(--space-2) 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.subnav a.subnav-link:hover { color: var(--fg); text-decoration: none; }
+.subnav a.subnav-link.active { color: var(--fg); font-weight: 600; border-bottom-color: var(--accent); }
+
 /* ── 主题切换控件（分段胶囊） ─────────────────────── */
 .theme-toggle { margin-left: auto; display: flex; border-radius: var(--radius-pill); overflow: hidden; border: 1px solid var(--fg-muted); }
 .theme-toggle button {

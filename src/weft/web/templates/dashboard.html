@@ -25,12 +25,4 @@
   </tbody>
 </table>
 {% else %}<p>（无待审阅项）</p>{% endif %}
-<h3>快捷入口</h3>
-<p>
-  <a href="/p/{{ entry.pid }}/parts">叙事工作台</a> ·
-  <a href="/p/{{ entry.pid }}/cards">卡片</a> ·
-  <a href="/p/{{ entry.pid }}/graph">元数据图谱</a> ·
-  <a href="/p/{{ entry.pid }}/inspire">灵感</a> ·
-  <a href="/p/{{ entry.pid }}/diagnostics">诊断（{{ entry.n_errors }} E / {{ entry.n_warnings }} W）</a>
-</p>
 {% endblock %}
