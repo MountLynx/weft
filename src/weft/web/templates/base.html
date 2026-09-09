@@ -3,7 +3,15 @@
 <head>
 <meta charset="utf-8">
 <title>{% block title %}weft{% endblock %} · weft WebUI</title>
+<script>
+/* 防闪主题恢复（样式设计 §6.1）：必须在 CSS 加载前同步执行 */
+try {
+  var t = localStorage.getItem("weft-theme");
+  if (t) document.documentElement.setAttribute("data-theme", t);
+} catch (e) { /* localStorage 不可用（隐私模式等）时静默走默认主题 */ }
+</script>
 <link rel="stylesheet" href="/static/webui.css">
+<link rel="stylesheet" href="/static/themes/academic.css">
 <script src="/static/htmx.min.js" defer></script>
 <script src="/static/webui.js" defer></script>
 </head>
@@ -11,6 +19,10 @@
 <nav class="topnav">
   <a class="brand" href="/">weft · AI 学术写作引擎</a>
   {% block nav %}{% endblock %}
+  <span class="theme-toggle" id="theme-toggle">
+    <button type="button" data-theme-id="">☀ 默认</button>
+    <button type="button" data-theme-id="academic">📜 学术</button>
+  </span>
 </nav>
 <main>
 {% block content %}{% endblock %}

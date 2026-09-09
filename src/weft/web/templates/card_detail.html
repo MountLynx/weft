@@ -12,8 +12,8 @@
 </table>
 <h3>审阅</h3>
 <form method="post" action="/p/{{ entry.pid }}/cards/{{ kind }}/{{ card.id }}/status">
-  <button class="ok" type="submit" name="status" value="approved">✅ 批准</button>
-  <button class="bad" type="submit" name="status" value="rejected">❌ 否决</button>
+  <button class="ok btn-primary" type="submit" name="status" value="approved">✅ 批准</button>
+  <button class="bad btn-danger" type="submit" name="status" value="rejected">❌ 否决</button>
   <button type="submit" name="status" value="draft">↩ 退回 draft</button>
   <label>comment<input name="comment" value="{{ card.comment }}"></label>
 </form>

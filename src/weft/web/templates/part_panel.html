@@ -29,13 +29,13 @@
                   hx-post="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status"
                   hx-target="#panel" hx-swap="innerHTML">
               <input type="hidden" name="status" value="approved">
-              <button class="ok" type="submit">✅</button>
+              <button class="ok btn-primary" type="submit">✅</button>
             </form>
             <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status"
                   hx-post="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status"
                   hx-target="#panel" hx-swap="innerHTML">
               <input type="hidden" name="status" value="rejected">
-              <button class="bad" type="submit">❌</button>
+              <button class="bad btn-danger" type="submit">❌</button>
             </form>
           </td>
         </tr>
@@ -49,7 +49,7 @@
             hx-post="/p/{{ pid }}/parts/{{ part.id }}/generate"
             hx-target="#run-log" hx-swap="innerHTML">
         <label class="check"><input type="checkbox" name="mock" value="1"> mock 模式（免 key）</label>
-        <button type="submit">▶ 生成本 part</button>
+        <button type="submit" class="btn-primary">▶ 生成本 part</button>
       </form>
       <div id="run-log" class="run-log"></div>
     </div>

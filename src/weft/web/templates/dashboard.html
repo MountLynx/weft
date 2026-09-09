@@ -7,7 +7,7 @@
   <div class="stat"><b>{{ entry.n_cards }}</b><span>卡片</span></div>
   <div class="stat"><b>{{ entry.project.parts | length }}</b><span>叙事 part</span></div>
   <div class="stat"><b>{{ status_counts["approved"] }}</b><span>approved</span></div>
-  <div class="stat"><b>{{ status_counts["draft"] }}</b><span>draft 待审</span></div>
+  <div class="stat {% if status_counts["draft"] %}warn{% endif %}"><b>{{ status_counts["draft"] }}</b><span>draft 待审</span></div>
   <div class="stat {% if entry.n_errors %}bad{% endif %}"><b>{{ entry.n_errors }}</b><span>错误</span></div>
   <div class="stat"><b>{{ entry.n_warnings }}</b><span>提醒</span></div>
 </div>
@@ -18,7 +18,7 @@
   <tbody>
   {% for item in review_queue %}
     <tr>
-      <td>{{ item.kind }}</td><td>{{ item.id }}</td><td><code>{{ item.rel }}</code></td>
+      <td><span class="badge kind-{{ item.kind }}">{{ item.kind }}</span></td><td>{{ item.id }}</td><td><code>{{ item.rel }}</code></td>
       <td><a href="{{ item.url }}">审阅</a></td>
     </tr>
   {% endfor %}

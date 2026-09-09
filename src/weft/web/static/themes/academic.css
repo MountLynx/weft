@@ -1,0 +1,48 @@
+/* 学术纸面主题（2026-09-09 样式设计 §4）。
+   守卫约定：本文件只允许令牌声明，不允许出现组件选择器（tests/test_web_theme.py 强制）。
+   自定义主题：复制本文件改令牌值 → base.html 加 <link> 与切换按钮 → webui.js THEMES 数组加一项。 */
+
+[data-theme="academic"] {
+  /* 表面：米白纸色，顶栏与页面同底，靠粗分隔线区隔 */
+  --bg: #faf7f0;
+  --bg-subtle: #f3eee2;
+  --bg-nav: #faf7f0;
+  --bg-inset: #211f1a;
+  /* 文字：墨色 */
+  --fg: #2c2a26;
+  --fg-muted: #6b6659;
+  --fg-nav: #2c2a26;
+  --fg-inset: #d8d2c4;
+  --fg-on-accent: #faf7f0;
+  /* 边框：细线代盒 */
+  --border: #d9d2c2;
+  --border-muted: #e7e1d3;
+  --border-strong: #2c2a26;
+  /* 强调：砖红 */
+  --accent: #9a3324;
+  --accent-subtle: #f5e7e2;
+  --accent-emphasis: #9a3324;
+  --accent-sub: #7a4a12;
+  --accent-sub-bg: #f3e9d8;
+  /* 语义色：墨绿 / 赭黄 / 砖红，浅底描边 */
+  --success: #3f6b4a;
+  --success-fg: #2f5238;
+  --success-subtle: #e9f0e6;
+  --success-border: #b9cdbd;
+  --warning: #8a6116;
+  --warning-fg: #6f4e10;
+  --warning-subtle: #f6ecd7;
+  --warning-border: #dcc79a;
+  --danger: #9a3324;
+  --danger-fg: #7e2a1d;
+  --danger-subtle: #f5e3df;
+  --danger-border: #dcb3aa;
+  /* 形状：小圆角、无阴影，排印感 */
+  --radius: 3px;
+  --radius-lg: 4px;
+  --radius-pill: 3px;
+  --shadow-sm: none;
+  --shadow-md: none;
+  /* 字体：衬线正文（中文回退宋体系），等宽保持 */
+  --font-body: Georgia, "Times New Roman", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
+}
