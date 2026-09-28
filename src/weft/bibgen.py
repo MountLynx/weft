@@ -60,7 +60,11 @@ def render_entry(note) -> str:
             rendered = _fmt(value)
         lines.append(f"  {name} = {{{rendered}}},")
     for name in sorted(entry.fields):
+        if name in _FIELD_ORDER:
+            raise BibValueError(f"条目 {note.id} 的 fields 与标准字段冲突：{name}")
         lines.append(f"  {name} = {{{_fmt(entry.fields[name])}}},")
+    if len(lines) == 1:
+        raise BibValueError(f"条目 {note.id} 无可渲染字段（title/year 为空）")
     lines[-1] = lines[-1].rstrip(",")
     lines.append("}")
     return "\n".join(lines)
@@ -84,8 +88,12 @@ def sync_bib(project: Project) -> tuple[Path, dict[str, int]]:
     stats = {"added": len(new_keys - old_keys), "removed": len(old_keys - new_keys),
              "total": len(new_keys)}
     tmp = target.with_name(target.name + ".tmp")
-    tmp.write_text(content, encoding="utf-8", newline="\n")
-    os.replace(tmp, target)
+    try:
+        tmp.write_text(content, encoding="utf-8", newline="\n")
+        os.replace(tmp, target)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
     return target, stats
 
 
@@ -102,7 +110,7 @@ def key_base_from_entry(entry: BibEntryFields) -> str:
     if entry.author:
         word = entry.author[0].split(",")[0]
     else:
-        word = entry.title.split()[0].strip("\"'(),.") if entry.title else ""
+        word = (entry.title.split() or [""])[0].strip("\"'(),.") if entry.title else ""
     base = re.sub(r"[^A-Za-z0-9]", "", word).lower() or "ref"
     return f"{base}{entry.year}"
 

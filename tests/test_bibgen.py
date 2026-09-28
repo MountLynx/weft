@@ -122,3 +122,55 @@ def test_key_base_from_entry():
         {"title": "Ignored", "author": ["Smith, Jane"], "year": 2020})) == "smith2020"
     assert bibgen.key_base_from_entry(BibEntryFields.model_validate(
         {"title": "Thermally activated", "year": 2020})) == "thermally2020"
+
+
+def test_render_entry_zero_fields_raises(tmp_path):
+    project = build_project(notes=[
+        _note("a2020", entry={"title": "", "year": ""}),
+    ])
+    with pytest.raises(bibgen.BibValueError):
+        bibgen.render_bib(project)
+    project.bib_files = ["references.bib"]
+    (tmp_path / "references.bib").write_text(
+        "@article{old1999,\n  title = {O},\n  year = {1999},\n}\n", encoding="utf-8")
+    with pytest.raises(bibgen.BibValueError):
+        bibgen.sync_bib(project)
+    assert "old1999" in (tmp_path / "references.bib").read_text(encoding="utf-8")
+
+
+def test_render_entry_fields_overlap_raises():
+    project = build_project(notes=[
+        _note("a2020", entry={"title": "T", "year": 2020, "fields": {"title": "dup"}}),
+    ])
+    with pytest.raises(bibgen.BibValueError):
+        bibgen.render_bib(project)
+
+
+def test_render_entry_multi_fields_sorted():
+    project = build_project(notes=[
+        _note("a2020", entry={"title": "T", "year": 2020,
+                              "fields": {"zeta": "1", "alpha": "2"}}),
+    ])
+    lines = bibgen.render_bib(project).splitlines()
+    alpha_i = next(i for i, ln in enumerate(lines) if ln.startswith("  alpha = "))
+    zeta_i = next(i for i, ln in enumerate(lines) if ln.startswith("  zeta = "))
+    assert alpha_i < zeta_i
+
+
+def test_key_base_whitespace_title():
+    from weft.models.bib import BibEntryFields
+    assert bibgen.key_base_from_entry(BibEntryFields.model_validate(
+        {"title": "  ", "year": 2020})) == "ref2020"
+
+
+def test_sync_tmp_cleaned_on_failure(tmp_path, monkeypatch):
+    project = _project_with_bib_file(
+        tmp_path, [_note("a2020", entry={"title": "A", "year": 2020})])
+
+    def _boom(src, dst):
+        raise OSError("目标被占用")
+
+    monkeypatch.setattr(bibgen.os, "replace", _boom)
+    with pytest.raises(OSError):
+        bibgen.sync_bib(project)
+    assert not (tmp_path / "references.bib.tmp").exists()
