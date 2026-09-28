@@ -10,7 +10,7 @@
 
 **执行环境约定：**
 - 工作区约定用 git worktree：在 `.worktrees/weft-parse` 建分支 `weft-parse` 开发，全部任务完成后合回 main 并删除 worktree（superpowers:finishing-a-development-branch）。
-- Windows + Git Bash；测试命令一律 `.venv/Scripts/python.exe -m pytest …`（worktree 内需先 `.venv/Scripts/python.exe -m pip install -e ".[dev]"` 或直接用主仓 venv 跑 worktree 路径——推荐后者：`cd .worktrees/weft-parse && C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pytest tests -q`）。
+- Windows + Git Bash；测试命令一律 `.venv/Scripts/python.exe -m pytest …`（worktree 内需先 `.venv/Scripts/python.exe -m pip install -e ".[dev]"` 或直接用主仓 venv 跑 worktree 路径——推荐后者：`cd .worktrees/weft-parse && C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pytest tests -q`）（实测主仓 venv 的 editable install 指向主仓 src，新增模块会收集失败——worktree 必须用自己的 .venv）。
 - 生成文件固定 LF（card_writer/scaffold 已处理，勿引入 `\r\n`）。
 
 **基线与精确计数：** 基线 342 passed, 1 deselected（2026-09-28 实测）。本计划新增测试（Task 1:+2、Task 3:+2、Task 5:+6、Task 6:+5、Task 7:+11、Task 8:+12、Task 9:+1、Task 10:+10、Task 11:+1 deselected）→ **预期最终 391 passed, 2 deselected**。若执行期出现合理偏差，把实际数回填本表与 AGENTS.md。
@@ -42,6 +42,7 @@
 | P10 | A1 前置 _safe_id(bib_key)（病态 bib key 含 / 或 .. 会在写卡中途炸 _safe_id，破坏零残留）；文献模式 new + 空 summary 出 WARN；补归档重名测试（Task 8 计数 +11 → +12） | Task 8 质量审查 Minor 项 |
 | P11 | decompose e2e 断言改为 claims/cited/claim-02.md：mock `_PARSE_MATCH` 恒返回 cited+cites=[key2020]（服务文献模式 e2e），decompose 模式下该 claim 带合法 key 落 cited 目录同样自洽；不做 mode-aware mock（测试替身保持无状态） | Task 9 质量审查发现计划内部矛盾 |
 | P12 | CLI read_text 移入 try（GBK/ANSI 文章裸 traceback → 干净 ERROR；UnicodeDecodeError ⊂ ValueError 已在捕获列表），inspire 命令同隐患同步修复；补非 UTF-8 测试（Task 10 计数 +9 → +10） | Task 10 质量审查 Important 项 |
+| P13 | module_id/报告名 slug 改用完整文件名（_slug 用 source.name 非 stem）——paper.md 与 paper.txt 不再共享快照与报告，落实设计 §4"文章换名即换 module_id"；报告名同步 _slug(source.name)-report.md | 最终审查阻塞项（stem 身份跨文章串快照） |
 
 ---
 

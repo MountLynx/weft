@@ -125,7 +125,7 @@ def test_run_persists_checkpoints_and_no_root_residue(tmp_path):
 
     project = _project(tmp_path)
     result = run_inspire(project, "随手记", client=_client(), source="idea.md")
-    assert result.module_id == "weft-inspire-idea"
+    assert result.module_id == "weft-inspire-idea-md"
     summary = load_snapshot_summary(
         result.module_id, base_dir=_runs_dir(project))
     assert summary is not None

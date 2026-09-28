@@ -24,7 +24,7 @@ def test_cli_parse_mock_end_to_end_decompose(tmp_path):
     assert "claims/cited/claim-02.md" in result.output   # mock match 恒 cited（P11）
     assert (tmp_path / "articles" / "processed" / "paper.md").is_file()
     assert not source.exists()
-    report = tmp_path / "generated" / "articles" / "paper-report.md"
+    report = tmp_path / "generated" / "articles" / "paper-md-report.md"
     assert report.is_file() and "报告" in result.output
 
 

@@ -56,7 +56,9 @@ class PipelineRun:
 
 
 def _slug(source: str) -> str:
-    return re.sub(r"[^A-Za-z0-9_-]+", "-", Path(source).stem).strip("-")
+    # slug 用完整文件名（含扩展名）：文章换名即换 module_id（设计 §4），
+    # paper.md 与 paper.txt 不共享断点快照，报告名同理不互相覆盖。
+    return re.sub(r"[^A-Za-z0-9_-]+", "-", Path(source).name).strip("-")
 
 
 def register_harnesses(reg, cores: dict[str, str]) -> None:

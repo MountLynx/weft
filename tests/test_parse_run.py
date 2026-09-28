@@ -106,7 +106,7 @@ def test_run_persists_checkpoints_and_no_root_residue(tmp_path):
 
     project = _project(tmp_path)
     result = run_parse(project, "文章", client=_client(), source="paper.md")
-    assert result.run_id == "weft-parse-paper"
+    assert result.run_id == "weft-parse-paper-md"
     summary = load_snapshot_summary(
         result.run_id, base_dir=project.root / "generated" / "articles" / ".runs")
     assert summary is not None

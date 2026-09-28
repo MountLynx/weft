@@ -55,4 +55,4 @@ def test_real_llm_parses_article(tmp_path):
     result = runner.invoke(app, ["parse", str(article), str(work),
                                  "--key", note_key])
     assert result.exit_code == 0, result.output
-    assert (work / "generated" / "articles" / "smoke-report.md").is_file()
+    assert (work / "generated" / "articles" / "smoke-md-report.md").is_file()

@@ -192,7 +192,7 @@ def test_report_sections_written(tmp_path):
     for section in ("## note 判定", "## claim 分类与依据", "## fact→data 关联建议",
                     "## 成卡覆盖审查", "## 丢弃与提示"):
         assert section in report
-    assert outcome.report == tmp_path / "generated" / "articles" / "paper-report.md"
+    assert outcome.report == tmp_path / "generated" / "articles" / "paper-md-report.md"
 
 
 def test_archive_name_collision_rejected(tmp_path):

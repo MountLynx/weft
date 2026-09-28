@@ -26,6 +26,7 @@ from weft.engine.parse.schemas import (
     ArticleMatchOutput,
     ArticleReviewOutput,
 )
+from weft.engine.pipeline import _slug
 from weft.store.project import Project
 
 
@@ -218,7 +219,7 @@ def apply_article(project: Project, *, source: Path, logic: ArticleLogicOutput,
     shutil.move(str(source), str(archive))
 
     # —— 报告 ——
-    report = root / "generated" / "articles" / f"{source.stem}-report.md"
+    report = root / "generated" / "articles" / f"{_slug(source.name)}-report.md"
     outcome.report = _write_article_report(
         report, source, logic, contradictions, outcome.written_cards,
         outcome.proposals, match, outcome.notes, coverage, note_lines)
