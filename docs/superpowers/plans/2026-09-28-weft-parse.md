@@ -36,6 +36,7 @@
 | P4 | note 提案写盘安排在草稿卡写盘之后、归档之前（与卡片补充提案同一批次），前置一致性校验全部在首个写盘前完成 | 零残留纪律 |
 | P5 | pipeline `_slug` 空值回退 `'run'`（旧 inspire 为 `'inspire'`）：纯 CJK 文件名的 module_id 尾缀变化（weft-inspire-inspire → weft-inspire-run），fails-safe（旧快照孤立、重跑全新），无碰撞语义变化 | Task 2 质量审查发现，计划原代码即 `'run'` |
 | P6 | `run_pipeline` 的 `project` 参数补 `Project` 类型标注（顺 Task 3 提交） | Task 2 质量审查建议 |
+| P7 | 文献模式 P3 注入 bib key（_REVIEW_LITERATURE_SCHEMA_TEMPLATE.replace），note 三档判定可对照正确 note 卡；decompose match 回补 [@key] 归属条款（原计划 P3 prompt 缺 key，Task 6 质量审查发现） | D6"由管线判断新内容"依赖 key 可见 |
 
 ---
 

@@ -53,7 +53,7 @@ _REVIEW_DECOMPOSE_SCHEMA = (
     "merged_statement 必填：包含原卡全部信息与补充内容的完整新卡陈述，不得丢失原卡信息）。"
 )
 
-_REVIEW_LITERATURE_SCHEMA = (
+_REVIEW_LITERATURE_SCHEMA_TEMPLATE = (
     '输出 JSON：{"classifications": [{"key": "…", "verdict": "new|conflict|supplement",'
     ' "against": ["现有卡id"], "reason": "理由", "merged_statement": ""}],'
     ' "note": {"verdict": "new|supplement|unchanged", "reason": "理由",'
@@ -61,7 +61,7 @@ _REVIEW_LITERATURE_SCHEMA = (
     "规则（卡片）：new=全新；conflict=与现有卡事实矛盾（against 填冲突卡 id，reason 必填）；"
     "supplement=目标只能是现存 fact/claim 卡（data/note 是人工维护的输入卡，禁止），"
     "merged_statement 必填且不得丢失原卡信息。"
-    "规则（note）：本篇文献的 bib key 见匹配节点规则；若现有卡片摘要索引中已有该 key 的"
+    "规则（note）：本篇文献的 bib key 是 {bibkey}——若现有卡片摘要索引中已有该 key 的"
     " note 卡，对照其摘要与本次解析的新摘要逐要点比对——有实质新内容→supplement 且"
     " merged_summary 必填（原摘要全部要点 + 新增内容整合，不得丢失原摘要信息）；"
     "无实质新内容→unchanged；索引中没有该 key 的 note 卡→new。"
@@ -121,24 +121,32 @@ def _extract_prompt(text: str, mode: Mode) -> str:
     )
 
 
-def _review_prompt(digest: str, mode: Mode) -> str:
-    schema = (_REVIEW_LITERATURE_SCHEMA if mode == "literature"
-              else _REVIEW_DECOMPOSE_SCHEMA)
-    return (
+def _review_prompt(digest: str, mode: Mode, bib_key: str | None) -> str:
+    head = (
         "【文章·现有卡审查】\n"
         "任务：对照现有卡片逐张审查草案，穷举比对（不要只看相似的）。\n"
         f"现有卡片摘要索引：\n{digest}\n"
         "待审卡片草案（JSON）：\n{p02}\n"
-        + schema
     )
+    if mode == "literature":
+        return head + _REVIEW_LITERATURE_SCHEMA_TEMPLATE.replace(
+            "{bibkey}", bib_key or "")
+    return head + _REVIEW_DECOMPOSE_SCHEMA
 
 
 def _match_prompt(text: str, digest: str, mode: Mode, bib_key: str | None) -> str:
+    if mode == "literature":
+        text_line = f"文章全文：\n{text}\n"
+    else:
+        text_line = (
+            f"文章全文（文中 [@key] 形式的显式引用是最强信号：这些 key 必须填入"
+            f"最贴切 claim 的 cites，除非该 key 不在索引中）：\n{text}\n"
+        )
     head = (
         "【文章·匹配】\n"
         "任务：为草案做三类匹配：fact→现有 data 卡关联；claim 的 cited/uncited "
         "分类与文献匹配；占位表述→现有 fact 卡匹配。\n"
-        f"文章全文（文中 [@key] 形式的显式引用是最强信号）：\n{text}\n"
+        + text_line +
         f"现有卡片摘要索引：\n{digest}\n"
         "卡片草案（JSON）：\n{p02}\n"
         "审查结论（JSON）：\n{p03}\n"
@@ -167,7 +175,7 @@ def build_parse_tasklist(text: str, digest: str, *, mode: Mode,
     prompts = {
         "p01": _logic_prompt(text),
         "p02": _extract_prompt(text, mode),
-        "p03": _review_prompt(digest, mode),
+        "p03": _review_prompt(digest, mode, bib_key),
         "p04": _match_prompt(text, digest, mode, bib_key),
         "p05": _cover_prompt(text),
     }

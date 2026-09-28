@@ -31,7 +31,9 @@ def test_literature_mode_prompts():
     assert "summary" in tl.tasks["p02"].prompt          # 摘要折进 P2
     assert '"note"' in tl.tasks["p03"].prompt           # note 三档判定指令
     assert "unchanged" in tl.tasks["p03"].prompt
+    assert "smith2024" in tl.tasks["p03"].prompt        # note 判定可对照正确 note 卡
     assert '"smith2024"' in tl.tasks["p04"].prompt      # 次级引用默认值注入
+    assert "{bibkey}" not in tl.tasks["p04"].prompt     # 模板替换无残留
 
 
 def test_decompose_mode_prompts():
@@ -39,8 +41,9 @@ def test_decompose_mode_prompts():
     assert "summary" not in tl.tasks["p02"].prompt
     assert '"note"' not in tl.tasks["p03"].prompt
     assert "note/bib key" in tl.tasks["p04"].prompt     # 同 inspire 的匹配规则
+    assert "最贴切 claim" in tl.tasks["p04"].prompt     # [@key] 归属条款同 inspire
 
 
 def test_literature_requires_bib_key():
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="bib_key"):
         _tasklist(mode="literature")
