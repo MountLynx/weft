@@ -95,8 +95,9 @@ SCAFFOLD_FILES: dict[str, str] = {
     "narrative/01-introduction/part-01.md": _PART_01_MD,
 }
 
-# 不随文件派生的空目录：六类卡片目录 + figures（默认 figures_dir）+ 灵感收件箱。
+# 不随文件派生的空目录：六类卡片目录 + figures（默认 figures_dir）+ 灵感/文章收件箱。
 SCAFFOLD_DIRS: tuple[str, ...] = (
+    "articles",
     "figures",
     "inspirations",
     "metadata/data",
