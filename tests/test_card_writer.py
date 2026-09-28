@@ -1,7 +1,7 @@
-"""inspire 受控写入器（红线 4 扩展）：草稿卡 → metadata/，提案 → inspirations/proposals/。"""
+"""受控写入器（红线 4）：草稿卡 → metadata/（fact|claim|note），提案 → inspirations/proposals/。"""
 import pytest
 
-from weft.engine.inspire.cards import write_proposal, write_proposed_cards
+from weft.engine.card_writer import write_proposal, write_proposed_cards
 from weft.store.project import Project
 from pathlib import Path
 
@@ -9,6 +9,8 @@ FACT_FIELDS = {"id": "fact-09", "status": "draft", "data": ["data-01"],
                "statement": "温度提高速率。", "supports": [], "comment": ""}
 CLAIM_FIELDS = {"id": "claim-09", "status": "draft", "claim_type": "cited",
                 "statement": "温度有正效应。", "cites": [], "comment": ""}
+NOTE_FIELDS = {"id": "key2020", "status": "draft", "summary": "文献概括。",
+               "comment": ""}
 
 
 def _project(tmp_path: Path) -> Project:
@@ -29,6 +31,19 @@ def test_write_claim_card_follows_claim_type_subdir(tmp_path):
     uncited = dict(CLAIM_FIELDS, id="claim-10", claim_type="uncited")
     write_proposed_cards(_project(tmp_path), [("claim", uncited)])
     assert (tmp_path / "metadata" / "claims" / "uncited" / "claim-10.md").is_file()
+
+
+def test_write_note_card_to_metadata(tmp_path):
+    paths = write_proposed_cards(_project(tmp_path), [("note", dict(NOTE_FIELDS))])
+    path = tmp_path / "metadata" / "notes" / "key2020.md"
+    assert paths == [path] and path.is_file()
+    assert "summary: 文献概括。" in path.read_text(encoding="utf-8")
+
+
+def test_write_rejects_unknown_kind(tmp_path):
+    with pytest.raises(ValueError):
+        write_proposed_cards(_project(tmp_path),
+                             [("data", dict(NOTE_FIELDS, id="data-09"))])
 
 
 def test_write_normalizes_crlf(tmp_path):

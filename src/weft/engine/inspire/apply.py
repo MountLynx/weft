@@ -13,7 +13,12 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from weft.engine.inspire.cards import write_proposal, write_proposed_cards
+from weft.engine.card_writer import (
+    all_card_ids,
+    next_card_id,
+    write_proposal,
+    write_proposed_cards,
+)
 from weft.engine.inspire.schemas import (
     CoverageOutput,
     ExtractOutput,
@@ -33,23 +38,6 @@ class ApplyOutcome:
     notes: list[str] = field(default_factory=list)   # 丢弃/缺口提示（CLI 逐行 WARN）
 
 
-def _next_id(used: set[str], prefix: str) -> str:
-    n = 1
-    while f"{prefix}-{n:02d}" in used:
-        n += 1
-    card_id = f"{prefix}-{n:02d}"
-    used.add(card_id)
-    return card_id
-
-
-def _all_ids(project: Project) -> set[str]:
-    used: set[str] = set()
-    for table in (project.data_cards, project.facts, project.claims,
-                  project.notes, project.methods, project.params):
-        used.update(table)
-    return used
-
-
 def apply_inspiration(project: Project, *, source: Path, logic: LogicOutput,
                       extract: ExtractOutput, review: ReviewOutput,
                       match: MatchOutput,
@@ -62,7 +50,7 @@ def apply_inspiration(project: Project, *, source: Path, logic: LogicOutput,
     cls_by_key = {c.key: c for c in review.classifications}
     fact_match = {m.key: m for m in match.fact_data}
     claim_match = {m.key: m for m in match.claim_cites}
-    used = _all_ids(project)
+    used = all_card_ids(project)
     outcome = ApplyOutcome()
     contradictions: list[str] = []
 
@@ -116,10 +104,10 @@ def apply_inspiration(project: Project, *, source: Path, logic: LogicOutput,
                 outcome.notes.append(
                     f"草案 {card.key}（fact）未关联到任何 data 卡，未落盘——需补充 data 关联")
                 continue
-            landing_facts[card.key] = _next_id(used, "fact")
+            landing_facts[card.key] = next_card_id(used, "fact")
             fact_data[card.key] = data_ids
         else:
-            landing_claims[card.key] = _next_id(used, "claim")
+            landing_claims[card.key] = next_card_id(used, "claim")
             claim_needs[card.key] = card.needs_citation
 
     # —— 内部连接（只在两端的卡都落盘时解析）；支持方向落在 fact.supports 上 ——
@@ -238,7 +226,7 @@ def apply_proposal(project: Project, card_id: str) -> tuple[Path, Path]:
     """
     import frontmatter
 
-    from weft.engine.inspire.cards import _normalize
+    from weft.engine.card_writer import _normalize
     from weft.models.cards import ClaimCard, FactCard
 
     proposal_path = project.root / "inspirations" / "proposals" / f"{card_id}.md"
