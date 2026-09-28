@@ -227,7 +227,7 @@ def apply_proposal(project: Project, card_id: str) -> tuple[Path, Path]:
     import frontmatter
 
     from weft.engine.card_writer import _normalize
-    from weft.models.cards import ClaimCard, FactCard
+    from weft.models.cards import ClaimCard, FactCard, NoteCard
 
     proposal_path = project.root / "inspirations" / "proposals" / f"{card_id}.md"
     if card_id not in project.card_paths:
@@ -237,7 +237,8 @@ def apply_proposal(project: Project, card_id: str) -> tuple[Path, Path]:
     old_rel = project.card_paths[card_id]
     old_path = project.root / old_rel
     is_fact = "facts" in old_rel.parts
-    model = FactCard if is_fact else ClaimCard
+    is_note = "notes" in old_rel.parts
+    model = NoteCard if is_note else (FactCard if is_fact else ClaimCard)
     try:
         post = frontmatter.load(proposal_path)
         new_card = model.model_validate(post.metadata)
@@ -247,7 +248,8 @@ def apply_proposal(project: Project, card_id: str) -> tuple[Path, Path]:
         raise ValueError(f"提案卡 id {new_card.id} 与目标 {card_id} 不一致")
 
     # 闸门：内存替换后全量校验，有 error 即拒绝（磁盘零改动）
-    table = project.facts if is_fact else project.claims
+    table = (project.notes if is_note
+             else project.facts if is_fact else project.claims)
     table[card_id] = new_card
     gate_errors = [d for d in validate_project(project) if d.is_error]
     if gate_errors:

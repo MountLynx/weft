@@ -28,6 +28,8 @@ from module_harness.infra.query import load_snapshot_summary, run_db_path
 from module_harness.infra.status import query_run_status
 from pydantic import BaseModel, ValidationError
 
+from weft.store.project import Project
+
 _TEMPERATURE = 0.2
 _MAX_TOKENS = {"max_tokens": 32768}   # SpecModule 默认 4096 会被推理模型思考耗尽（e2e 实测）
 _MAX_TICKS = 14                        # 5 节点链 + 余量（M2 决策 14d）
@@ -69,7 +71,7 @@ def register_harnesses(reg, cores: dict[str, str]) -> None:
         ))
 
 
-def run_pipeline(spec: PipelineSpec, project, tasklist_builder: Callable[[], Tasklist],
+def run_pipeline(spec: PipelineSpec, project: Project, tasklist_builder: Callable[[], Tasklist],
                  client, source: str) -> PipelineRun:
     """跑一条多节点管线；tasklist_builder() 闭包携带全文/digest/mode。"""
     module_id = f"{spec.module_prefix}-{_slug(source) or 'run'}"[:120]

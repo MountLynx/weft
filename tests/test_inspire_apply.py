@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from weft.engine.inspire.apply import apply_inspiration
+from weft.engine.inspire.apply import apply_inspiration, apply_proposal
 from weft.engine.inspire.schemas import (
     ClaimMatch,
     Classification,
@@ -207,3 +207,35 @@ def test_apply_proposal_replaces_and_archives(tmp_path):
     assert (root / "archive" / "cards" / "uncited" / "claim-01.md").exists()
     assert archive_path == root / "archive" / "cards" / "uncited" / "claim-01.md"
     assert not proposals.joinpath("claim-01.md").exists()
+
+
+def test_apply_proposal_supports_note_target(tmp_path):
+    """parse 管线的 note 补充提案：weft replace 同一入口，归档 archive/cards/notes/。"""
+    from weft.store.loader import load_project
+
+    make_minimal_project(tmp_path)
+    proposal = tmp_path / "inspirations" / "proposals" / "key2020.md"
+    proposal.parent.mkdir(parents=True, exist_ok=True)
+    proposal.write_text(
+        "---\nid: key2020\nstatus: draft\nsummary: 旧摘要，补充了实验细节。\n"
+        'comment: "取代 key2020（文章补充）"\n---\n', encoding="utf-8")
+    project, _ = load_project(tmp_path)
+    old_path, archive_path = apply_proposal(project, "key2020")
+    assert "实验细节" in old_path.read_text(encoding="utf-8")
+    assert archive_path == tmp_path / "archive" / "cards" / "notes" / "key2020.md"
+    assert archive_path.is_file()
+    assert not proposal.exists()
+
+
+def test_apply_proposal_note_id_mismatch_rejected(tmp_path):
+    from weft.store.loader import load_project
+
+    make_minimal_project(tmp_path)
+    proposal = tmp_path / "inspirations" / "proposals" / "key2020.md"
+    proposal.parent.mkdir(parents=True, exist_ok=True)
+    proposal.write_text("---\nid: otherkey\nstatus: draft\nsummary: x\n---\n",
+                        encoding="utf-8")
+    project, _ = load_project(tmp_path)
+    with pytest.raises(ValueError, match="不一致"):
+        apply_proposal(project, "key2020")
+    assert proposal.exists()   # 磁盘零改动
