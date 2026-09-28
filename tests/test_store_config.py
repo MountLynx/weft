@@ -174,3 +174,32 @@ def test_bib_managed_non_bool_reports_cfg_error(tmp_path):
     project, _ = load_project(tmp_path)
     assert project.bib_managed is False
     assert project.bib_cfg_error is not None
+
+
+def test_bib_non_dict_reports_cfg_error(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"bib": ["not", "a", "map"]})
+    project, _ = load_project(tmp_path)
+    assert project.bib_managed is False
+    assert project.bib_cfg_error == "bib 段必须是映射"
+
+
+def test_bib_files_drops_blank_entries(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "_quarto.yml",
+               {"project": {"type": "default"},
+                "bibliography": ["references.bib", "  "]})
+    project, diagnostics = load_project(tmp_path)
+    assert project.bib_files == ["references.bib"]
+    miss = [d for d in diagnostics if d.code == "E-BIB-MISSING"]
+    assert miss == []
+
+
+def test_bib_mixed_type_keys_no_crash(tmp_path):
+    """红线 3：bib 段出现非字符串键（YAML 合法）不得让加载崩溃。"""
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"bib": {1: "x", "wat": "y"}})
+    project, _ = load_project(tmp_path)
+    assert project.bib_managed is False
+    assert project.bib_cfg_error is not None
+    assert "wat" in project.bib_cfg_error and "1" in project.bib_cfg_error

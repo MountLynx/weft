@@ -284,6 +284,6 @@ def _load_config(root: Path, project: Project, diagnostics: list[Diagnostic]) ->
             project.bib_cfg_error = "bib.managed 必须是布尔值"
         else:
             project.bib_managed = managed
-            unknown = sorted(set(bib_cfg) - {"managed"})
+            unknown = sorted(str(k) for k in set(bib_cfg) - {"managed"})
             if unknown:
                 project.bib_cfg_error = f"bib 段未知键：{unknown}"
