@@ -193,3 +193,14 @@ def test_report_sections_written(tmp_path):
                     "## 成卡覆盖审查", "## 丢弃与提示"):
         assert section in report
     assert outcome.report == tmp_path / "generated" / "articles" / "paper-report.md"
+
+
+def test_archive_name_collision_rejected(tmp_path):
+    source = _source(tmp_path)
+    project = _project(tmp_path, with_note=False)
+    (tmp_path / "articles" / "processed").mkdir(parents=True)
+    (tmp_path / "articles" / "processed" / "paper.md").write_text("旧档",
+                                                                 encoding="utf-8")
+    with pytest.raises(ValueError, match="归档重名"):
+        _apply(project, source, note=NoteReview(verdict="new"))
+    assert source.exists()   # fail-closed：零写盘

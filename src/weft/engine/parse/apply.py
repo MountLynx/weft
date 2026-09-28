@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from weft.engine.card_writer import (
+    _safe_id,
     all_card_ids,
     next_card_id,
     write_proposal,
@@ -48,6 +49,8 @@ def apply_article(project: Project, *, source: Path, logic: ArticleLogicOutput,
     literature = bib_key is not None
     if literature and bib_key not in project.bib_keys:
         raise ValueError(f"[E-ARTICLE-KEY] --key 不在 bib 中：{bib_key}")
+    if literature:
+        _safe_id(bib_key)   # 病态 bib key（含 / 或 ..）写卡中途才炸会破坏零残留，前置拦截
 
     # —— note 判定一致性（先于一切写盘，计划 P4）——
     note_review = review.note
@@ -178,6 +181,9 @@ def apply_article(project: Project, *, source: Path, logic: ArticleLogicOutput,
             }))
             note_lines.append(
                 f"- 新建 note 卡 `metadata/notes/{bib_key}.md`（draft，审后 approve）")
+            if not extract.summary.strip():
+                outcome.notes.append(
+                    f"note {bib_key} 解析摘要为空——落盘后需人工补充 summary")
         elif note_review.verdict == "supplement":
             fields = project.notes[bib_key].model_dump()
             fields["summary"] = note_review.merged_summary
