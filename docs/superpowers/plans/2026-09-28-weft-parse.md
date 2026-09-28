@@ -34,6 +34,8 @@
 | P2 | `ParseResult` 用 `run_id` 单字段（不保留 InspireResult 的 run_id+module_id 双字段历史包袱） | 简化 |
 | P3 | 文献模式 claim 的 `cites` 过滤仍走"∩ project.bib_keys"（A1 机械闸），mock 客户端返回 `key2020`（make_minimal_project 的 key）作确定性测试值 | 闭包纪律 |
 | P4 | note 提案写盘安排在草稿卡写盘之后、归档之前（与卡片补充提案同一批次），前置一致性校验全部在首个写盘前完成 | 零残留纪律 |
+| P5 | pipeline `_slug` 空值回退 `'run'`（旧 inspire 为 `'inspire'`）：纯 CJK 文件名的 module_id 尾缀变化（weft-inspire-inspire → weft-inspire-run），fails-safe（旧快照孤立、重跑全新），无碰撞语义变化 | Task 2 质量审查发现，计划原代码即 `'run'` |
+| P6 | `run_pipeline` 的 `project` 参数补 `Project` 类型标注（顺 Task 3 提交） | Task 2 质量审查建议 |
 
 ---
 
