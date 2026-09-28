@@ -40,6 +40,7 @@
 | P8 | Task 7 追加 2 个测试镜像覆盖 pipeline 两个未测分支：并发重跑拒绝（monkeypatch `query_run_status` phase=running）与首节点失败清场（leading==0 → 全新重跑），Task 7 计数 +9 → +11 | Task 2 质量审查建议（该两分支此前任何套件均未覆盖） |
 | P9 | Task 8 测试 `_project` helper 在 `root` 给定且 `with_note` 时用 `write_card` 把既有 note 卡落盘：supplement/unchanged 档断言"原卡不动"读的是盘上 `metadata/notes/key2020.md`，而 `build_project` 纯内存不落盘，计划原文的测试会 FileNotFoundError（实现无需改动，A1 语义正确） | 执行期实测发现计划测试 bug |
 | P10 | A1 前置 _safe_id(bib_key)（病态 bib key 含 / 或 .. 会在写卡中途炸 _safe_id，破坏零残留）；文献模式 new + 空 summary 出 WARN；补归档重名测试（Task 8 计数 +11 → +12） | Task 8 质量审查 Minor 项 |
+| P11 | decompose e2e 断言改为 claims/cited/claim-02.md：mock `_PARSE_MATCH` 恒返回 cited+cites=[key2020]（服务文献模式 e2e），decompose 模式下该 claim 带合法 key 落 cited 目录同样自洽；不做 mode-aware mock（测试替身保持无状态） | Task 9 质量审查发现计划内部矛盾 |
 
 ---
 
@@ -2076,7 +2077,7 @@ def test_cli_parse_mock_end_to_end_decompose(tmp_path):
     result = runner.invoke(app, ["parse", str(source), str(tmp_path), "--mock"])
     assert result.exit_code == 0, result.output
     assert "已写入 metadata/facts/fact-02.md" in result.output
-    assert "claims/uncited/claim-02.md" in result.output
+    assert "claims/cited/claim-02.md" in result.output   # mock match 恒 cited（P11）
     assert (tmp_path / "articles" / "processed" / "paper.md").is_file()
     assert not source.exists()
     report = tmp_path / "generated" / "articles" / "paper-report.md"
