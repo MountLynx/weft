@@ -28,6 +28,7 @@ def test_managed_two_bib_files_shape_error(tmp_path):
                 "bibliography": ["references.bib", "manual.bib"]})
     project, _ = load_project(tmp_path)
     assert any(d.code == "E-BIB-SHAPE" for d in validate_project(project))
+    assert not any(d.code == "W-BIB-STALE" for d in validate_project(project))
 
 
 def test_bib_cfg_error_shape(tmp_path):
@@ -90,3 +91,16 @@ def test_unmanaged_draft_note_still_checked(tmp_path):
     project, _ = load_project(tmp_path)
     assert any(d.code == "E-NOTE-NOT-IN-BIB" and d.path.endswith("new2021.md")
                for d in validate_project(project))
+    assert not any("weft bib sync" in d.message for d in validate_project(project)
+                   if d.code == "E-NOTE-NOT-IN-BIB" and d.path.endswith("new2021.md"))
+
+
+def test_bib_value_error_reported_not_raised(tmp_path):
+    """approved 卡花括号不平衡：validate 报 E-BIB-VALUE 而非崩溃（T4 质量审查）。"""
+    project = _managed_fresh(tmp_path)
+    write_card(tmp_path / "metadata" / "notes", "key2020",
+               {"id": "key2020", "summary": "s", "status": "approved",
+                "entry": {"type": "article", "title": "Smith {O'Brien", "year": 2020}})
+    project, _ = load_project(tmp_path)
+    codes = {d.code for d in validate_project(project)}
+    assert "E-BIB-VALUE" in codes

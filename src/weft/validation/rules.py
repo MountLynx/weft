@@ -99,7 +99,7 @@ def _check_notes_in_bib(project: Project) -> list[Diagnostic]:
 
 
 def _check_bib_managed(project: Project) -> list[Diagnostic]:
-    """bibgen 设计 §7：managed 形状 / 过期 / 词表提醒。unmanaged 项目零变化。"""
+    """bibgen 设计 §7：managed 形状 / 过期 / 词表提醒。unmanaged 项目不查形状/过期（bib_cfg_error 除外）。"""
     out: list[Diagnostic] = []
     if project.bib_cfg_error:
         out.append(Diagnostic(Level.ERROR, "E-BIB-SHAPE", "weft.yaml", "bib",
@@ -109,10 +109,18 @@ def _check_bib_managed(project: Project) -> list[Diagnostic]:
             out.append(Diagnostic(
                 Level.ERROR, "E-BIB-SHAPE", "_quarto.yml", "bibliography",
                 "managed 项目 bibliography 必须恰好指向一个文件（生成目标）"))
-        elif bibgen.bib_is_stale(project):
-            out.append(Diagnostic(
-                Level.WARNING, "W-BIB-STALE", project.bib_files[0], None,
-                "bib 文件与已批准文献卡不一致（运行 weft bib sync）"))
+        else:
+            try:
+                stale = bibgen.bib_is_stale(project)
+            except bibgen.BibValueError as exc:
+                out.append(Diagnostic(
+                    Level.ERROR, "E-BIB-VALUE", project.bib_files[0], "entry",
+                    str(exc)))
+            else:
+                if stale:
+                    out.append(Diagnostic(
+                        Level.WARNING, "W-BIB-STALE", project.bib_files[0], None,
+                        "bib 文件与已批准文献卡不一致（运行 weft bib sync）"))
     for nid, note in project.notes.items():
         if note.status == "rejected" or note.entry is None:
             continue
