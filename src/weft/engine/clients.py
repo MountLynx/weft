@@ -24,6 +24,7 @@ class ScriptedLLMClient:
     - 【draft·校验】：verdict=pass（check_fix=True 时输出 fix+修正段）
     - 【draft·衔接】/【draft·润色】：回显 <<<PARAGRAPH …>>> 内的文本
     - 【灵感·…】：inspire 管线各节点默认响应（与 make_minimal_project 自洽）
+    - 【文章·…】：parse 管线各节点默认响应（与 make_minimal_project 自洽，key2020）。
     broken=True 时 draft 通道返回非 JSON（测 E-DRAFT-SHAPE 路径）。
     """
 
@@ -40,6 +41,23 @@ class ScriptedLLMClient:
         {"fact_data": [{"key": "f1", "data_ids": ["data-01"]}],
          "claim_cites": [{"key": "c1", "claim_type": "uncited", "cites": [],
                           "reason": "（mock）无需文献"}],
+         "placeholders": []}, ensure_ascii=False)
+    _PARSE_EXTRACT = json.dumps(
+        {"summary": "（mock 摘要）本文研究了搅拌对溶解速率的影响。",
+         "cards": [{"key": "f1", "kind": "fact", "statement": "（mock 事实）搅拌加速溶解。",
+                    "placeholder": False, "needs_citation": False},
+                   {"key": "c1", "kind": "claim", "statement": "（mock 观点）搅拌是主要因素。",
+                    "placeholder": False, "needs_citation": False}],
+         "links": [{"from": "f1", "to": "c1"}]}, ensure_ascii=False)
+    _PARSE_REVIEW = json.dumps(
+        {"classifications": [{"key": "f1", "verdict": "new"},
+                             {"key": "c1", "verdict": "new"}],
+         "note": {"verdict": "new", "reason": "", "merged_summary": ""}},
+        ensure_ascii=False)
+    _PARSE_MATCH = json.dumps(
+        {"fact_data": [{"key": "f1", "data_ids": ["data-01"]}],
+         "claim_cites": [{"key": "c1", "claim_type": "cited", "cites": ["key2020"],
+                          "reason": "（mock）本篇文献"}],
          "placeholders": []}, ensure_ascii=False)
 
     def __init__(self, paragraph: str = "（mock 段落）正文。",
@@ -91,6 +109,16 @@ class ScriptedLLMClient:
         if "【灵感·匹配】" in prompt:
             return self._INSPIRE_MATCH
         if "【灵感·成卡覆盖】" in prompt:
+            return json.dumps({"coverage": []}, ensure_ascii=False)
+        if "【文章·逻辑核查】" in prompt:
+            return json.dumps({"issues": self.logic_issues}, ensure_ascii=False)
+        if "【文章·卡片拆解】" in prompt:
+            return self._PARSE_EXTRACT
+        if "【文章·现有卡审查】" in prompt:
+            return self._PARSE_REVIEW
+        if "【文章·匹配】" in prompt:
+            return self._PARSE_MATCH
+        if "【文章·成卡覆盖】" in prompt:
             return json.dumps({"coverage": []}, ensure_ascii=False)
         return json.dumps(
             {"paragraph": self.paragraph, "uses": self.uses, "cites": self.cites},

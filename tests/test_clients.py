@@ -48,6 +48,25 @@ def test_scripted_inspire_branches_still_work():
         {"coverage": []}
 
 
+def test_scripted_parse_branches():
+    """文章解析 mock 响应：与 make_minimal_project 自洽（key2020 / data-01）。"""
+    import json
+
+    from weft.engine.clients import ScriptedLLMClient
+
+    client = ScriptedLLMClient()
+    extract = json.loads(client._respond("【文章·卡片拆解】\n文章全文：\nx"))
+    assert extract["summary"] and extract["cards"][0]["key"] == "f1"
+    review = json.loads(client._respond("【文章·现有卡审查】\n草案：\nx"))
+    assert review["note"]["verdict"] == "new"
+    match = json.loads(client._respond("【文章·匹配】\n索引：\nx"))
+    assert match["claim_cites"][0]["cites"] == ["key2020"]
+    logic = json.loads(client._respond("【文章·逻辑核查】\n全文：\nx"))
+    assert logic["issues"] == []
+    cover = json.loads(client._respond("【文章·成卡覆盖】\n草案：\nx"))
+    assert cover["coverage"] == []
+
+
 def test_make_client_mock_and_real_error(tmp_path):
     assert isinstance(make_client(True), ScriptedLLMClient)
     with pytest.raises(DraftError, match="真实 LLM 客户端构造失败"):
