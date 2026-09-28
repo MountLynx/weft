@@ -38,6 +38,7 @@
 | P6 | `run_pipeline` 的 `project` 参数补 `Project` 类型标注（顺 Task 3 提交） | Task 2 质量审查建议 |
 | P7 | 文献模式 P3 注入 bib key（_REVIEW_LITERATURE_SCHEMA_TEMPLATE.replace），note 三档判定可对照正确 note 卡；decompose match 回补 [@key] 归属条款（原计划 P3 prompt 缺 key，Task 6 质量审查发现） | D6"由管线判断新内容"依赖 key 可见 |
 | P8 | Task 7 追加 2 个测试镜像覆盖 pipeline 两个未测分支：并发重跑拒绝（monkeypatch `query_run_status` phase=running）与首节点失败清场（leading==0 → 全新重跑），Task 7 计数 +9 → +11 | Task 2 质量审查建议（该两分支此前任何套件均未覆盖） |
+| P9 | Task 8 测试 `_project` helper 在 `root` 给定且 `with_note` 时用 `write_card` 把既有 note 卡落盘：supplement/unchanged 档断言"原卡不动"读的是盘上 `metadata/notes/key2020.md`，而 `build_project` 纯内存不落盘，计划原文的测试会 FileNotFoundError（实现无需改动，A1 语义正确） | 执行期实测发现计划测试 bug |
 
 ---
 
