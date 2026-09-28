@@ -4,6 +4,7 @@ import pytest
 pytest.importorskip("fastapi")
 
 from weft.store.loader import load_project
+from tests.helpers import make_managed_project, write_card
 from tests.webutil import make_client
 
 
@@ -46,3 +47,62 @@ def test_review_invalid_status_400(tmp_path):
     assert resp.status_code == 400
     project, _ = load_project(root / "demo")
     assert project.facts["fact-01"].status == "approved"
+
+
+ENTRY_YAML = "type: article\ntitle: T\nauthor:\n- A, B\nyear: 2020\njournal: J\nvolume: '1'\n"
+
+
+def _managed_web_client(tmp_path):
+    client, root = make_client(tmp_path)
+    make_managed_project(root / "demo")
+    return client, root
+
+
+def test_note_edit_form_shows_entry_yaml(tmp_path):
+    client, _ = _managed_web_client(tmp_path)
+    resp = client.get("/p/demo/cards/note/key2020/edit")
+    assert resp.status_code == 200 and 'name="entry"' in resp.text
+    assert "type: article" in resp.text          # 既有 entry 以 YAML 文本回显
+
+
+def test_note_edit_saves_entry(tmp_path):
+    client, root = _managed_web_client(tmp_path)
+    resp = client.post("/p/demo/cards/note/key2020/edit", data={
+        "summary": "s", "pdf": "", "entry": ENTRY_YAML,
+        "status": "approved", "comment": ""}, follow_redirects=False)
+    assert resp.status_code == 303
+    project, _ = load_project(root / "demo")
+    assert project.notes["key2020"].entry.title == "T"
+
+
+def test_approve_note_managed_syncs_bib(tmp_path):
+    client, root = _managed_web_client(tmp_path)
+    resp = client.post("/p/demo/cards/note/key2020/status",
+                       data={"status": "approved", "comment": ""},
+                       follow_redirects=False)
+    assert resp.status_code == 303 and "bib=bib_updated" in resp.headers["location"]
+    content = (root / "demo" / "references.bib").read_text(encoding="utf-8")
+    assert content.startswith("%") and "@article{key2020" in content
+
+
+def test_approve_note_unmanaged_no_bib_flag(tmp_path):
+    client, root = make_client(tmp_path)
+    resp = client.post("/p/demo/cards/note/key2020/status",
+                       data={"status": "approved", "comment": ""},
+                       follow_redirects=False)
+    assert resp.status_code == 303 and "bib=" not in resp.headers["location"]
+
+
+def test_approve_note_managed_bib_error_flag(tmp_path):
+    client, root = _managed_web_client(tmp_path)
+    # 花括号不平衡的 entry 若直接以 approved 落盘，validate_project 会判 E-BIB-VALUE
+    # 使项目「不可用」（请求级 404），故以 draft 落盘、经批准动作触发同步失败（P-D1）
+    write_card(root / "demo" / "metadata" / "notes", "key2020",
+               {"id": "key2020", "summary": "s", "status": "draft",
+                "entry": {"type": "article", "title": "{T", "year": 2020}})
+    resp = client.post("/p/demo/cards/note/key2020/status",
+                       data={"status": "approved", "comment": ""},
+                       follow_redirects=False)
+    assert "bib=bib_error" in resp.headers["location"]
+    content = (root / "demo" / "references.bib").read_text(encoding="utf-8")
+    assert not content.startswith("%")       # 旧内容未被破坏

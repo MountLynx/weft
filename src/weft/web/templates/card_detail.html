@@ -4,6 +4,8 @@
 <h2>{{ kind }} 卡 {{ card.id }}
   <span class="badge {{ card.status }}">{{ card.status }}</span></h2>
 <p><code>{{ rel }}</code></p>
+{% if bib_flag == "bib_updated" %}<div class="banner">references.bib 已同步（bibgen）。</div>{% endif %}
+{% if bib_flag == "bib_error" %}<div class="banner error">bib 同步失败：entry 字段值花括号不平衡（E-BIB-VALUE）；修正后再次保存/批准即重试。</div>{% endif %}
 <table class="list">
   {% for k, v in fields.items() %}
   <tr><th>{{ k }}</th><td><code>{{ v }}</code></td></tr>

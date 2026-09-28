@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import re
 
+import yaml
 from pydantic import ValidationError
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
@@ -33,6 +34,21 @@ _CARD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 # 列表页展示的"关键字段"（有则显示），按卡种
 _KEY_FIELD = {"data": "description", "fact": "statement", "claim": "statement",
               "note": "summary", "method": "statement", "param": "method"}
+
+
+def _sync_managed_bib(project_root) -> str | None:
+    """note 卡写盘后重渲 managed bib；返回重定向标记（None = unmanaged/形状不齐，P-D1）。"""
+    from weft import bibgen
+    from weft.store.loader import load_project
+
+    project, _ = load_project(project_root)
+    if not project.bib_managed or len(project.bib_files) != 1:
+        return None
+    try:
+        bibgen.sync_bib(project)
+    except bibgen.BibValueError:
+        return "bib_error"
+    return "bib_updated"
 
 
 def _table(request: Request, pid: str, kind: str):
@@ -149,9 +165,11 @@ def card_detail(request: Request, pid: str, kind: str, card_id: str):
         request, "card_detail.html",
         {"entry": entry, "kind": kind, "card": card,
          "rel": entry.project.card_paths[card_id].as_posix(),
-         "fields": {k: ("" if v is None else v)
+         "fields": {k: (yaml.safe_dump(v, allow_unicode=True, sort_keys=False)
+                        if k == "entry" and v else ("" if v is None else v))
                     for k, v in card.model_dump().items()
-                    if k not in ("id", "status", "comment")}})
+                    if k not in ("id", "status", "comment")},
+         "bib_flag": request.query_params.get("bib"),})
 
 
 @router.post("/p/{pid}/cards/{kind}/{card_id}/status")
@@ -168,7 +186,12 @@ async def card_review(request: Request, pid: str, kind: str, card_id: str):
                                        "comment": str(form.get("comment", ""))})
     save_card(entry.project.root, new_card,
               old_rel=entry.project.card_paths[card_id].as_posix())
-    return RedirectResponse(f"/p/{pid}/cards/{kind}/{card_id}", status_code=303)
+    url = f"/p/{pid}/cards/{kind}/{card_id}"
+    if kind == "note":
+        flag = _sync_managed_bib(entry.project.root)
+        if flag:
+            url += f"?bib={flag}"
+    return RedirectResponse(url, status_code=303)
 
 
 @router.get("/p/{pid}/cards/{kind}/{card_id}/edit")
@@ -219,7 +242,12 @@ async def card_edit_post(request: Request, pid: str, kind: str, card_id: str):
         return rerender(errors)
     save_card(entry.project.root, card,
               old_rel=entry.project.card_paths[card_id].as_posix())
-    return RedirectResponse(f"/p/{pid}/cards/{kind}/{card_id}", status_code=303)
+    url = f"/p/{pid}/cards/{kind}/{card_id}"
+    if kind == "note":
+        flag = _sync_managed_bib(entry.project.root)
+        if flag:
+            url += f"?bib={flag}"
+    return RedirectResponse(url, status_code=303)
 
 
 def register(app: FastAPI) -> None:
