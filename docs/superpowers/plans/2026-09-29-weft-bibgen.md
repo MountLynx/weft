@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.11+ / pydantic v2（`extra="forbid"`）/ typer / FastAPI+Jinja2 / pytest。无新依赖。
 
-**基线计数：391 passed, 2 deselected**（worktree 实测；主检出 392 含 1 个未提交测试，见 P-D6）。本计划完成后预期（worktree）：**448 passed, 2 deselected**。
+**基线计数：391 passed, 2 deselected**（worktree 实测；主检出 392 含 1 个未提交测试，见 P-D6）。本计划完成后预期（worktree）：**453 passed, 2 deselected**。
 
 **执行约定：**
 - 在 git worktree `.worktrees/bibgen` 中开发（superpowers:using-git-worktrees），合回 main 后删除。
@@ -22,16 +22,16 @@
 |---|---|---|---|
 | T1 | `models/bib.py` + NoteCard.entry | 5 | 396 |
 | T2 | loader/Project：bib_files / bib_managed / bib_cfg_error | 7（4 计划 + 3 审查补） | 403 |
-| T3 | `bibgen.py` 渲染器 + key minting | 8 | 411 |
-| T4 | validate：E-BIB-SHAPE / W-BIB-ETYPE / W-BIB-STALE / E-NOTE-NOT-IN-BIB managed 语义 | 9 | 420 |
-| T5 | scaffold init 模板 `bib: managed: false` | 1 | 421 |
-| T6 | CLI `weft bib sync [--check]` | 5 | 426 |
-| T7 | WebUI：note 表单 entry 字段 + 批准/编辑后自动同步 | 5 | 431 |
-| T8 | engine `bib_propose.py` + ScriptedLLMClient 分支 | 5 | 436 |
-| T9 | WebUI AI 提案路由 + 模板 | 5 | 441 |
-| T10 | parse 文献模式 entry 提取联动 | 5 | 446 |
-| T11 | paper-demo 转 managed | 2 | 448 |
-| T12 | AGENTS.md / roadmap 登记（诊断码总表、红线 4、必读清单） | 0 | 448 |
+| T3 | `bibgen.py` 渲染器 + key minting | 13（8 计划 + 5 审查补） | 416 |
+| T4 | validate：E-BIB-SHAPE / W-BIB-ETYPE / W-BIB-STALE / E-NOTE-NOT-IN-BIB managed 语义 | 9 | 425 |
+| T5 | scaffold init 模板 `bib: managed: false` | 1 | 426 |
+| T6 | CLI `weft bib sync [--check]` | 5 | 431 |
+| T7 | WebUI：note 表单 entry 字段 + 批准/编辑后自动同步 | 5 | 436 |
+| T8 | engine `bib_propose.py` + ScriptedLLMClient 分支 | 5 | 441 |
+| T9 | WebUI AI 提案路由 + 模板 | 5 | 446 |
+| T10 | parse 文献模式 entry 提取联动 | 5 | 451 |
+| T11 | paper-demo 转 managed | 2 | 453 |
+| T12 | AGENTS.md / roadmap 登记（诊断码总表、红线 4、必读清单） | 0 | 453 |
 
 ## 设计决策（计划期定案，执行期偏离继续回填此处）
 
@@ -44,6 +44,7 @@
 | P-D5 | spec §4 示例 `author: [Smith, Jane, Lee, Kyung]` 未加引号会被 YAML 拆成 4 项——实现与测试一律用 `["Smith, Jane", "Lee, Kyung"]` 引号形式（spec 笔误，实现不随；spec 后续修订时更正示例）。 |
 | P-D6 | 计数基线勘误（T1 质量审查）：计划写基线 392，含主检出**未提交**的 `test_prompt_core_manuscript_language_is_english`；worktree（干净 HEAD）实测基线 **391 passed, 2 deselected**。worktree 内各任务累计验收 = 总览表数字 **−1**（T1=396 … T11=445）；合回主检出后即计划数字（446）。另：T1 审查补齐 spec §11 承诺的 year str/int 双收与缺 title 断言（加强既有测试，不增计数）。 |
 | P-D7 | T2 质量审查三项登记：① 计划 Step 3 代码自带 bug——未知键 `sorted(set(...))` 撞混合类型 YAML 键（如 `{1: x, wat: y}`）抛 TypeError 违反红线 3，改为 `sorted(str(k) for k in ...)` 并补回归测试（计划文本的偏离，正当）；② `bib_cfg_error` 无条件转 E-BIB-SHAPE——unmanaged 项目 bib 段有未知键也报（spec §7 表述只提 managed，此处更宽是有意的：拼写错误无论如何都该看见）；③ `bib_files` 过滤空白项但**不**去首尾空格——保持 Quarto 对 bibliography 的字面语义，与既有 key 提取循环一致。补 3 个分支测试（非 dict bib / 空白项过滤 / 混合类型键），总览表计数已同步更新。 |
+| P-D8 | T3 计划文本与审查加固登记：① 计划 Step 3 `render_bib` 连接公式与自家 golden 矛盾（BIB_HEADER 自带结尾换行），以 golden 为准改为 `BIB_HEADER + "\n" + "\n\n".join(blocks) + "\n"`；② 质量审查补 4 道加固：零字段条目（title/year 为空串，schema 合法）渲染畸形 bib → `BibValueError`；fields 逃生舱与标准字段重名 → `BibValueError`（拒绝而非静默）；空白题名 `key_base_from_entry` IndexError → `(split() or [""])[0]`；写盘失败清理 `.tmp` 残留。③ `bib_is_stale` docstring 引用的 E-BIB-MISSING 真实存在（loader v1 代码），审查者误报，不改；`managed_target` 空 `bib_files` 不设防（所有调用方先查形状，T4/T6/T7 一致）。补 5 个测试，总览表计数同步。 |
 
 ---
 
