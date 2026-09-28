@@ -53,7 +53,7 @@
 - Modify: `src/weft/engine/inspire/apply.py:16`（import）、`src/weft/engine/inspire/apply.py:36-50`（_next_id/_all_ids 迁出）、`src/weft/engine/inspire/apply.py:241`（_normalize import）
 - Delete: `tests/test_inspire_cards.py` → Create: `tests/test_card_writer.py`
 
-- [ ] **Step 1: 写失败测试（新文件，import 新模块必失败）**
+- [x] **Step 1: 写失败测试（新文件，import 新模块必失败）**
 
 创建 `tests/test_card_writer.py`：
 
@@ -124,12 +124,12 @@ def test_write_proposal_path_and_rejects_escape(tmp_path):
         write_proposal(_project(tmp_path), "fact-01", dict(FACT_FIELDS))
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_card_writer.py -q`
 Expected: FAIL（`ModuleNotFoundError: No module named 'weft.engine.card_writer'`）
 
-- [ ] **Step 3: 创建 `src/weft/engine/card_writer.py`**
+- [x] **Step 3: 创建 `src/weft/engine/card_writer.py`**
 
 ```python
 """受控写入器（红线 4）：AI 产物唯二落盘点（inspire / parse 两管线共用）。
@@ -218,12 +218,12 @@ def next_card_id(used: set[str], prefix: str) -> str:
     return card_id
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_card_writer.py -q`
 Expected: 6 passed
 
-- [ ] **Step 5: 切换 inspire/apply.py 的 import 并删除旧写入器**
+- [x] **Step 5: 切换 inspire/apply.py 的 import 并删除旧写入器**
 
 `src/weft/engine/inspire/apply.py` 三处修改：
 
@@ -244,12 +244,12 @@ from weft.engine.card_writer import (
 
 然后 `git rm src/weft/engine/inspire/cards.py`，并删除 `tests/test_inspire_cards.py`（已被 test_card_writer.py 取代）。
 
-- [ ] **Step 6: 全量测试守护**
+- [x] **Step 6: 全量测试守护**
 
 Run: `.venv/Scripts/python.exe -m pytest tests -q`
 Expected: 344 passed, 1 deselected（342 − 4 删 + 6 新 + 2 净增）；若有 import 残漏此处会暴露
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -265,7 +265,7 @@ git commit -m "refactor: 受控写入器提炼 engine/card_writer.py——write_
 - Modify: `src/weft/engine/inspire/run.py`（整体重写为薄编排层）
 - Modify: `tests/test_inspire_run.py:66-80`（_register_harnesses 测试改走 pipeline）
 
-- [ ] **Step 1: 创建 `src/weft/engine/pipeline.py`（提炼自 inspire/run.py，机械件参数化）**
+- [x] **Step 1: 创建 `src/weft/engine/pipeline.py`（提炼自 inspire/run.py，机械件参数化）**
 
 ```python
 """多节点 SpecModule 管线公用运行层（parse 设计 §8，D8 提炼件）。
@@ -439,7 +439,7 @@ def run_pipeline(spec: PipelineSpec, project, tasklist_builder: Callable[[], Tas
 
 （注意：原 run.py 的 `except InspireError: raise` 分支在提炼后不再需要——error_cls 就是本管线异常类型，统一走 `except Exception` 重抛路径即可，语义不变。）
 
-- [ ] **Step 2: 重写 `src/weft/engine/inspire/run.py` 为薄编排层**
+- [x] **Step 2: 重写 `src/weft/engine/inspire/run.py` 为薄编排层**
 
 ```python
 """inspire 管线：节点 schema/harness 内容 + 运行编排（inspire 设计 §4）。
@@ -513,7 +513,7 @@ def run_inspire(project: Project, text: str, *, client,
                          module_id=run.run_id, resumed=run.resumed)
 ```
 
-- [ ] **Step 3: 更新 `tests/test_inspire_run.py` 的 harness 注册测试**
+- [x] **Step 3: 更新 `tests/test_inspire_run.py` 的 harness 注册测试**
 
 `test_harnesses_register_with_raised_max_tokens` 整体替换为：
 
@@ -536,7 +536,7 @@ def test_harnesses_register_with_raised_max_tokens():
         assert cfg.api_params == {"max_tokens": 32768}
 ```
 
-- [ ] **Step 4: 跑 inspire 全套 + 全量测试守护等价性**
+- [x] **Step 4: 跑 inspire 全套 + 全量测试守护等价性**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_inspire_run.py tests/test_cli_inspire.py tests/test_web_inspire.py -q`
 Expected: 全部 passed（断点续跑/清场重跑/快照路径行为不变）
@@ -544,7 +544,7 @@ Expected: 全部 passed（断点续跑/清场重跑/快照路径行为不变）
 Run: `.venv/Scripts/python.exe -m pytest tests -q`
 Expected: 344 passed, 1 deselected
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -559,7 +559,7 @@ git commit -m "refactor: 管线运行层提炼 engine/pipeline.py——PipelineS
 - Modify: `src/weft/engine/inspire/apply.py`（apply_proposal 内 model/table 选择）
 - Test: `tests/test_inspire_apply.py`（追加 2 例）
 
-- [ ] **Step 1: 写失败测试（追加到 tests/test_inspire_apply.py 末尾）**
+- [x] **Step 1: 写失败测试（追加到 tests/test_inspire_apply.py 末尾）**
 
 ```python
 def test_apply_proposal_supports_note_target(tmp_path):
@@ -597,12 +597,12 @@ def test_apply_proposal_note_id_mismatch_rejected(tmp_path):
 （若测试文件顶部尚未 import `apply_proposal` / `make_minimal_project` / `pytest`，补上：
 `from weft.engine.inspire.apply import apply_proposal`、`from tests.helpers import make_minimal_project`。）
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_inspire_apply.py -q -k note`
 Expected: FAIL（note 目标被当成 ClaimCard 校验，报缺 claim_type 之类）
 
-- [ ] **Step 3: 修改 `apply_proposal` 的 model/table 选择**
+- [x] **Step 3: 修改 `apply_proposal` 的 model/table 选择**
 
 在 `src/weft/engine/inspire/apply.py` 的 `apply_proposal` 中，把：
 
@@ -636,12 +636,12 @@ Expected: FAIL（note 目标被当成 ClaimCard 校验，报缺 claim_type 之�
 
 （归档路径 `archive/cards/<old_rel.parent.name>` 本就通用，notes 目标自动归档到 `archive/cards/notes/`，无需改动。顶部 `from weft.models.cards import ClaimCard, FactCard` 可顺手合并 NoteCard。）
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_inspire_apply.py -q`
 Expected: 11 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -656,7 +656,7 @@ git commit -m "feat: weft replace 支持 note 目标——apply_proposal 三类�
 - Modify: `src/weft/scaffold.py:98-109`（SCAFFOLD_DIRS）
 - Modify: `tests/test_scaffold.py:14-27`（SCAFFOLD_DIRS 期望元组）
 
-- [ ] **Step 1: 更新测试期望（先红）**
+- [x] **Step 1: 更新测试期望（先红）**
 
 `tests/test_scaffold.py` 的 `SCAFFOLD_DIRS` 元组首位插入 `"articles"`：
 
@@ -678,12 +678,12 @@ SCAFFOLD_DIRS = (
 )
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_scaffold.py -q`
 Expected: FAIL（`test_init_new_dir_creates_directories`：articles 目录不存在）
 
-- [ ] **Step 3: 修改 `src/weft/scaffold.py`**
+- [x] **Step 3: 修改 `src/weft/scaffold.py`**
 
 ```python
 # 不随文件派生的空目录：六类卡片目录 + figures（默认 figures_dir）+ 灵感/文章收件箱。
@@ -701,12 +701,12 @@ SCAFFOLD_DIRS: tuple[str, ...] = (
 )
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_scaffold.py tests/test_cli_init.py tests/test_web_new_project.py -q`
 Expected: 全部 passed（骨架文件数仍 7，`test_cli_init.py` 的 `count("已创建 ") == 7` 不受影响；init 后 validate 仍零诊断——空目录不参与加载）
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -722,7 +722,7 @@ git commit -m "feat: weft init 骨架新增 articles/ 文章收件箱（parse �
 - Create: `src/weft/engine/parse/schemas.py`
 - Create: `tests/test_parse_schemas.py`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `tests/test_parse_schemas.py`：
 
@@ -780,12 +780,12 @@ def test_match_output_claim_type_literal():
     assert out.placeholders[0].matched_fact is None
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_parse_schemas.py -q`
 Expected: FAIL（`ModuleNotFoundError: No module named 'weft.engine.parse'`）
 
-- [ ] **Step 3: 实现**
+- [x] **Step 3: 实现**
 
 创建 `src/weft/engine/parse/__init__.py`：
 
@@ -911,12 +911,12 @@ class ArticleCoverageOutput(BaseModel):
     coverage: list[ArticleCoverageEntry] = []
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_parse_schemas.py -q`
 Expected: 6 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -931,7 +931,7 @@ git commit -m "feat: parse 管线节点输出 schema——summary 可选、note 
 - Create: `src/weft/engine/parse/spec_build.py`
 - Create: `tests/test_parse_spec_build.py`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `tests/test_parse_spec_build.py`：
 
@@ -984,12 +984,12 @@ def test_literature_requires_bib_key():
         _tasklist(mode="literature")
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_parse_spec_build.py -q`
 Expected: FAIL（ModuleNotFoundError）
 
-- [ ] **Step 3: 实现 `src/weft/engine/parse/spec_build.py`**
+- [x] **Step 3: 实现 `src/weft/engine/parse/spec_build.py`**
 
 ```python
 """文章 → SpecModule 任务表（p01–p05 链式；parse 设计 §3-§4）。
@@ -1184,12 +1184,12 @@ def build_parse_tasklist(text: str, digest: str, *, mode: Mode,
     return Tasklist(tasks=tasks, flow=flow)
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_parse_spec_build.py -q`
 Expected: 5 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1204,7 +1204,7 @@ git commit -m "feat: parse spec_build 双模式 Tasklist——文献/拆解 prom
 - Create: `src/weft/engine/parse/run.py`
 - Create: `tests/test_parse_run.py`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `tests/test_parse_run.py`：
 
@@ -1358,12 +1358,12 @@ def test_long_text_warns_but_runs():
     assert result.run_id   # 管线照常完成（不阻断不分块）
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_parse_run.py -q`
 Expected: FAIL（ModuleNotFoundError）
 
-- [ ] **Step 3: 实现 `src/weft/engine/parse/run.py`**
+- [x] **Step 3: 实现 `src/weft/engine/parse/run.py`**
 
 ```python
 """parse 管线运行层：P1–P5 一次 SpecModule run（parse 设计 §4、§7）。
@@ -1445,12 +1445,12 @@ def run_parse(project: Project, text: str, *, client, source: str = "article",
                        warnings=warnings, resumed=run.resumed)
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_parse_run.py -q`
 Expected: 11 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1465,7 +1465,7 @@ git commit -m "feat: parse 管线运行层——复用 pipeline 提炼件，E-AR
 - Create: `src/weft/engine/parse/apply.py`
 - Create: `tests/test_parse_apply.py`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `tests/test_parse_apply.py`：
 
@@ -1661,12 +1661,12 @@ def test_report_sections_written(tmp_path):
     assert outcome.report == tmp_path / "generated" / "articles" / "paper-report.md"
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_parse_apply.py -q`
 Expected: FAIL（ModuleNotFoundError）
 
-- [ ] **Step 3: 实现 `src/weft/engine/parse/apply.py`**
+- [x] **Step 3: 实现 `src/weft/engine/parse/apply.py`**
 
 ```python
 """A1 聚合（parse 设计 §4–§5）：节点输出 → 落盘。
@@ -1942,12 +1942,12 @@ def _write_article_report(report: Path, source: Path, logic: ArticleLogicOutput,
     return report
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_parse_apply.py -q`
 Expected: 12 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1962,7 +1962,7 @@ git commit -m "feat: parse A1 聚合——note 三档判定、落盘闭包、归
 - Modify: `src/weft/engine/clients.py`（mock 响应 + `_respond` 分支）
 - Modify: `tests/test_clients.py`（追加 1 例）
 
-- [ ] **Step 1: 写失败测试（追加到 tests/test_clients.py）**
+- [x] **Step 1: 写失败测试（追加到 tests/test_clients.py）**
 
 ```python
 def test_scripted_parse_branches():
@@ -1984,12 +1984,12 @@ def test_scripted_parse_branches():
     assert cover["coverage"] == []
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_clients.py -q -k parse`
 Expected: FAIL（走通用兜底分支，返回 paragraph 形状）
 
-- [ ] **Step 3: 实现——`src/weft/engine/clients.py`**
+- [x] **Step 3: 实现——`src/weft/engine/clients.py`**
 
 类属性区（`_INSPIRE_MATCH` 之后）追加：
 
@@ -2030,12 +2030,12 @@ Expected: FAIL（走通用兜底分支，返回 paragraph 形状）
 
 并把类 docstring 的分支列表补一行 `- 【文章·…】：parse 管线各节点默认响应（与 make_minimal_project 自洽，key2020）。`
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_clients.py -q`
 Expected: 6 passed
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -2050,7 +2050,7 @@ git commit -m "feat: ScriptedLLMClient 文章分支——parse 管线 mock 冒�
 - Modify: `src/weft/cli.py`（新增 parse 命令，放在 inspire 之后）
 - Create: `tests/test_cli_parse.py`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 创建 `tests/test_cli_parse.py`：
 
@@ -2175,12 +2175,12 @@ def test_cli_replace_note_proposal_end_to_end(tmp_path):
     assert not proposal.exists()
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_cli_parse.py -q`
 Expected: FAIL（`parse` 命令不存在）
 
-- [ ] **Step 3: 实现——`src/weft/cli.py` 在 `inspire` 命令之后新增**
+- [x] **Step 3: 实现——`src/weft/cli.py` 在 `inspire` 命令之后新增**
 
 ```python
 @app.command()
@@ -2258,17 +2258,17 @@ def parse(
         _print_diagnostics(warnings)
 ```
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_cli_parse.py -q`
 Expected: 9 passed
 
-- [ ] **Step 5: 全量测试**
+- [x] **Step 5: 全量测试**
 
 Run: `.venv/Scripts/python.exe -m pytest tests -q`
 Expected: 391 passed, 1 deselected（342 基线 + Task1 +2 + Task3 +2 + Task5 +6 + Task6 +5 + Task7 +11 + Task8 +12 + Task9 +1 + Task10 +10 = 391；smoke 在 Task 11 追加后再 +1 deselected）
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -2282,7 +2282,7 @@ git commit -m "feat: CLI weft parse——双模式文章解析命令，E-ARTICLE
 **Files:**
 - Modify: `tests/test_smoke_real_llm.py`（追加 1 例）
 
-- [ ] **Step 1: 追加冒烟测试**
+- [x] **Step 1: 追加冒烟测试**
 
 ```python
 @pytest.mark.skipif(not os.environ.get("WEFT_SMOKE_LLM"),
@@ -2309,12 +2309,12 @@ def test_real_llm_parses_article(tmp_path):
     assert (work / "generated" / "articles" / "smoke-report.md").is_file()
 ```
 
-- [ ] **Step 2: 确认默认排除 + 冒烟链路语法正确**
+- [x] **Step 2: 确认默认排除 + 冒烟链路语法正确**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_smoke_real_llm.py -q`
 Expected: `2 deselected`（draft + parse 两个冒烟都默认跳过；不设 WEFT_SMOKE_LLM 不触网）
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
@@ -2330,7 +2330,7 @@ git commit -m "test: parse 真实 LLM 冒烟——文献模式端到端（-m smo
 - Modify: `docs/roadmap.md`（扩展场景 #1 状态）
 - Modify: 本计划文档（执行期实际计数回填）
 
-- [ ] **Step 1: AGENTS.md 五处更新**
+- [x] **Step 1: AGENTS.md 五处更新**
 
 1. 必读文档清单追加一行（放在 inspire 设计之后、WebUI 样式之前）：
 
@@ -2354,7 +2354,7 @@ git commit -m "test: parse 真实 LLM 冒烟——文献模式端到端（-m smo
 
 5. 红线 5 总表指向追加：`…、2026-09-04-weft-inspire.md（E-INSPIRE-SHAPE / E-INSPIRE-FAILED）、2026-09-28-weft-parse.md（E-ARTICLE-SHAPE / E-ARTICLE-FAILED / E-ARTICLE-KEY / W-ARTICLE-LONG）`。
 
-- [ ] **Step 2: roadmap.md 扩展场景 #1 标记完成**
+- [x] **Step 2: roadmap.md 扩展场景 #1 标记完成**
 
 把：
 
@@ -2368,12 +2368,12 @@ git commit -m "test: parse 真实 LLM 冒烟——文献模式端到端（-m smo
 1. **文章解析** ✅（2026-09-28 落地，设计定案 `docs/superpowers/specs/2026-09-28-weft-parse-design.md`）：`weft parse` SpecModule 五节点管线（逻辑核查 / 拆解+摘要 / 对照审查 / 匹配 / 覆盖），统一管线按 `--key` 分文献模式（note 卡 + 次级引用 claim）与拆解模式（fact/claim，data 闭包）；同 key note 三档判定（new 直落 / supplement 提案 / unchanged 零写入）；run 机械件提炼 `engine/pipeline.py`、受控写入器提炼 `engine/card_writer.py`（inspire 同步复用）。
 ```
 
-- [ ] **Step 3: 全量测试拿最终计数并回填**
+- [x] **Step 3: 全量测试拿最终计数并回填**
 
 Run: `.venv/Scripts/python.exe -m pytest tests -q`
 Expected: **391 passed, 2 deselected**（与计划预期一致；若有偏差，回填本计划头部与 AGENTS.md 为实际值，并在下方执行记录注明原因）
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add -A
@@ -2386,4 +2386,15 @@ git commit -m "docs: AGENTS/roadmap 回填——parse 管线入必读清单与�
 
 | Task | 实际测试计数 | 偏差与原因 |
 |---|---|---|
-| （执行时填写） | | |
+| Task 1 card_writer | 344 passed, 1 deselected | 无偏差 |
+| Task 2 pipeline | 344 passed, 1 deselected | P5（slug 空值回退）、P6（类型标注）回填，6cf77ef |
+| Task 3 apply_proposal note | 346 passed, 1 deselected | 无偏差 |
+| Task 4 scaffold articles/ | 346 passed, 1 deselected | 无偏差 |
+| Task 5 parse/schemas | 352 passed, 1 deselected | 无偏差 |
+| Task 6 parse/spec_build | 357 passed, 1 deselected | P7（P3 注入 bib key）修复，2ee6f43 |
+| Task 7 parse/run | 368 passed, 1 deselected | P8（两分支覆盖 +2 测试），3a30010 |
+| Task 8 parse/apply | 380 passed, 1 deselected | P9（测试 helper 落盘 note 卡）、P10（加固 +1 测试），90d7144 |
+| Task 9 mock 分支 | 381 passed, 1 deselected | P11（decompose e2e 断言 cited），7aa969b |
+| Task 10 CLI parse | 391 passed, 1 deselected | P12（read_text 入 try +1 测试），171dafe |
+| Task 11 smoke | 391 passed, 2 deselected | 无偏差 |
+| Task 12 文档回填 | 391 passed, 2 deselected | 本行 |

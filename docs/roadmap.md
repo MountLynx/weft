@@ -45,7 +45,7 @@
 
 按设计文档 §10，均不动已冻结的 v1 数据结构：
 
-1. **文章解析**：AI 从现成文章抽取 fact/claim 草稿卡 → 人工审阅；cited 缺引文 → 提醒补文献。
+1. **文章解析** ✅（2026-09-28 落地，设计定案 `docs/superpowers/specs/2026-09-28-weft-parse-design.md`）：`weft parse` SpecModule 五节点管线（逻辑核查 / 拆解+摘要 / 对照审查 / 匹配 / 覆盖），统一管线按 `--key` 分文献模式（note 卡 + 次级引用 claim）与拆解模式（fact/claim，data 闭包）；同 key note 三档判定（new 直落 / supplement 提案 / unchanged 零写入）；run 机械件提炼 `engine/pipeline.py`、受控写入器提炼 `engine/card_writer.py`（inspire 同步复用）。
 2. **灵感式写作** ✅（2026-09-04 提前落地，设计定案 `docs/superpowers/specs/2026-09-04-weft-inspire-design.md`）：`weft inspire` SpecModule 四节点管线（逻辑核查 / 卡片拆解 / 现有卡审查·矛盾·补充 / 匹配）+ 内存摘要索引（`weft/digest.py`，穷举比对，非向量 RAG）+ 落盘闭包 fail-closed + 处理报告；补充卡走完整新卡提案，`weft replace` 替换旧卡并归档；`weft missing-cites` 直查缺文献的 cited 卡。
 3. **pyzotero 同步**：从 Zotero collection 自动生成/更新 note 卡与 PDF。
 4. **数据处理/绘图管理集成**：外部系统以 `data.refs` 编号 + `figures/` 命名契约为界。
