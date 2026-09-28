@@ -133,6 +133,11 @@ def test_note_card_entry_roundtrip():
     assert card.entry.title == "T"
     assert card.entry.year == 2020
     assert card.entry.author == ["Smith, Jane", "Lee, Kyung"]
+    # str year 双收：保住 "c. 1850" / "in press" 这类合法值不被收紧成纯 int
+    card2 = NoteCard.model_validate({
+        "id": "k1", "status": "approved",
+        "entry": {"title": "T", "year": "2020"}})
+    assert card2.entry.year == "2020"
 
 
 def test_note_card_entry_forbids_unknown_field():
@@ -146,6 +151,9 @@ def test_note_card_entry_requires_title_and_year():
     with pytest.raises(ValidationError):
         NoteCard.model_validate({
             "id": "k1", "status": "approved", "entry": {"title": "T"}})
+    with pytest.raises(ValidationError):
+        NoteCard.model_validate({
+            "id": "k1", "status": "approved", "entry": {"year": 2020}})
 
 
 def test_bib_types_vocab():
