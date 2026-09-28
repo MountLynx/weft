@@ -42,6 +42,7 @@
 | P-D3 | bibgen 复用 loader 的 key 提取正则：`from weft.store.loader import _BIB_ENTRY, _BIB_IGNORED`（weft→store 单向，无环；不复制正则）。 |
 | P-D4 | YAML 1.1 陷阱：`yes/on/true` 裸写都会解析成布尔，`bib.managed` 非布尔测试用 `1` 构造。 |
 | P-D5 | spec §4 示例 `author: [Smith, Jane, Lee, Kyung]` 未加引号会被 YAML 拆成 4 项——实现与测试一律用 `["Smith, Jane", "Lee, Kyung"]` 引号形式（spec 笔误，实现不随；spec 后续修订时更正示例）。 |
+| P-D6 | 计数基线勘误（T1 质量审查）：计划写基线 392，含主检出**未提交**的 `test_prompt_core_manuscript_language_is_english`；worktree（干净 HEAD）实测基线 **391 passed, 2 deselected**。worktree 内各任务累计验收 = 总览表数字 **−1**（T1=396 … T11=445）；合回主检出后即计划数字（446）。另：T1 审查补齐 spec §11 承诺的 year str/int 双收与缺 title 断言（加强既有测试，不增计数）。 |
 
 ---
 
