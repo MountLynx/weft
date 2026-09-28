@@ -8,30 +8,30 @@
 
 **Tech Stack:** Python 3.11+ / pydantic v2（`extra="forbid"`）/ typer / FastAPI+Jinja2 / pytest。无新依赖。
 
-**基线计数：392 passed, 2 deselected**（2026-09-29 实测，含工作区未提交的 test_workflow 新测试）。本计划完成后预期：**446 passed, 2 deselected**。
+**基线计数：391 passed, 2 deselected**（worktree 实测；主检出 392 含 1 个未提交测试，见 P-D6）。本计划完成后预期（worktree）：**448 passed, 2 deselected**。
 
 **执行约定：**
 - 在 git worktree `.worktrees/bibgen` 中开发（superpowers:using-git-worktrees），合回 main 后删除。
 - 测试命令：`.venv/Scripts/python.exe -m pytest tests -q`；聚焦：`... -v tests/test_xxx.py::test_yyy`。
-- 每任务：先写失败测试 → 跑红 → 最小实现 → 跑绿 → 全量回归 → 中文 conventional commit（只 add 本任务文件；工作区另有进行中改动 workflow.py / tests/test_workflow.py / examples/paper-demo/metadata/data/data-01.md / docs/manual.md，**严禁**卷入提交）。
+- 每任务：先写失败测试 → 跑红 → 最小实现 → 跑绿 → 全量回归 → 中文 conventional commit（只 add 本任务文件；主检出的进行中改动 workflow.py / tests/test_workflow.py / examples/paper-demo/metadata/data/data-01.md / docs/manual.md 不在 worktree 内，无卷入风险）。
 - 生成文件固定 LF。
 
-## 任务与计数总览
+## 任务与计数总览（worktree 实际数字，P-D6/P-D7 勘误后）
 
 | 任务 | 内容 | 新增测试 | 累计 passed |
 |---|---|---|---|
-| T1 | `models/bib.py` + NoteCard.entry | 5 | 397 |
-| T2 | loader/Project：bib_files / bib_managed / bib_cfg_error | 4 | 401 |
-| T3 | `bibgen.py` 渲染器 + key minting | 8 | 409 |
-| T4 | validate：E-BIB-SHAPE / W-BIB-ETYPE / W-BIB-STALE / E-NOTE-NOT-IN-BIB managed 语义 | 9 | 418 |
-| T5 | scaffold init 模板 `bib: managed: false` | 1 | 419 |
-| T6 | CLI `weft bib sync [--check]` | 5 | 424 |
-| T7 | WebUI：note 表单 entry 字段 + 批准/编辑后自动同步 | 5 | 429 |
-| T8 | engine `bib_propose.py` + ScriptedLLMClient 分支 | 5 | 434 |
-| T9 | WebUI AI 提案路由 + 模板 | 5 | 439 |
-| T10 | parse 文献模式 entry 提取联动 | 5 | 444 |
-| T11 | paper-demo 转 managed | 2 | 446 |
-| T12 | AGENTS.md / roadmap 登记（诊断码总表、红线 4、必读清单） | 0 | 446 |
+| T1 | `models/bib.py` + NoteCard.entry | 5 | 396 |
+| T2 | loader/Project：bib_files / bib_managed / bib_cfg_error | 7（4 计划 + 3 审查补） | 403 |
+| T3 | `bibgen.py` 渲染器 + key minting | 8 | 411 |
+| T4 | validate：E-BIB-SHAPE / W-BIB-ETYPE / W-BIB-STALE / E-NOTE-NOT-IN-BIB managed 语义 | 9 | 420 |
+| T5 | scaffold init 模板 `bib: managed: false` | 1 | 421 |
+| T6 | CLI `weft bib sync [--check]` | 5 | 426 |
+| T7 | WebUI：note 表单 entry 字段 + 批准/编辑后自动同步 | 5 | 431 |
+| T8 | engine `bib_propose.py` + ScriptedLLMClient 分支 | 5 | 436 |
+| T9 | WebUI AI 提案路由 + 模板 | 5 | 441 |
+| T10 | parse 文献模式 entry 提取联动 | 5 | 446 |
+| T11 | paper-demo 转 managed | 2 | 448 |
+| T12 | AGENTS.md / roadmap 登记（诊断码总表、红线 4、必读清单） | 0 | 448 |
 
 ## 设计决策（计划期定案，执行期偏离继续回填此处）
 
@@ -43,6 +43,7 @@
 | P-D4 | YAML 1.1 陷阱：`yes/on/true` 裸写都会解析成布尔，`bib.managed` 非布尔测试用 `1` 构造。 |
 | P-D5 | spec §4 示例 `author: [Smith, Jane, Lee, Kyung]` 未加引号会被 YAML 拆成 4 项——实现与测试一律用 `["Smith, Jane", "Lee, Kyung"]` 引号形式（spec 笔误，实现不随；spec 后续修订时更正示例）。 |
 | P-D6 | 计数基线勘误（T1 质量审查）：计划写基线 392，含主检出**未提交**的 `test_prompt_core_manuscript_language_is_english`；worktree（干净 HEAD）实测基线 **391 passed, 2 deselected**。worktree 内各任务累计验收 = 总览表数字 **−1**（T1=396 … T11=445）；合回主检出后即计划数字（446）。另：T1 审查补齐 spec §11 承诺的 year str/int 双收与缺 title 断言（加强既有测试，不增计数）。 |
+| P-D7 | T2 质量审查三项登记：① 计划 Step 3 代码自带 bug——未知键 `sorted(set(...))` 撞混合类型 YAML 键（如 `{1: x, wat: y}`）抛 TypeError 违反红线 3，改为 `sorted(str(k) for k in ...)` 并补回归测试（计划文本的偏离，正当）；② `bib_cfg_error` 无条件转 E-BIB-SHAPE——unmanaged 项目 bib 段有未知键也报（spec §7 表述只提 managed，此处更宽是有意的：拼写错误无论如何都该看见）；③ `bib_files` 过滤空白项但**不**去首尾空格——保持 Quarto 对 bibliography 的字面语义，与既有 key 提取循环一致。补 3 个分支测试（非 dict bib / 空白项过滤 / 混合类型键），总览表计数已同步更新。 |
 
 ---
 
