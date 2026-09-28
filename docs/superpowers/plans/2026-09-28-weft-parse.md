@@ -13,7 +13,7 @@
 - Windows + Git Bash；测试命令一律 `.venv/Scripts/python.exe -m pytest …`（worktree 内需先 `.venv/Scripts/python.exe -m pip install -e ".[dev]"` 或直接用主仓 venv 跑 worktree 路径——推荐后者：`cd .worktrees/weft-parse && C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pytest tests -q`）。
 - 生成文件固定 LF（card_writer/scaffold 已处理，勿引入 `\r\n`）。
 
-**基线与精确计数：** 基线 342 passed, 1 deselected（2026-09-28 实测）。本计划新增测试（Task 1:+2、Task 3:+2、Task 5:+6、Task 6:+5、Task 7:+9、Task 8:+11、Task 9:+1、Task 10:+9、Task 11:+1 deselected）→ **预期最终 387 passed, 2 deselected**。若执行期出现合理偏差，把实际数回填本表与 AGENTS.md。
+**基线与精确计数：** 基线 342 passed, 1 deselected（2026-09-28 实测）。本计划新增测试（Task 1:+2、Task 3:+2、Task 5:+6、Task 6:+5、Task 7:+11、Task 8:+11、Task 9:+1、Task 10:+9、Task 11:+1 deselected）→ **预期最终 389 passed, 2 deselected**。若执行期出现合理偏差，把实际数回填本表与 AGENTS.md。
 
 ## 诊断码总表（登记处，红线 5）
 
@@ -37,6 +37,7 @@
 | P5 | pipeline `_slug` 空值回退 `'run'`（旧 inspire 为 `'inspire'`）：纯 CJK 文件名的 module_id 尾缀变化（weft-inspire-inspire → weft-inspire-run），fails-safe（旧快照孤立、重跑全新），无碰撞语义变化 | Task 2 质量审查发现，计划原代码即 `'run'` |
 | P6 | `run_pipeline` 的 `project` 参数补 `Project` 类型标注（顺 Task 3 提交） | Task 2 质量审查建议 |
 | P7 | 文献模式 P3 注入 bib key（_REVIEW_LITERATURE_SCHEMA_TEMPLATE.replace），note 三档判定可对照正确 note 卡；decompose match 回补 [@key] 归属条款（原计划 P3 prompt 缺 key，Task 6 质量审查发现） | D6"由管线判断新内容"依赖 key 可见 |
+| P8 | Task 7 追加 2 个测试镜像覆盖 pipeline 两个未测分支：并发重跑拒绝（monkeypatch `query_run_status` phase=running）与首节点失败清场（leading==0 → 全新重跑），Task 7 计数 +9 → +11 | Task 2 质量审查建议（该两分支此前任何套件均未覆盖） |
 
 ---
 
@@ -1443,7 +1444,7 @@ def run_parse(project: Project, text: str, *, client, source: str = "article",
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `.venv/Scripts/python.exe -m pytest tests/test_parse_run.py -q`
-Expected: 9 passed
+Expected: 11 passed
 
 - [ ] **Step 5: Commit**
 
@@ -2261,7 +2262,7 @@ Expected: 9 passed
 - [ ] **Step 5: 全量测试**
 
 Run: `.venv/Scripts/python.exe -m pytest tests -q`
-Expected: 387 passed, 1 deselected（342 基线 + Task1 +2 + Task3 +2 + Task5 +6 + Task6 +5 + Task7 +9 + Task8 +11 + Task9 +1 + Task10 +9 = 387；smoke 在 Task 11 追加后再 +1 deselected）
+Expected: 389 passed, 1 deselected（342 基线 + Task1 +2 + Task3 +2 + Task5 +6 + Task6 +5 + Task7 +11 + Task8 +11 + Task9 +1 + Task10 +9 = 389；smoke 在 Task 11 追加后再 +1 deselected）
 
 - [ ] **Step 6: Commit**
 
@@ -2333,7 +2334,7 @@ git commit -m "test: parse 真实 LLM 冒烟——文献模式端到端（-m smo
 - `docs/superpowers/specs/2026-09-28-weft-parse-design.md` — 文章解析管线设计定案（统一管线双模式：文献/拆解、note 三档判定、E-ARTICLE-* 诊断码）；其计划文档 `2026-09-28-weft-parse.md` 含执行期决策 P1–P4
 ```
 
-2. 常用命令全量测试注释改为实际计数（预期 `# 全量测试（387 passed, 2 deselected）`，以实测为准）。
+2. 常用命令全量测试注释改为实际计数（预期 `# 全量测试（389 passed, 2 deselected）`，以实测为准）。
 
 3. CLI 清单行加 `parse`：
 
@@ -2366,7 +2367,7 @@ git commit -m "test: parse 真实 LLM 冒烟——文献模式端到端（-m smo
 - [ ] **Step 3: 全量测试拿最终计数并回填**
 
 Run: `.venv/Scripts/python.exe -m pytest tests -q`
-Expected: **387 passed, 2 deselected**（与计划预期一致；若有偏差，回填本计划头部与 AGENTS.md 为实际值，并在下方执行记录注明原因）
+Expected: **389 passed, 2 deselected**（与计划预期一致；若有偏差，回填本计划头部与 AGENTS.md 为实际值，并在下方执行记录注明原因）
 
 - [ ] **Step 4: Commit**
 
