@@ -24,7 +24,7 @@ class ScriptedLLMClient:
     - 【draft·校验】：verdict=pass（check_fix=True 时输出 fix+修正段）
     - 【draft·衔接】/【draft·润色】：回显 <<<PARAGRAPH …>>> 内的文本
     - 【灵感·…】：inspire 管线各节点默认响应（与 make_minimal_project 自洽）
-    - 【文章·…】：parse 管线各节点默认响应（与 make_minimal_project 自洽，key2020）。
+    - 【文章·…】：parse 管线各节点默认响应（与 make_minimal_project 自洽，key2020；文献模式 mock 判定 note=new，项目须无同 key note 卡）。
     broken=True 时 draft 通道返回非 JSON（测 E-DRAFT-SHAPE 路径）。
     """
 

@@ -50,6 +50,9 @@ class ParseResult:
 
 def run_parse(project: Project, text: str, *, client, source: str = "article",
               bib_key: str | None = None) -> ParseResult:
+    """运行一次 P1–P5 文章解析管线（parse 设计 §4、§7）。source 决定
+    run_id（weft-parse-<slug>），不同文章必须传不同 source，否则断点快照会跨文章串跑。
+    """
     mode = "literature" if bib_key else "decompose"
     warnings: list[str] = []
     if len(text) > LONG_TEXT_CHARS:

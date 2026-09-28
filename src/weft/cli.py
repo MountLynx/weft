@@ -288,6 +288,81 @@ def inspire(
         _print_diagnostics(warnings)
 
 
+@app.command()
+def parse(
+    target: Path = typer.Argument(
+        None, help="文章 md/txt（须在 articles/ 下）或项目根目录；缺省取当前项目收件箱最旧一个"),
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+    key: str = typer.Option(None, "--key",
+                            help="文献模式：bib key（必须已在 bib；不给 = 拆解模式）"),
+    mock: bool = typer.Option(False, "--mock", help="免 key 假客户端（管线冒烟）"),
+) -> None:
+    """解析一篇文章 → 草稿卡 + 替换提案 + 处理报告（parse 管线，fail-closed）。"""
+    from weft.engine import DraftError, make_client
+    from weft.engine.parse.apply import apply_article
+    from weft.engine.parse.run import ParseError, run_parse
+
+    file: Path | None = target
+    if target is not None and target.is_dir():
+        # 单位置用法：weft parse <项目根>（同 validate/inspire 的习惯）
+        project_dir, file = target, None
+
+    project, load_diags = load_project(project_dir)
+    diagnostics = load_diags + validate_project(project)
+    if any(d.is_error for d in diagnostics):
+        _print_diagnostics(diagnostics)
+        typer.echo("—— 校验存在错误，拒绝处理文章")
+        raise typer.Exit(code=1)
+    if key is not None and key not in project.bib_keys:
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-ARTICLE-KEY", "articles", None,
+            f"--key 不在 bib 中：{key}")])
+        raise typer.Exit(code=1)
+
+    inbox = project.root / "articles"
+    if file is None:
+        candidates = sorted(p for pattern in ("*.md", "*.txt")
+                            for p in (inbox.glob(pattern) if inbox.is_dir() else []))
+        if not candidates:
+            typer.echo(f"ERROR 文章收件箱为空：{inbox}")
+            raise typer.Exit(code=1)
+        source = min(candidates, key=lambda p: p.stat().st_mtime)
+    else:
+        source = file if file.is_absolute() else Path.cwd() / file
+        if (not source.is_file() or source.suffix.lower() not in (".md", ".txt")
+                or source.resolve().parent != inbox.resolve()):
+            typer.echo(f"ERROR 文章文件必须是 {inbox} 下的 .md/.txt：{file}")
+            raise typer.Exit(code=1)
+
+    text = source.read_text(encoding="utf-8")
+    try:
+        result = run_parse(project, text,
+                           client=make_client(mock, project_root=project.root),
+                           source=source.name, bib_key=key)
+        outcome = apply_article(project, source=source, logic=result.logic,
+                                extract=result.extract, review=result.review,
+                                match=result.match, coverage=result.coverage,
+                                bib_key=key)
+    except (ParseError, DraftError, ValueError, OSError) as exc:
+        typer.echo(f"ERROR {exc}")
+        raise typer.Exit(code=1) from exc
+    if result.resumed:
+        typer.echo("本次为断点续跑：已完成节点取自上次快照（generated/articles/.runs/）")
+    for path in outcome.written_cards:
+        typer.echo(f"已写入 {path.relative_to(project.root).as_posix()}")
+    for path in outcome.proposals:
+        typer.echo(f"已生成替换提案 {path.relative_to(project.root).as_posix()}"
+                   "（审后 weft replace 应用）")
+    typer.echo(f"报告 {outcome.report.relative_to(project.root).as_posix()}")
+    for warning in result.warnings:
+        typer.echo(f"WARN {warning}")
+    for note in outcome.notes:
+        typer.echo(f"WARN {note}")
+    warnings = [d for d in diagnostics if not d.is_error]
+    if warnings:
+        _print_diagnostics(warnings)
+
+
 @app.command(name="replace")
 def replace_proposal(
     card_id: str = typer.Argument(..., help="目标卡 id（对应 inspirations/proposals/<id>.md）"),
