@@ -25,7 +25,7 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实 LLM 冒烟（默认排除，双保险门）
 ```
 
-- 无远程仓库，提交只到本地 main；**不要 push**。
+- 远程仓库：GitHub `MountLynx/weft`（私有，origin 已配置）。提交到本地 main 后可推送 `git push`（main 跟踪 origin/main）。
 - 提交信息用中文 conventional commit（`feat:`/`fix:`/`docs:`/`test:`/`chore:`）。
 - 测试先红后绿（TDD）；新增任务在计划文档里登记精确测试计数。
 
