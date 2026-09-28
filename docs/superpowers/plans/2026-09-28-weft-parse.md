@@ -13,7 +13,7 @@
 - Windows + Git Bash；测试命令一律 `.venv/Scripts/python.exe -m pytest …`（worktree 内需先 `.venv/Scripts/python.exe -m pip install -e ".[dev]"` 或直接用主仓 venv 跑 worktree 路径——推荐后者：`cd .worktrees/weft-parse && C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pytest tests -q`）。
 - 生成文件固定 LF（card_writer/scaffold 已处理，勿引入 `\r\n`）。
 
-**基线与精确计数：** 基线 342 passed, 1 deselected（2026-09-28 实测）。本计划新增测试（Task 1:+2、Task 3:+2、Task 5:+6、Task 6:+5、Task 7:+11、Task 8:+12、Task 9:+1、Task 10:+9、Task 11:+1 deselected）→ **预期最终 390 passed, 2 deselected**。若执行期出现合理偏差，把实际数回填本表与 AGENTS.md。
+**基线与精确计数：** 基线 342 passed, 1 deselected（2026-09-28 实测）。本计划新增测试（Task 1:+2、Task 3:+2、Task 5:+6、Task 6:+5、Task 7:+11、Task 8:+12、Task 9:+1、Task 10:+10、Task 11:+1 deselected）→ **预期最终 391 passed, 2 deselected**。若执行期出现合理偏差，把实际数回填本表与 AGENTS.md。
 
 ## 诊断码总表（登记处，红线 5）
 
@@ -41,6 +41,7 @@
 | P9 | Task 8 测试 `_project` helper 在 `root` 给定且 `with_note` 时用 `write_card` 把既有 note 卡落盘：supplement/unchanged 档断言"原卡不动"读的是盘上 `metadata/notes/key2020.md`，而 `build_project` 纯内存不落盘，计划原文的测试会 FileNotFoundError（实现无需改动，A1 语义正确） | 执行期实测发现计划测试 bug |
 | P10 | A1 前置 _safe_id(bib_key)（病态 bib key 含 / 或 .. 会在写卡中途炸 _safe_id，破坏零残留）；文献模式 new + 空 summary 出 WARN；补归档重名测试（Task 8 计数 +11 → +12） | Task 8 质量审查 Minor 项 |
 | P11 | decompose e2e 断言改为 claims/cited/claim-02.md：mock `_PARSE_MATCH` 恒返回 cited+cites=[key2020]（服务文献模式 e2e），decompose 模式下该 claim 带合法 key 落 cited 目录同样自洽；不做 mode-aware mock（测试替身保持无状态） | Task 9 质量审查发现计划内部矛盾 |
+| P12 | CLI read_text 移入 try（GBK/ANSI 文章裸 traceback → 干净 ERROR；UnicodeDecodeError ⊂ ValueError 已在捕获列表），inspire 命令同隐患同步修复；补非 UTF-8 测试（Task 10 计数 +9 → +10） | Task 10 质量审查 Important 项 |
 
 ---
 
@@ -2265,7 +2266,7 @@ Expected: 9 passed
 - [ ] **Step 5: 全量测试**
 
 Run: `.venv/Scripts/python.exe -m pytest tests -q`
-Expected: 390 passed, 1 deselected（342 基线 + Task1 +2 + Task3 +2 + Task5 +6 + Task6 +5 + Task7 +11 + Task8 +12 + Task9 +1 + Task10 +9 = 390；smoke 在 Task 11 追加后再 +1 deselected）
+Expected: 391 passed, 1 deselected（342 基线 + Task1 +2 + Task3 +2 + Task5 +6 + Task6 +5 + Task7 +11 + Task8 +12 + Task9 +1 + Task10 +10 = 391；smoke 在 Task 11 追加后再 +1 deselected）
 
 - [ ] **Step 6: Commit**
 
@@ -2337,7 +2338,7 @@ git commit -m "test: parse 真实 LLM 冒烟——文献模式端到端（-m smo
 - `docs/superpowers/specs/2026-09-28-weft-parse-design.md` — 文章解析管线设计定案（统一管线双模式：文献/拆解、note 三档判定、E-ARTICLE-* 诊断码）；其计划文档 `2026-09-28-weft-parse.md` 含执行期决策 P1–P4
 ```
 
-2. 常用命令全量测试注释改为实际计数（预期 `# 全量测试（390 passed, 2 deselected）`，以实测为准）。
+2. 常用命令全量测试注释改为实际计数（预期 `# 全量测试（391 passed, 2 deselected）`，以实测为准）。
 
 3. CLI 清单行加 `parse`：
 
@@ -2370,7 +2371,7 @@ git commit -m "test: parse 真实 LLM 冒烟——文献模式端到端（-m smo
 - [ ] **Step 3: 全量测试拿最终计数并回填**
 
 Run: `.venv/Scripts/python.exe -m pytest tests -q`
-Expected: **390 passed, 2 deselected**（与计划预期一致；若有偏差，回填本计划头部与 AGENTS.md 为实际值，并在下方执行记录注明原因）
+Expected: **391 passed, 2 deselected**（与计划预期一致；若有偏差，回填本计划头部与 AGENTS.md 为实际值，并在下方执行记录注明原因）
 
 - [ ] **Step 4: Commit**
 

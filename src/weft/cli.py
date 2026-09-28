@@ -1,4 +1,4 @@
-"""typer 入口：weft init / validate / graph / review / draft / assemble / render。"""
+"""typer 入口：weft init / validate / graph / review / draft / assemble / render / inspire / parse / replace / missing-cites / serve。"""
 from __future__ import annotations
 
 import sys
@@ -263,8 +263,8 @@ def inspire(
             typer.echo(f"ERROR 灵感文件必须存在于 {inbox} 下：{file}")
             raise typer.Exit(code=1)
 
-    text = source.read_text(encoding="utf-8")
     try:
+        text = source.read_text(encoding="utf-8")
         result = run_inspire(project, text, client=make_client(mock, project_root=project.root),
                              source=source.name)
         outcome = apply_inspiration(project, source=source, logic=result.logic,
@@ -334,8 +334,8 @@ def parse(
             typer.echo(f"ERROR 文章文件必须是 {inbox} 下的 .md/.txt：{file}")
             raise typer.Exit(code=1)
 
-    text = source.read_text(encoding="utf-8")
     try:
+        text = source.read_text(encoding="utf-8")
         result = run_parse(project, text,
                            client=make_client(mock, project_root=project.root),
                            source=source.name, bib_key=key)

@@ -102,6 +102,18 @@ def test_cli_parse_real_client_failure_is_clean(tmp_path):
     assert source.exists()
 
 
+def test_cli_parse_non_utf8_article_is_clean_error(tmp_path):
+    """GBK/ANSI 编码的文章 → 干净 ERROR，不甩 traceback（Windows 记事本 ANSI 场景）。"""
+    make_minimal_project(tmp_path)
+    source = _article(tmp_path)
+    source.write_bytes("这是 GBK 编码的内容：温度速率。".encode("gbk"))
+    result = runner.invoke(app, ["parse", str(source), str(tmp_path), "--mock"])
+    assert result.exit_code == 1
+    assert result.output.startswith("ERROR")
+    assert "Traceback" not in result.output
+    assert source.exists()   # 收件箱不动
+
+
 def test_cli_replace_note_proposal_end_to_end(tmp_path):
     """parse 产出的 note 提案经 weft replace 应用（CLI 级闭环）。"""
     make_minimal_project(tmp_path)
