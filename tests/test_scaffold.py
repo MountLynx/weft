@@ -90,3 +90,10 @@ def test_init_writes_lf_only(tmp_path):
     init_project(root)
     for rel in ("_quarto.yml", "weft.yaml", "narrative/01-introduction/part-01.md"):
         assert b"\r" not in (root / rel).read_bytes(), rel
+
+
+def test_init_weft_yaml_declares_bib_managed_false(tmp_path):
+    from weft.scaffold import init_project
+    init_project(tmp_path / "p")
+    text = (tmp_path / "p" / "weft.yaml").read_text(encoding="utf-8")
+    assert "managed: false" in text
