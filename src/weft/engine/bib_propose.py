@@ -38,7 +38,10 @@ def _sink_extras(raw):
         return raw
     extras = {k: raw.pop(k) for k in list(raw)
               if k not in BibEntryFields.model_fields}
-    fields = raw.setdefault("fields", {})
+    fields = raw.get("fields")
+    if not isinstance(fields, dict):   # null/str/list 等坏值丢弃，换新 dict 兜底
+        fields = {}
+        raw["fields"] = fields
     for k, v in extras.items():
         if v is not None:
             fields.setdefault(k, str(v))

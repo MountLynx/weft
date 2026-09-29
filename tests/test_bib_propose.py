@@ -81,3 +81,15 @@ def test_propose_note_fields_passthrough():
 
     _, fields = asyncio.run(propose_note(_project_with("key2020"), "x", _FieldsClient()))
     assert fields["entry"]["fields"] == {"editor": "Ed, Itor"}
+
+
+def test_propose_note_non_dict_fields_with_extras():
+    class _NullFieldsClient:
+        async def complete(self, **kwargs):
+            return LLMResponse(
+                content='{"title": "T", "year": 2020, "fields": null, "editor": "X"}',
+                usage={}, finish_reason="end_turn")
+
+    _, fields = asyncio.run(propose_note(_project_with("key2020"), "x",
+                                         _NullFieldsClient()))
+    assert fields["entry"]["fields"] == {"editor": "X"}
