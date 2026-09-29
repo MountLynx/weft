@@ -59,6 +59,10 @@ class ScriptedLLMClient:
          "claim_cites": [{"key": "c1", "claim_type": "cited", "cites": ["key2020"],
                           "reason": "（mock）本篇文献"}],
          "placeholders": []}, ensure_ascii=False)
+    _BIB_PROPOSE = json.dumps(
+        {"type": "article", "title": "Thermally activated catalysis",
+         "author": ["Smith, Jane"], "year": 2020,
+         "journal": "Journal of Thermal Chemistry"}, ensure_ascii=False)
 
     def __init__(self, paragraph: str = "（mock 段落）正文。",
                  uses: list[str] | None = None, cites: list[str] | None = None,
@@ -120,6 +124,8 @@ class ScriptedLLMClient:
             return self._PARSE_MATCH
         if "【文章·成卡覆盖】" in prompt:
             return json.dumps({"coverage": []}, ensure_ascii=False)
+        if "【文献·条目提案】" in prompt:
+            return self._BIB_PROPOSE
         return json.dumps(
             {"paragraph": self.paragraph, "uses": self.uses, "cites": self.cites},
             ensure_ascii=False)
