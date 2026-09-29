@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.11+ / pydantic v2（`extra="forbid"`）/ typer / FastAPI+Jinja2 / pytest。无新依赖。
 
-**基线计数：391 passed, 2 deselected**（worktree 实测；主检出 392 含 1 个未提交测试，见 P-D6）。本计划完成后预期（worktree）：**464 passed, 2 deselected**。
+**基线计数：391 passed, 2 deselected**（worktree 实测；主检出 392 含 1 个未提交测试，见 P-D6）。本计划完成后预期（worktree）：**465 passed, 2 deselected**。
 
 **执行约定：**
 - 在 git worktree `.worktrees/bibgen` 中开发（superpowers:using-git-worktrees），合回 main 后删除。
@@ -26,12 +26,12 @@
 | T4 | validate：E-BIB-SHAPE / W-BIB-ETYPE / W-BIB-STALE / E-NOTE-NOT-IN-BIB managed 语义 | 10（9 计划 + 1 审查补） | 426 |
 | T5 | scaffold init 模板 `bib: managed: false` | 1 | 427 |
 | T6 | CLI `weft bib sync [--check]` | 9（5 计划 + 4 审查补） | 436 |
-| T7 | WebUI：note 表单 entry 字段 + 批准/编辑后自动同步 | 11（5 计划 + 6 审查补；1 旧测试契约改写不增减） | 447 |
-| T8 | engine `bib_propose.py` + ScriptedLLMClient 分支 | 5 | 452 |
-| T9 | WebUI AI 提案路由 + 模板 | 5 | 457 |
-| T10 | parse 文献模式 entry 提取联动 | 5 | 462 |
-| T11 | paper-demo 转 managed | 2 | 464 |
-| T12 | AGENTS.md / roadmap 登记（诊断码总表、红线 4、必读清单） | 0 | 464 |
+| T7 | WebUI：note 表单 entry 字段 + 批准/编辑后自动同步 | 12（5 计划 + 7 审查补；1 旧测试契约改写不增减） | 448 |
+| T8 | engine `bib_propose.py` + ScriptedLLMClient 分支 | 5 | 453 |
+| T9 | WebUI AI 提案路由 + 模板 | 5 | 458 |
+| T10 | parse 文献模式 entry 提取联动 | 5 | 463 |
+| T11 | paper-demo 转 managed | 2 | 465 |
+| T12 | AGENTS.md / roadmap 登记（诊断码总表、红线 4、必读清单） | 0 | 465 |
 
 ## 设计决策（计划期定案，执行期偏离继续回填此处）
 
@@ -47,7 +47,7 @@
 | P-D8 | T3 计划文本与审查加固登记：① 计划 Step 3 `render_bib` 连接公式与自家 golden 矛盾（BIB_HEADER 自带结尾换行），以 golden 为准改为 `BIB_HEADER + "\n" + "\n\n".join(blocks) + "\n"`；② 质量审查补 4 道加固：零字段条目（title/year 为空串，schema 合法）渲染畸形 bib → `BibValueError`；fields 逃生舱与标准字段重名 → `BibValueError`（拒绝而非静默）；空白题名 `key_base_from_entry` IndexError → `(split() or [""])[0]`；写盘失败清理 `.tmp` 残留。③ `bib_is_stale` docstring 引用的 E-BIB-MISSING 真实存在（loader v1 代码），审查者误报，不改；`managed_target` 空 `bib_files` 不设防（所有调用方先查形状，T4/T6/T7 一致）。补 5 个测试，总览表计数同步。 |
 | P-D9 | T4 质量审查 Critical 登记：计划 Step 3 自带缺陷——`_check_bib_managed` 直调 `bib_is_stale` 会把 `BibValueError`（approved 卡花括号不平衡，schema 合法、loader 正常）裸抛给所有 validate 消费方（validate/graph/draft/assemble/serve 全崩），使 spec §8"W-BIB-STALE 可见"承诺不可达。修复：try/except 转 `E-BIB-VALUE` ERROR 诊断（path=bib 文件、field=entry）——E-BIB-VALUE 由此获得第二个发射点（validate 侧，与渲染器侧同码）。补 1 回归测试；形状错时仍跳过 stale 检查（if/else 语义不变）；unmanaged hint 缺席与两文件无 STALE 各加锁断言。 |
 | P-D10 | T6 质量审查登记（计划级缺口）：① **bootstrap 缺口**——managed 项目 bib 文件不存在时，loader 的 E-BIB-MISSING（v1 语义）把 `weft bib sync` 挡在 load 闸，"生成文件的命令不能创建文件"；修复：load 后对 managed 项目豁免指向声明 bib 文件的 E-BIB-MISSING（sync 负责创建；T7 WebUI 直调 sync_bib 本就无此闸，CLI 对齐后分叉消除）；② CLI 形状闸补 `bib_cfg_error` 分支（与 validate 的 E-BIB-SHAPE 覆盖对齐，未知键在 sync 时也拦）；③ 补 3 测试（缺文件引导/两文件形状/cfg 拼写错误）。诊断构造 rules.py 与 cli.py 各一份维持现状（YAGNI，第三个发射点出现再提取）。④ 实现者补充（已裁定保留）：①使 `--check` 遇缺失文件裸抛 FileNotFoundError——check 分支加守卫：目标缺失 → E-BIB-MISSING 干净退 1（check 不负责创建，与 `bib_is_stale` 缺失≠stale 语义闭环）+ 1 回归测试。 |
-| P-D11 | T7 执行与审查登记：① 计划测试代码两处笔误修正（获批）：URL kind 段是单数 `note`（计划写 `notes` 必 404）；bib_error 触发改为 draft 落盘→批准动作（approved 直落坏值会被 T4 的 E-BIB-VALUE 判项目不可用 404，原写法到不了路由）。② 质量审查 Critical 处置——bib_error 横幅是 UI 死胡同（approved 坏值落盘后全站 404），**E-BIB-VALUE 前置为落盘前拒绝**：`_entry_value_error` 预检（dataclasses.replace 假设态渲染）在 review 400 拒绝 / edit/new 转表单字段错误；spec §8"批准失败不回滚"语义保持成立（无需回滚——什么都没落盘）；bib_error 旗标降级为纯防御路径（实测正常流不可达）。③ 审查缺口修补：`card_new_post` 新建即批准（note+approved）补同步钩子（draft/rejected 新建不挂——本就不在 bib）；`_sync_managed_bib` 捕获扩至 OSError/UnicodeDecodeError；banner 文案泛化+`&lt;id&gt;` 转义+`banner success` 绿色变体（webui.css 组件层）+entry 单元格 pre-wrap。④ 补 6 测试；1 旧测试（bib_error 旗标）契约改写为 400 预检契约。 |
+| P-D11 | T7 执行与审查登记：① 计划测试代码两处笔误修正（获批）：URL kind 段是单数 `note`（计划写 `notes` 必 404）；bib_error 触发改为 draft 落盘→批准动作（approved 直落坏值会被 T4 的 E-BIB-VALUE 判项目不可用 404，原写法到不了路由）。② 质量审查 Critical 处置——bib_error 横幅是 UI 死胡同（approved 坏值落盘后全站 404），**E-BIB-VALUE 前置为落盘前拒绝**：`_entry_value_error` 预检（dataclasses.replace 假设态渲染）在 review 400 拒绝 / edit/new 转表单字段错误；spec §8"批准失败不回滚"语义保持成立（无需回滚——什么都没落盘）；bib_error 旗标降级为纯防御路径（实测正常流不可达）。③ 审查缺口修补：`card_new_post` 新建即批准（note+approved）补同步钩子（draft/rejected 新建不挂——本就不在 bib）；`_sync_managed_bib` 捕获扩至 OSError/UnicodeDecodeError；banner 文案泛化+`&lt;id&gt;` 转义+`banner success` 绿色变体（webui.css 组件层）+entry 单元格 pre-wrap。④ 补 6 测试；1 旧测试（bib_error 旗标）契约改写为 400 预检契约。⑤ 复审 Minor：`_entry_value_error` 按 `bib_managed` 设门（unmanaged 的 entry 坏值无消费方，预检不得挡无关编辑）+ 1 测试。 |
 
 ---
 
