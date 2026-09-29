@@ -10,6 +10,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from weft.models.bib import BibEntryFields
+
 
 class ArticleLogicOutput(BaseModel):
     """P1 逻辑核查（建议性，不阻断；输出格式仍须合法）。"""
@@ -33,11 +35,12 @@ class ArticleProposedCard(BaseModel):
 
 
 class ArticleExtractOutput(BaseModel):
-    """P2 拆解：拟建卡 + 内部连接；summary 仅文献模式有值（结构化文献摘要）。"""
+    """P2 拆解：拟建卡 + 内部连接；summary/entry 仅文献模式有值（书目字段，原文锚定）。"""
 
     cards: list[ArticleProposedCard] = []
     links: list[_Link] = []
     summary: str = ""
+    entry: BibEntryFields | None = None
 
 
 class ArticleClassification(BaseModel):

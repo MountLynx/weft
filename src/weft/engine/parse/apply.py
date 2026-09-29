@@ -175,11 +175,14 @@ def apply_article(project: Project, *, source: Path, logic: ArticleLogicOutput,
 
     if literature:
         if note_review.verdict == "new":
-            entries.append(("note", {
+            note_fields = {
                 "id": bib_key, "status": "draft",
                 "summary": extract.summary,
                 "comment": f"来源：文章 {source.name}（解析摘要）",
-            }))
+            }
+            if extract.entry is not None:
+                note_fields["entry"] = extract.entry.model_dump()
+            entries.append(("note", note_fields))
             note_lines.append(
                 f"- 新建 note 卡 `metadata/notes/{bib_key}.md`（draft，审后 approve）")
             if not extract.summary.strip():

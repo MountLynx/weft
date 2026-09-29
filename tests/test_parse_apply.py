@@ -1,4 +1,5 @@
 """parse A1 聚合：note 三档、落盘闭包、归档、报告、一致性 fail-closed。"""
+import frontmatter
 import pytest
 
 from weft.engine.parse.apply import apply_article
@@ -204,3 +205,25 @@ def test_archive_name_collision_rejected(tmp_path):
     with pytest.raises(ValueError, match="归档重名"):
         _apply(project, source, note=NoteReview(verdict="new"))
     assert source.exists()   # fail-closed：零写盘
+
+
+def test_apply_note_new_with_entry(tmp_path):
+    from weft.models.bib import BibEntryFields
+    source = _source(tmp_path)
+    project = _project(tmp_path, with_note=False)
+    base = _extract()
+    extract = ArticleExtractOutput(
+        summary=base.summary, cards=base.cards, links=base.links,
+        entry=BibEntryFields(type="article", title="T", author=["A, B"], year=2020))
+    _apply(project, source, note=NoteReview(verdict="new"), extract=extract)
+    meta = frontmatter.load(tmp_path / "metadata" / "notes" / "key2020.md").metadata
+    assert meta["entry"]["title"] == "T"
+    assert meta["entry"]["author"] == ["A, B"]
+
+
+def test_apply_note_new_without_entry(tmp_path):
+    source = _source(tmp_path)
+    project = _project(tmp_path, with_note=False)
+    _apply(project, source, note=NoteReview(verdict="new"))
+    meta = frontmatter.load(tmp_path / "metadata" / "notes" / "key2020.md").metadata
+    assert "entry" not in meta
