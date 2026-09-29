@@ -42,11 +42,17 @@ def _rel(root: Path, path: Path) -> str:
     return path.relative_to(root).as_posix()
 
 
+def is_weft_project(path: Path) -> bool:
+    """项目判据单一实现（projects registry 设计 R3）：根下含 metadata/ 或 _quarto.yml。"""
+    path = Path(path)
+    return (path / "metadata").is_dir() or (path / "_quarto.yml").exists()
+
+
 def load_project(root: Path) -> tuple[Project, list[Diagnostic]]:
     root = root.resolve()
     diagnostics: list[Diagnostic] = []
 
-    if not (root / "_quarto.yml").exists() and not (root / "metadata").is_dir():
+    if not is_weft_project(root):
         diagnostics.append(Diagnostic(
             Level.ERROR, "E-NOT-A-PROJECT", ".", None,
             f"{root} 不是 weft 项目根目录（缺少 _quarto.yml 与 metadata/）"))

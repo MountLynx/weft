@@ -2,12 +2,18 @@
 {% block title %}项目列表{% endblock %}
 {% block content %}
 <h2>weft 论文项目</h2>
-<p class="subtitle">根目录：{{ projects_root }}</p>
+<p class="subtitle">{% if registry_mode %}注册表：{{ registry_path }}{% else %}根目录：{{ projects_root }}{% endif %}</p>
+{% if reg_error %}<div class="banner error">注册表读取失败：{{ reg_error.code }} {{ reg_error.message }}（{{ reg_error.path }}）</div>{% endif %}
 {% if new_error %}<div class="banner error">新建失败：{{ new_error }}</div>{% endif %}
 <form method="post" action="/projects/new" class="new-project">
   <label>项目名
     <input name="name" value="{{ new_name }}" placeholder="如 paper-demo 或 我的论文" required>
   </label>
+  {% if registry_mode %}
+  <label>位置（可选）
+    <input name="location" value="{{ new_location }}" placeholder="留空 = 默认根目录">
+  </label>
+  {% endif %}
   <button type="submit" class="btn-primary">新建项目</button>
 </form>
 {% if entries %}
@@ -17,16 +23,21 @@
   {% for e in entries %}
     <tr>
       <td>{{ e.pid }}</td>
-      <td>{% if e.available %}<span class="badge approved">可用</span>
+      <td>{% if e.missing %}<span class="badge rejected">位置失联</span>
+          {% elif e.available %}<span class="badge approved">可用</span>
           {% else %}<span class="badge rejected">不可用</span>{% endif %}</td>
       <td>{{ e.n_cards }}</td>
       <td>E: {{ e.n_errors }} · W: {{ e.n_warnings }}</td>
-      <td><a href="/p/{{ e.pid }}/">打开</a></td>
+      <td>{% if e.missing %}{{ e.path }}{% else %}<a href="/p/{{ e.pid }}/">打开</a>{% endif %}</td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
-{% else %}
+{% elif not reg_error %}
+  {% if registry_mode %}
+<p>注册表为空——用 <code>weft projects add &lt;路径&gt;</code> 登记现有项目，或在上方表单新建。</p>
+  {% else %}
 <p>未发现 weft 项目——根目录下需存在含 <code>metadata/</code> 的子目录。</p>
+  {% endif %}
 {% endif %}
 {% endblock %}

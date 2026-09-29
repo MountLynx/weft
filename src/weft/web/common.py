@@ -18,11 +18,20 @@ KIND_LABELS = {"data": "data 卡", "fact": "fact 卡", "claim": "claim 卡",
                "note": "note 卡", "method": "method 卡", "param": "param 卡"}
 
 
-def load_entry_or_404(request: Request, pid: str) -> ProjectEntry:
-    from weft.web.discovery import scan_projects
+def _entries_for(request: Request) -> list[ProjectEntry]:
+    """两模式统一的条目来源：注册表模式实时读表（R7），扫描模式目录扫描。"""
+    from weft.web.discovery import registry_projects, scan_projects
 
-    for entry in scan_projects(request.app.state.projects_root):
+    if getattr(request.app.state, "projects_source", "scan") == "registry":
+        return registry_projects()
+    return scan_projects(request.app.state.projects_root)
+
+
+def load_entry_or_404(request: Request, pid: str) -> ProjectEntry:
+    for entry in _entries_for(request):
         if entry.pid == pid:
+            if entry.missing:
+                raise HTTPException(status_code=404, detail="项目位置失联")
             return entry
     raise HTTPException(status_code=404, detail="项目不存在")
 

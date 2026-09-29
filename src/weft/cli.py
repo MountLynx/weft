@@ -1,4 +1,4 @@
-"""typer 入口：weft init / validate / graph / review / draft / assemble / render / inspire / parse / replace / missing-cites / bib / serve。"""
+"""typer 入口：weft init / validate / graph / review / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve。"""
 from __future__ import annotations
 
 import sys
@@ -17,6 +17,10 @@ app = typer.Typer(add_completion=False,
 
 bib_app = typer.Typer(add_completion=False, help="bib 生成与维护（managed 模式，bibgen 设计）")
 app.add_typer(bib_app, name="bib")
+
+projects_app = typer.Typer(add_completion=False,
+                           help="全局项目注册表管理（projects registry 设计）")
+app.add_typer(projects_app, name="projects")
 
 
 def _ensure_utf8_stdout() -> None:
@@ -40,6 +44,30 @@ def _print_diagnostics(diagnostics: list[Diagnostic]) -> None:
         prefix = "ERROR" if d.is_error else "WARN "
         field = f" 字段 {d.field}:" if d.field else ""
         typer.echo(f"{prefix} {d.path} [{d.code}]{field} {d.message}")
+
+
+def _registry_error(exc) -> None:
+    """RegistryError → 诊断输出 + 退出码 1（exc.diagnostic() 自带 E-REG-* 码）。"""
+    _print_diagnostics([exc.diagnostic()])
+    raise typer.Exit(code=1)
+
+
+def _load_registry():
+    """读全局注册表；损坏 fail-closed（E-REG-MALFORMED → 退出码 1）。"""
+    from weft.registry import RegistryError, load_registry
+
+    try:
+        return load_registry()
+    except RegistryError as exc:
+        _registry_error(exc)
+
+
+def _init_collision_diagnostic(exc) -> Diagnostic:
+    """E-INIT-COLLISION 诊断（init 与 projects new 共用；exc 为 InitCollisionError）。"""
+    preview = "、".join(exc.entries[:5]) + ("…" if len(exc.entries) > 5 else "")
+    return Diagnostic(
+        Level.ERROR, "E-INIT-COLLISION", str(exc.root), None,
+        f"目标目录非空（{preview}）；为避免覆盖，未写入任何文件")
 
 
 def _print_review(project: Project) -> None:
@@ -77,10 +105,7 @@ def init(
     try:
         created = init_project(project_dir)
     except InitCollisionError as exc:
-        preview = "、".join(exc.entries[:5]) + ("…" if len(exc.entries) > 5 else "")
-        _print_diagnostics([Diagnostic(
-            Level.ERROR, "E-INIT-COLLISION", str(exc.root), None,
-            f"目标目录非空（{preview}）；为避免覆盖，未写入任何文件")])
+        _print_diagnostics([_init_collision_diagnostic(exc)])
         raise typer.Exit(code=1) from exc
     for path in created:
         typer.echo(f"已创建 {path.relative_to(project_dir).as_posix()}")
@@ -410,11 +435,16 @@ def missing_cites(
 
 @app.command()
 def serve(
-    projects_root: Path = typer.Argument(..., help="weft 论文项目根目录（扫描一级子目录）"),
+    projects_root: Path = typer.Argument(
+        None, help="扫描模式：projects 根目录。省略 = 注册表模式（全局注册表，多项目共存）"),
     host: str = typer.Option("127.0.0.1", "--host", help="监听地址；部署用 0.0.0.0"),
     port: int = typer.Option(8000, "--port", help="监听端口"),
 ) -> None:
-    """启动 WebUI（webui 设计 §10）：weft serve <projects_root> --host 0.0.0.0 --port 8000。"""
+    """启动 WebUI 主程序（webui 设计 §10、projects registry 设计 §5）。
+
+    weft serve —— 注册表模式：列出全局注册表的全部项目，项目可位于磁盘任意位置。
+    weft serve <projects_root> —— 扫描模式：现状行为（扫描一级子目录）。
+    """
     try:
         import uvicorn
     except ImportError as exc:
@@ -422,10 +452,139 @@ def serve(
         raise typer.Exit(code=1) from exc
     from weft.web import create_app
 
+    if projects_root is None:
+        uvicorn.run(create_app(use_registry=True), host=host, port=port)
+        return
     if not projects_root.is_dir():
         typer.echo(f"ERROR 项目根目录不存在：{projects_root}")
         raise typer.Exit(code=1)
     uvicorn.run(create_app(projects_root), host=host, port=port)
+
+
+@projects_app.command("add")
+def projects_add(
+    path: Path = typer.Argument(..., help="要登记的 weft 项目根目录"),
+    name: str = typer.Option(None, "--name", help="注册名（缺省取目录名）"),
+) -> None:
+    """校验是合法 weft 项目后登记进全局注册表（不动项目文件）。"""
+    from weft.registry import (
+        RegistryError,
+        register_project,
+        save_registry,
+    )
+    from weft.store.loader import is_weft_project
+
+    if not path.is_dir() or not is_weft_project(path):
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-REG-NOT-PROJECT", str(path), None,
+            f"{path} 不是 weft 项目根目录（缺少 metadata/ 与 _quarto.yml）")])
+        raise typer.Exit(code=1)
+    resolved = path.resolve()
+    reg_name = name if name is not None else resolved.name
+    reg = _load_registry()
+    try:
+        entry = register_project(reg, reg_name, resolved)
+        save_registry(reg)
+    except RegistryError as exc:
+        _registry_error(exc)
+    typer.echo(f"已登记 {entry.name} -> {entry.path}")
+
+
+@projects_app.command("new")
+def projects_new(
+    name: str = typer.Argument(..., help="注册名（同时是项目目录名）"),
+    root: Path = typer.Option(
+        None, "--root", help="父目录；缺省依次回退注册表 default_root、~/weft-projects"),
+) -> None:
+    """新建项目并登记：init 骨架 + 注册表条目；名称冲突/目录非空零写入。"""
+    from weft.registry import (
+        RegistryError,
+        ensure_registrable,
+        register_project,
+        resolve_default_root,
+        save_registry,
+    )
+    from weft.scaffold import InitCollisionError, init_project
+
+    reg = _load_registry()
+    parent = root if root is not None else resolve_default_root(reg)
+    target = parent / name
+    try:
+        clean = ensure_registrable(reg, name, target)  # 落盘前预检：零写入
+        target.parent.mkdir(parents=True, exist_ok=True)
+        init_project(target)
+    except RegistryError as exc:
+        _registry_error(exc)
+    except InitCollisionError as exc:
+        _print_diagnostics([_init_collision_diagnostic(exc)])
+        raise typer.Exit(code=1) from exc
+    try:
+        entry = register_project(reg, clean, target)
+        save_registry(reg)
+    except RegistryError as exc:
+        _registry_error(exc)
+    except OSError as exc:
+        typer.echo(f"ERROR 注册表写入失败（骨架已创建于 {target}）：{exc}")
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"已创建并登记 {entry.name} -> {entry.path}")
+
+
+@projects_app.command("list")
+def projects_list() -> None:
+    """列出注册表全部项目（纯只读，失联条目只展示不清理）。"""
+    from weft.store.loader import is_weft_project
+
+    reg = _load_registry()
+    if not reg.projects:
+        typer.echo("注册表为空——用 weft projects add <路径> 登记现有项目，"
+                   "或 weft projects new <名称> 新建。")
+        return
+    typer.echo("名称\t路径\t状态\t登记时间")
+    for entry in reg.projects:
+        path = Path(entry.path)
+        status = "ok" if path.is_dir() and is_weft_project(path) else "missing"
+        typer.echo(f"{entry.name}\t{entry.path}\t{status}\t{entry.registered_at}")
+
+
+@projects_app.command("remove")
+def projects_remove(
+    name: str = typer.Argument(..., help="要摘除的注册名"),
+) -> None:
+    """只从注册表摘除项目；本地文件一律不动。"""
+    from weft.registry import (
+        RegistryError,
+        save_registry,
+        unregister_project,
+    )
+
+    reg = _load_registry()
+    try:
+        entry = unregister_project(reg, name)
+        save_registry(reg)
+    except RegistryError as exc:
+        _registry_error(exc)
+    typer.echo(f"已从注册表摘除 {entry.name}")
+    typer.echo(f"本地文件未删除：{entry.path}")
+
+
+@projects_app.command("root")
+def projects_root(
+    directory: Path = typer.Argument(
+        None, help="省略 = 显示当前默认根；给出 = 设置（相对路径按当前目录解析）"),
+) -> None:
+    """查看/设置 `projects new` 的默认父目录（存注册表 default_root）。"""
+    from weft.registry import resolve_default_root, save_registry
+
+    reg = _load_registry()
+    if directory is None:
+        if reg.default_root:
+            typer.echo(f"默认根（配置值）：{reg.default_root}")
+        else:
+            typer.echo(f"默认根（默认值）：{resolve_default_root(reg)}")
+        return
+    reg.default_root = directory.resolve().as_posix()
+    save_registry(reg)
+    typer.echo(f"已设置默认根：{reg.default_root}")
 
 
 @bib_app.command("sync")
