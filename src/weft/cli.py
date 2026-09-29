@@ -62,6 +62,17 @@ def _load_registry():
         _registry_error(exc)
 
 
+def _save_registry(reg) -> None:
+    """写全局注册表；环境异常（只读 home/磁盘满/位点被占等）转 ERROR 行，不裸 traceback。"""
+    from weft.registry import save_registry
+
+    try:
+        save_registry(reg)
+    except OSError as exc:
+        typer.echo(f"ERROR 注册表写入失败：{exc}")
+        raise typer.Exit(code=1) from exc
+
+
 def _init_collision_diagnostic(exc) -> Diagnostic:
     """E-INIT-COLLISION 诊断（init 与 projects new 共用；exc 为 InitCollisionError）。"""
     preview = "、".join(exc.entries[:5]) + ("…" if len(exc.entries) > 5 else "")
@@ -484,7 +495,7 @@ def projects_add(
     reg = _load_registry()
     try:
         entry = register_project(reg, reg_name, resolved)
-        save_registry(reg)
+        _save_registry(reg)
     except RegistryError as exc:
         _registry_error(exc)
     typer.echo(f"已登记 {entry.name} -> {entry.path}")
@@ -502,15 +513,18 @@ def projects_new(
         ensure_registrable,
         register_project,
         resolve_default_root,
-        save_registry,
+        validate_project_name,
     )
     from weft.scaffold import InitCollisionError, init_project
 
     reg = _load_registry()
+    clean, name_err = validate_project_name(name)  # 先规范名，再拼路径（对齐 web 版顺序）
+    if name_err is not None:
+        _registry_error(RegistryError("E-REG-NAME", name, name_err))
     parent = root if root is not None else resolve_default_root(reg)
-    target = parent / name
+    target = parent / clean
     try:
-        clean = ensure_registrable(reg, name, target)  # 落盘前预检：零写入
+        ensure_registrable(reg, clean, target)  # 落盘前预检：零写入
         target.parent.mkdir(parents=True, exist_ok=True)
         init_project(target)
     except RegistryError as exc:
@@ -518,14 +532,14 @@ def projects_new(
     except InitCollisionError as exc:
         _print_diagnostics([_init_collision_diagnostic(exc)])
         raise typer.Exit(code=1) from exc
+    except OSError as exc:
+        typer.echo(f"ERROR 无法创建项目骨架（{target}）：{exc}")
+        raise typer.Exit(code=1) from exc
     try:
         entry = register_project(reg, clean, target)
-        save_registry(reg)
+        _save_registry(reg)
     except RegistryError as exc:
         _registry_error(exc)
-    except OSError as exc:
-        typer.echo(f"ERROR 注册表写入失败（骨架已创建于 {target}）：{exc}")
-        raise typer.Exit(code=1) from exc
     typer.echo(f"已创建并登记 {entry.name} -> {entry.path}")
 
 
@@ -560,7 +574,7 @@ def projects_remove(
     reg = _load_registry()
     try:
         entry = unregister_project(reg, name)
-        save_registry(reg)
+        _save_registry(reg)
     except RegistryError as exc:
         _registry_error(exc)
     typer.echo(f"已从注册表摘除 {entry.name}")
@@ -573,7 +587,7 @@ def projects_root(
         None, help="省略 = 显示当前默认根；给出 = 设置（相对路径按当前目录解析）"),
 ) -> None:
     """查看/设置 `projects new` 的默认父目录（存注册表 default_root）。"""
-    from weft.registry import resolve_default_root, save_registry
+    from weft.registry import resolve_default_root
 
     reg = _load_registry()
     if directory is None:
@@ -583,7 +597,7 @@ def projects_root(
             typer.echo(f"默认根（默认值）：{resolve_default_root(reg)}")
         return
     reg.default_root = directory.resolve().as_posix()
-    save_registry(reg)
+    _save_registry(reg)
     typer.echo(f"已设置默认根：{reg.default_root}")
 
 

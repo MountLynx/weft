@@ -187,3 +187,44 @@ def test_malformed_registry_error_banner(tmp_path, monkeypatch):
     resp = client.get("/")
     assert resp.status_code == 200
     assert "E-REG-MALFORMED" in resp.text
+
+
+# ---------- 审查修复补充 ----------
+
+def test_new_project_rejects_invalid_name(tmp_path, monkeypatch):
+    """表单非法名（E-REG-NAME 场景）：错误文案 + 零写入（审查 Minor 5a）。"""
+    setup_weft_home(tmp_path, monkeypatch)
+    projects = make_projects_root(tmp_path)
+    set_default_root(projects)
+    client = TestClient(create_app(use_registry=True))
+    resp = client.post("/projects/new", data={"name": "a/b"})
+    assert resp.status_code == 200
+    assert "新建失败" in resp.text
+    assert registry_entry_names() == []
+    assert not (projects / "a").exists()
+
+
+def test_scan_mode_does_not_touch_registry(tmp_path, monkeypatch):
+    """扫描模式（含其新建表单）不读写注册表（审查 Minor 5b 回归守护）。"""
+    setup_weft_home(tmp_path, monkeypatch)
+    projects = make_projects_root(tmp_path)
+    make_minimal_project(projects / "demo")
+    client = TestClient(create_app(projects))
+    assert client.get("/").status_code == 200
+    resp = client.post("/projects/new", data={"name": "scan-made"},
+                       follow_redirects=False)
+    assert resp.status_code == 303
+    assert load_registry().projects == []
+
+
+def test_probe_survives_pathological_path(tmp_path, monkeypatch):
+    """手改注册表塞入病态路径（null 字节）：条目转 missing 而非 500（审查 Minor 3）。"""
+    from weft.registry import RegistryData, RegistryEntry, save_registry
+    from weft.web.discovery import registry_projects
+
+    setup_weft_home(tmp_path, monkeypatch)
+    save_registry(RegistryData(projects=[
+        RegistryEntry(name="bad", path="x\x00y", registered_at="2026-09-29T00:00:00")]))
+    entries = registry_projects()
+    assert [e.pid for e in entries] == ["bad"]
+    assert entries[0].missing is True

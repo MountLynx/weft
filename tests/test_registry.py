@@ -193,3 +193,18 @@ def test_is_weft_project_quarto_only(tmp_path):
 def test_is_weft_project_negative(tmp_path):
     assert not is_weft_project(tmp_path)
     assert not is_weft_project(tmp_path / "missing")
+
+
+def test_load_rejects_older_version(tmp_path):
+    """version 过旧：报"过旧"而非"过新"（审查 Minor 1 文案与事实相反）。"""
+    target = tmp_path / "projects.json"
+    target.write_text(json.dumps({"version": 0, "projects": []}), encoding="utf-8")
+    with pytest.raises(RegistryError) as excinfo:
+        load_registry(target)
+    assert "过旧" in excinfo.value.message
+
+
+def test_registry_path_default_home_ignores_env(monkeypatch):
+    """环境残留 WEFT_HOME 不影响默认分支（审查 Minor 5d：显式 delenv 隔离）。"""
+    monkeypatch.delenv("WEFT_HOME", raising=False)
+    assert registry_path() == Path.home() / ".weft" / "projects.json"

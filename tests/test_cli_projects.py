@@ -233,3 +233,38 @@ def test_malformed_registry_fails_closed(tmp_path, monkeypatch):
     result = runner.invoke(app, ["projects", "list"])
     assert result.exit_code == 1
     assert "E-REG-MALFORMED" in result.output
+
+
+# ---------- 审查修复：环境异常 fail-closed 与名称规范化 ----------
+
+def test_new_strips_whitespace_name(tmp_path, monkeypatch):
+    """含首尾空格的名称：用规范名建目录与登记（审查 Issue 2，此前崩溃并残留目录）。"""
+    home = make_home(tmp_path, monkeypatch)
+    root = tmp_path / "roots"
+    result = runner.invoke(app, ["projects", "new", "  demo  ", "--root", str(root)])
+    assert result.exit_code == 0, result.output
+    assert (root / "demo" / "weft.yaml").is_file()
+    assert entry_names(home) == ["demo"]
+    assert not (root / "  demo  ").exists()
+
+
+def test_new_root_is_file_fails_closed(tmp_path, monkeypatch):
+    """--root 指向文件：ERROR 行 + 退出 1，不裸 traceback、零写入（审查 Issue 1）。"""
+    make_home(tmp_path, monkeypatch)
+    blocked = tmp_path / "blocked"
+    blocked.write_text("x", encoding="utf-8")
+    result = runner.invoke(app, ["projects", "new", "x", "--root", str(blocked)])
+    assert result.exit_code == 1
+    assert result.output.startswith("ERROR"), result.output
+    assert not (blocked / "x").exists()
+
+
+def test_save_oserror_fails_closed(tmp_path, monkeypatch):
+    """注册表写入位点被占（tmp 是目录）：ERROR 行 + 退出 1（审查 Issue 1 写侧）。"""
+    home = tmp_path / "home"
+    (home / "projects.json.tmp").mkdir(parents=True)
+    monkeypatch.setenv("WEFT_HOME", str(home))
+    project = make_minimal_project(tmp_path / "demo")
+    result = runner.invoke(app, ["projects", "add", str(project)])
+    assert result.exit_code == 1
+    assert result.output.startswith("ERROR"), result.output

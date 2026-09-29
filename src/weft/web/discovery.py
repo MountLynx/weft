@@ -60,8 +60,13 @@ def registry_projects() -> list[ProjectEntry]:
     pairs: list[tuple[str, Path]] = []
     entries: list[ProjectEntry] = []
     for item in reg.projects:
-        path = Path(item.path)
-        if path.is_dir() and is_weft_project(path):
+        try:
+            path = Path(item.path)
+            usable = path.is_dir() and is_weft_project(path)
+        except (OSError, ValueError):
+            # 手改注册表塞入病态路径值（null 字节等）：条目转 missing，不让单条炸掉整页
+            path, usable = Path(), False
+        if usable:
             pairs.append((item.name, path))
         else:
             entries.append(ProjectEntry(pid=item.name, path=path,

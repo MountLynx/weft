@@ -101,10 +101,13 @@ def load_registry(path: Path | None = None) -> RegistryData:
     except ValidationError as exc:
         raise RegistryError("E-REG-MALFORMED", str(target),
                             f"注册表结构不符：{exc}") from exc
-    if data.version != REGISTRY_VERSION:
+    if data.version > REGISTRY_VERSION:
         raise RegistryError("E-REG-MALFORMED", str(target),
                             f"注册表版本过新（{data.version} > {REGISTRY_VERSION}），"
                             "请升级 weft")
+    if data.version < REGISTRY_VERSION:
+        raise RegistryError("E-REG-MALFORMED", str(target),
+                            f"注册表版本过旧（{data.version} < {REGISTRY_VERSION}）")
     return data
 
 

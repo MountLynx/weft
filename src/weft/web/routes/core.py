@@ -102,6 +102,7 @@ def _project_new_registry(request: Request, form, name: str,
     from weft.web.discovery import registry_projects
 
     location = str(form.get("location", "")).strip()
+    target: Path | None = None
     if error is None:
         try:
             reg = load_registry()
@@ -123,7 +124,8 @@ def _project_new_registry(request: Request, form, name: str,
         except RegistryError as exc:
             error = f"{exc.code} {exc.message}"
         except (ValueError, OSError) as exc:
-            error = str(exc)
+            where = f"（骨架可能已部分创建于 {target}）" if target is not None else ""
+            error = f"写入失败{where}：{exc}"
     if error is not None:
         try:
             entries = registry_projects()

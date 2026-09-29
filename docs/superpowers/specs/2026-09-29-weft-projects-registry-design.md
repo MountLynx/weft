@@ -120,7 +120,7 @@ weft projects root [<dir>]               # 无参=显示当前默认根；带参
 - `tests/test_registry.py`：加载/保存/原子写、`WEFT_HOME` 隔离、空文件初态、损坏文件 fail-closed（`E-REG-MALFORMED`）、名称/路径去重、共享名称校验器（黑名单 + 路径分隔符）、默认根三级回退。
 - CLI 测试（并入或新立 `tests/test_cli_projects.py`）：五命令快乐路径 + 错误路径 + 退出码；`remove` 后本地文件原样存在；`new` 重名时零写入。
 - WebUI 测试：无参 serve 读注册表渲染列表、missing 灰显禁入、`/projects/new` 创建即登记闭环、默认根未配置的表单报错、注册表损坏的错误横幅、扫描模式回归（现有用例全数保持绿）。
-- 精确测试计数在实施计划文档中登记。（实现说明：用户裁定跳过计划文档直接实现；实际计数 69 条新增 = test_registry 41 + test_cli_projects 18 + test_web_registry 10，全量 539 passed / 2 deselected，登记于 roadmap M4。）
+- 精确测试计数在实施计划文档中登记。（实现说明：用户裁定跳过计划文档直接实现；实际计数 77 条新增 = test_registry 43 + test_cli_projects 21 + test_web_registry 13，全量 547 passed / 2 deselected，登记于 roadmap M4。）
 
 ## 10. 兼容性与文档登记
 

@@ -41,7 +41,7 @@
 - 断点续跑/回滚接入 CLI（复用 SpecModule 原生能力）。
 - 溯源注释完善与用户文档。
 - bib 自动生成（bibgen）✅（2026-09-29）：`weft bib sync`；managed 模式以已批准文献卡为真源（note 卡 entry 书目字段，spec 2026-09-29-weft-bibgen），WebUI 批准/编辑即同步，AI 提案与 parse 文献模式两条草案入口。
-- 项目注册表（projects registry）✅（2026-09-29）：全局注册表（`$WEFT_HOME/projects.json`）让项目散落磁盘任意位置；`weft projects add/new/list/remove/root` 命令组 + `weft serve` 双模式（无参 = 注册表模式，一个主程序多项目共存且相互隔离；带参 = 扫描模式现状不变）；WebUI 新建表单登记闭环、失联灰显、损坏横幅（E-REG-* fail-closed）；设计定案 `docs/superpowers/specs/2026-09-29-weft-projects-registry-design.md`（决策 R1–R12，测试 539 passed）。
+- 项目注册表（projects registry）✅（2026-09-29）：全局注册表（`$WEFT_HOME/projects.json`）让项目散落磁盘任意位置；`weft projects add/new/list/remove/root` 命令组 + `weft serve` 双模式（无参 = 注册表模式，一个主程序多项目共存且相互隔离；带参 = 扫描模式现状不变）；WebUI 新建表单登记闭环、失联灰显、损坏横幅（E-REG-* fail-closed）；设计定案 `docs/superpowers/specs/2026-09-29-weft-projects-registry-design.md`（决策 R1–R12，测试 547 passed）。
 
 ## 扩展场景（M4 后，架构已预留）
 
