@@ -57,6 +57,8 @@ def _entry_value_error(project, card) -> str | None:
 
     from weft import bibgen
 
+    if not project.bib_managed:
+        return None
     if card.entry is None:
         return None
     notes = dict(project.notes)

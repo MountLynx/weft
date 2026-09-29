@@ -175,3 +175,18 @@ def test_detail_banner_success_renders(tmp_path):
     client, _ = _managed_web_client(tmp_path)
     resp = client.get("/p/demo/cards/note/key2020?bib=bib_updated")
     assert resp.status_code == 200 and "已同步" in resp.text
+
+
+def test_unmanaged_entry_error_not_prechecked(tmp_path):
+    """unmanaged 项目 entry 坏值无消费方：预检不设门会挡住无关编辑（T7 复审 Minor）。"""
+    client, root = make_client(tmp_path)
+    write_card(root / "demo" / "metadata" / "notes", "key2020",
+               {"id": "key2020", "summary": "旧", "status": "approved",
+                "entry": {"type": "article", "title": "{T", "year": 2020}})
+    resp = client.post("/p/demo/cards/note/key2020/edit", data={
+        "summary": "新概括", "pdf": "",
+        "entry": "title: 'Smith {O''Brien'\nyear: 2020\ntype: article\n",
+        "status": "approved", "comment": ""}, follow_redirects=False)
+    assert resp.status_code == 303
+    project, _ = load_project(root / "demo")
+    assert project.notes["key2020"].summary == "新概括"    # 无关编辑照常落盘
