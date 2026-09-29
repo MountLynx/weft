@@ -14,6 +14,7 @@ from fastapi.responses import RedirectResponse
 
 from weft.engine.bib_propose import BibProposeError, propose_note
 from weft.engine.clients import make_client
+from weft.engine.draft_rules import DraftError
 from weft.store.writer import create_card, next_card_id, save_card
 from weft.web.card_forms import (
     FIELD_SPECS,
@@ -188,7 +189,7 @@ async def card_new_post(request: Request, pid: str, kind: str):
 
 @router.get("/p/{pid}/notes/propose")
 def bib_propose_get(request: Request, pid: str):
-    entry = load_project_or_404(request, pid)
+    load_project_or_404(request, pid)
     return templates.TemplateResponse(
         request, "bib_propose.html",
         {"pid": pid, "action": f"/p/{pid}/notes/propose",
@@ -200,7 +201,6 @@ async def bib_propose_post(request: Request, pid: str):
     entry = load_project_or_404(request, pid)
     form = await request.form()
     clues = str(form.get("clues") or "")
-    client = make_client(mock=False, project_root=entry.project.root)
 
     def rerender(error: str):
         return templates.TemplateResponse(
@@ -209,8 +209,9 @@ async def bib_propose_post(request: Request, pid: str):
              "cancel_url": f"/p/{pid}/cards/note", "clues": clues, "error": error})
 
     try:
+        client = make_client(mock=False, project_root=entry.project.root)
         key, fields = await propose_note(entry.project, clues, client)
-    except BibProposeError as exc:
+    except (BibProposeError, DraftError) as exc:
         return rerender(str(exc))
     from weft.engine.card_writer import write_proposed_cards
     write_proposed_cards(entry.project, [("note", fields)])

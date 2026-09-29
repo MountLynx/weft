@@ -72,3 +72,17 @@ def test_propose_invalid_schema_rerenders(tmp_path, monkeypatch):
     _patch(monkeypatch, _NoYear())
     resp = client.post("/p/demo/notes/propose", data={"clues": "x"})
     assert resp.status_code == 200 and "条目提案输出非法" in resp.text
+
+
+def test_propose_make_client_failure_rerenders(tmp_path, monkeypatch):
+    """LLM 配置缺失：make_client 的 DraftError 呈现为页面错误而非 500（T9 质量审查）。"""
+    from weft.engine.draft_rules import DraftError
+
+    def _boom(mock, project_root=None):
+        raise DraftError("真实 LLM 客户端构造失败（检查 config.json / .env）：无配置")
+
+    client, root = make_client(tmp_path)
+    monkeypatch.setattr("weft.web.routes.cards.make_client", _boom)
+    resp = client.post("/p/demo/notes/propose", data={"clues": "x"})
+    assert resp.status_code == 200 and "config.json" in resp.text
+    assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
