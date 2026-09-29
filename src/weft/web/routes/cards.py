@@ -46,9 +46,26 @@ def _sync_managed_bib(project_root) -> str | None:
         return None
     try:
         bibgen.sync_bib(project)
-    except bibgen.BibValueError:
+    except (bibgen.BibValueError, OSError, UnicodeDecodeError):
         return "bib_error"
     return "bib_updated"
+
+
+def _entry_value_error(project, card) -> str | None:
+    """预检：假设卡写盘后渲染 bib 是否合法（E-BIB-VALUE 前置，避免毒化项目）。"""
+    from dataclasses import replace
+
+    from weft import bibgen
+
+    if card.entry is None:
+        return None
+    notes = dict(project.notes)
+    notes[card.id] = card
+    try:
+        bibgen.render_bib(replace(project, notes=notes))
+    except bibgen.BibValueError as exc:
+        return str(exc)
+    return None
 
 
 def _table(request: Request, pid: str, kind: str):
@@ -144,6 +161,11 @@ async def card_new_post(request: Request, pid: str, kind: str):
         # id 是用户可控的落盘路径组件：拒绝空串/路径片段（模型层 id 无约束且 schema 冻结）
         errors = {"id": "id 非法：须以字母或数字开头，仅含 A-Z a-z 0-9 . _ : -，且不含 '..'"}
         card = None
+    if card is not None and kind == "note":
+        err = _entry_value_error(entry.project, card)
+        if err:
+            errors = {"entry": f"[E-BIB-VALUE] {err}"}
+            card = None
     if card is not None:
         try:
             create_card(entry.project.root, card)
@@ -152,7 +174,12 @@ async def card_new_post(request: Request, pid: str, kind: str):
             card = None
     if card is None:
         return rerender(errors)
-    return RedirectResponse(f"/p/{pid}/cards/{kind}/{card.id}", status_code=303)
+    url = f"/p/{pid}/cards/{kind}/{card.id}"
+    if kind == "note" and card.status == "approved":
+        flag = _sync_managed_bib(entry.project.root)
+        if flag:
+            url += f"?bib={flag}"
+    return RedirectResponse(url, status_code=303)
 
 
 @router.get("/p/{pid}/cards/{kind}/{card_id}")
@@ -184,6 +211,10 @@ async def card_review(request: Request, pid: str, kind: str, card_id: str):
         raise HTTPException(status_code=400, detail="非法 status")
     new_card = card.model_copy(update={"status": status,
                                        "comment": str(form.get("comment", ""))})
+    if kind == "note":
+        err = _entry_value_error(entry.project, new_card)
+        if err:
+            raise HTTPException(status_code=400, detail=f"[E-BIB-VALUE] {err}")
     save_card(entry.project.root, new_card,
               old_rel=entry.project.card_paths[card_id].as_posix())
     url = f"/p/{pid}/cards/{kind}/{card_id}"
@@ -237,6 +268,11 @@ async def card_edit_post(request: Request, pid: str, kind: str, card_id: str):
             card = KIND_MODELS[kind].model_validate(meta)
         except ValidationError as exc:
             errors = validation_errors(exc)
+            card = None
+    if card is not None and kind == "note":
+        err = _entry_value_error(entry.project, card)
+        if err:
+            errors = {"entry": f"[E-BIB-VALUE] {err}"}
             card = None
     if card is None:
         return rerender(errors)

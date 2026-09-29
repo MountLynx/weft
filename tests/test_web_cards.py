@@ -94,15 +94,84 @@ def test_approve_note_unmanaged_no_bib_flag(tmp_path):
 
 
 def test_approve_note_managed_bib_error_flag(tmp_path):
+    """E-BIB-VALUE 前置为落盘前拒绝后：坏值批准被 400 挡下，盘上零毒化。
+
+    （原「批准后 bib_error 旗标」契约已废除——旗标降级为纯防御路径，正常流不可达。）
+    """
     client, root = _managed_web_client(tmp_path)
+    before = (root / "demo" / "references.bib").read_text(encoding="utf-8")
     # 花括号不平衡的 entry 若直接以 approved 落盘，validate_project 会判 E-BIB-VALUE
-    # 使项目「不可用」（请求级 404），故以 draft 落盘、经批准动作触发同步失败（P-D1）
+    # 使项目「不可用」（请求级 404），故以 draft 落盘、经批准动作触发预检拒绝
     write_card(root / "demo" / "metadata" / "notes", "key2020",
                {"id": "key2020", "summary": "s", "status": "draft",
                 "entry": {"type": "article", "title": "{T", "year": 2020}})
     resp = client.post("/p/demo/cards/note/key2020/status",
                        data={"status": "approved", "comment": ""},
                        follow_redirects=False)
-    assert "bib=bib_error" in resp.headers["location"]
+    assert resp.status_code == 400 and "E-BIB-VALUE" in resp.text
+    project, _ = load_project(root / "demo")
+    assert project.notes["key2020"].status == "draft"     # 未落盘
+    assert (root / "demo" / "references.bib").read_text(encoding="utf-8") == before
+
+
+def test_edit_entry_value_error_field_error(tmp_path):
+    client, root = _managed_web_client(tmp_path)
+    before = (root / "demo" / "references.bib").read_text(encoding="utf-8")
+    resp = client.post("/p/demo/cards/note/key2020/edit", data={
+        "summary": "s", "pdf": "", "entry": "title: 'Smith {O''Brien'\nyear: 2020\ntype: article\n",
+        "status": "approved", "comment": ""})
+    assert resp.status_code == 200 and "E-BIB-VALUE" in resp.text
+    card_path = root / "demo" / "metadata" / "notes" / "key2020.md"
+    assert "O'Brien" not in card_path.read_text(encoding="utf-8")      # 未落盘
+    assert (root / "demo" / "references.bib").read_text(encoding="utf-8") == before
+
+
+def test_review_bad_entry_blocked_400(tmp_path):
+    client, root = _managed_web_client(tmp_path)
+    write_card(root / "demo" / "metadata" / "notes", "bad2020",
+               {"id": "bad2020", "summary": "s", "status": "draft",
+                "entry": {"type": "article", "title": "{T", "year": 2020}})
+    resp = client.post("/p/demo/cards/note/bad2020/status",
+                       data={"status": "approved", "comment": ""})
+    assert resp.status_code == 400 and "E-BIB-VALUE" in resp.text
+    project, _ = load_project(root / "demo")
+    assert project.notes["bad2020"].status == "draft"                 # 批准被阻止
+
+
+def test_new_note_approved_syncs_bib(tmp_path):
+    client, root = _managed_web_client(tmp_path)
+    # 夹具自带 note key2020（approved+entry）；create_card 遇重名会 409 rerender，
+    # 故删掉预置卡以走「新建即批准」路径（断言与原意不变）
+    (root / "demo" / "metadata" / "notes" / "key2020.md").unlink()
+    resp = client.post("/p/demo/cards/note/new", data={
+        "id": "key2020", "summary": "s", "pdf": "",
+        "entry": "type: article\ntitle: T\nyear: 2020\n",
+        "status": "approved", "comment": ""}, follow_redirects=False)
+    assert resp.status_code == 303 and "bib=bib_updated" in resp.headers["location"]
     content = (root / "demo" / "references.bib").read_text(encoding="utf-8")
-    assert not content.startswith("%")       # 旧内容未被破坏
+    assert "@article{key2020" in content and "title = {T}" in content
+
+
+def test_new_note_draft_no_bib_flag(tmp_path):
+    client, root = _managed_web_client(tmp_path)
+    resp = client.post("/p/demo/cards/note/new", data={
+        "id": "new2021", "summary": "s", "pdf": "",
+        "entry": "type: article\ntitle: N\nyear: 2021\n",
+        "status": "draft", "comment": ""}, follow_redirects=False)
+    assert resp.status_code == 303 and "bib=" not in resp.headers["location"]
+
+
+def test_reject_note_removes_from_bib(tmp_path):
+    client, root = _managed_web_client(tmp_path)
+    resp = client.post("/p/demo/cards/note/key2020/status",
+                       data={"status": "rejected", "comment": ""},
+                       follow_redirects=False)
+    assert "bib=bib_updated" in resp.headers["location"]
+    content = (root / "demo" / "references.bib").read_text(encoding="utf-8")
+    assert "@article{key2020" not in content
+
+
+def test_detail_banner_success_renders(tmp_path):
+    client, _ = _managed_web_client(tmp_path)
+    resp = client.get("/p/demo/cards/note/key2020?bib=bib_updated")
+    assert resp.status_code == 200 and "已同步" in resp.text
