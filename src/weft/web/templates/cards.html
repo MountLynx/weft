@@ -24,5 +24,6 @@
   </tbody>
 </table>
 <p><a href="/p/{{ entry.pid }}/cards/{{ kind }}/new">＋ 新建{{ labels[kind] }}</a></p>
+{% if kind == "note" %}<p><a href="/p/{{ entry.pid }}/notes/propose">✨ AI 提案文献</a></p>{% endif %}
 {% endif %}
 {% endblock %}

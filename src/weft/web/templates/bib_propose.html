@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}AI 提案文献{% endblock %}
+{% block content %}
+<h2>AI 提案文献（note 卡草稿）</h2>
+{% if error %}<div class="banner error">{{ error }}</div>{% endif %}
+<form method="post" action="{{ action }}">
+  <label>线索（DOI / 标题 / 作者 / 年份 / 摘要，任意组合）
+    <textarea name="clues" rows="6">{{ clues }}</textarea>
+  </label>
+  <button type="submit" class="btn-primary">生成提案草稿卡</button>
+  <a href="{{ cancel_url }}">取消</a>
+</form>
+<p>生成结果为 status: draft 的 note 卡（含 entry 书目字段）；批准后才会进 bib（managed 项目自动同步）。</p>
+{% endblock %}
