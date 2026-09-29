@@ -2,7 +2,7 @@
 
 - 日期：2026-09-29
 - 依据：用户需求"一个主程序启动，多个项目共存，项目间隔离，而不是靠切换根目录一次只能看一个"；现状勘察（CLI 单项目寻址、serve 仅单根扫描、项目无元数据、判据两处不一致）
-- 状态：设计已获用户逐节确认（brainstorm 决策表见文末 R1–R11）
+- 状态：设计已获用户逐节确认（brainstorm 决策表见文末 R1–R12，R12 为实现期增补）
 
 ## 1. 目标与非目标
 
@@ -111,6 +111,7 @@ weft projects root [<dir>]               # 无参=显示当前默认根；带参
 | `E-REG-PATH-DUP` | 错误 | 同一路径已用其他名称登记 |
 | `E-REG-NOT-PROJECT` | 错误 | `add` 目标不存在或不是 weft 项目 |
 | `E-REG-UNKNOWN` | 错误 | `remove` 时未知注册名（WebUI 未知 pid 走常规 404，不用此码） |
+| `E-REG-NAME` | 错误 | 注册名不合法（黑名单/路径分隔符/Windows 保留名等；实现期增补，R12） |
 
 沿用码：`E-INIT-COLLISION`（`new` 目标非空）。失联条目是环境状态而非错误，**不设**诊断码（R9）。
 
@@ -119,7 +120,7 @@ weft projects root [<dir>]               # 无参=显示当前默认根；带参
 - `tests/test_registry.py`：加载/保存/原子写、`WEFT_HOME` 隔离、空文件初态、损坏文件 fail-closed（`E-REG-MALFORMED`）、名称/路径去重、共享名称校验器（黑名单 + 路径分隔符）、默认根三级回退。
 - CLI 测试（并入或新立 `tests/test_cli_projects.py`）：五命令快乐路径 + 错误路径 + 退出码；`remove` 后本地文件原样存在；`new` 重名时零写入。
 - WebUI 测试：无参 serve 读注册表渲染列表、missing 灰显禁入、`/projects/new` 创建即登记闭环、默认根未配置的表单报错、注册表损坏的错误横幅、扫描模式回归（现有用例全数保持绿）。
-- 精确测试计数在实施计划文档中登记。
+- 精确测试计数在实施计划文档中登记。（实现说明：用户裁定跳过计划文档直接实现；实际计数 69 条新增 = test_registry 41 + test_cli_projects 18 + test_web_registry 10，全量 539 passed / 2 deselected，登记于 roadmap M4。）
 
 ## 10. 兼容性与文档登记
 
@@ -142,3 +143,4 @@ weft projects root [<dir>]               # 无参=显示当前默认根；带参
 | R9 | 失联（missing）= 环境状态：列表灰显、不设诊断码、不改退出码 |
 | R10 | 隔离四维（数据/运行/LLM 配置/路径白名单）全部沿用现状机制，注册表不新增落盘点 |
 | R11 | YAGNI 边界：不做按名寻址、WebUI remove/rename、文件锁、自动清理、云同步本体 |
+| R12 | 实现期增补：CLI 侧名称不合法需要诊断码 → `E-REG-NAME`（`register_project`/`ensure_registrable` 抛出；WebUI 表单沿用无码文案惯例） |

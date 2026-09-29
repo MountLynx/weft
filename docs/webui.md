@@ -7,12 +7,23 @@
 
 ```bash
 pip install "weft[web]"
-weft serve /srv/weft-projects --host 0.0.0.0 --port 8000
+weft serve --host 0.0.0.0 --port 8000                      # 注册表模式（推荐）：一个主程序托管多项目
+weft serve /srv/weft-projects --host 0.0.0.0 --port 8000   # 扫描模式：现状行为不变
 ```
 
-- `<projects_root>` 下的一级子目录中，凡含 `metadata/` 的即识别为 weft 论文项目，
-  首页列出可选；演示前用 `weft init` 或拷贝 `examples/paper-demo` 准备多个示例项目
-  （拷贝后删除 `drafts/`、`generated/` 产物可从零演示）。
+- **注册表模式**（`weft serve` 无参数）：项目清单来自全局注册表 `~/.weft/projects.json`
+  （`WEFT_HOME` 环境变量可重定向），项目可位于磁盘任意位置。设计定案
+  `docs/superpowers/specs/2026-09-29-weft-projects-registry-design.md`。配套 CLI：
+  `weft projects add <路径>` 登记现有项目、`weft projects new <名称>` 新建并登记
+  （位置回退 `--root` > 注册表默认根 > `~/weft-projects`）、
+  `weft projects remove <名称>`（只摘表，绝不删本地文件）、`weft projects list`、
+  `weft projects root <目录>`（设默认根）。首页新建表单：位置留空落默认根
+  （未配置则提示先执行 `weft projects root`），填写父目录则在其中创建；
+  失联项目灰显不可点入，注册表损坏显示错误横幅（fail-closed，`E-REG-MALFORMED`）。
+- **扫描模式**（给 `<projects_root>`）：一级子目录中凡含 `metadata/` 的即识别为
+  weft 论文项目，首页列出可选；不读写注册表。演示前用 `weft init` 或拷贝
+  `examples/paper-demo` 准备多个示例项目（拷贝后删除 `drafts/`、`generated/`
+  产物可从零演示）。
 - 浏览器打开 `http://<server>:8000`。
 
 ## LLM 配置
