@@ -92,15 +92,19 @@ def fill_placeholders(text: str, node: Node, part_id: str,
     """占位符确定性替换为图表字面编号 / [@cites]；返回 (文本, 软提醒)。"""
     reminders: list[str] = []
     used = {u.id for u in node.uses}
-    for m in _PLACEHOLDER.finditer(text):
-        target = m.group(0)[2:-2]
+    seen: set[str] = set()
+
+    def _sub(m: re.Match) -> str:
+        token = m.group(0)
+        target = token[2:-2]
         if target not in used:
             raise DraftRuleError(_diag(
                 "E-DRAFT-USES", node.id, part_id, "paragraph",
-                f"占位符 {m.group(0)} 越界：不属于本节点 uses"))
-
-    def _sub(m: re.Match) -> str:
-        target = m.group(0)[2:-2]
+                f"占位符 {token} 越界：不属于本节点 uses"))
+        if token in seen:
+            # 同段重复占位符只保留首次出现（模型惯于写两遍，e2e 实测）
+            return ""
+        seen.add(token)
         if target.startswith("fact-"):
             fact = project.facts.get(target)
             labels = [ref for d in (fact.data if fact else [])
@@ -110,19 +114,45 @@ def fill_placeholders(text: str, node: Node, part_id: str,
                 reminders.append(
                     f"W-REF-EMPTY {target} 未关联到任何图表 ref，占位符已移除")
                 return ""
-            return "；".join(_label_to_text(x, project) for x in labels)
+            return "; ".join(_label_to_text(x, project) for x in labels)
         claim = project.claims.get(target)
         cites = list(claim.cites) if claim else []
         if not cites:
             reminders.append(
                 f"W-CITES-EMPTY {target} 分类 cited 但 cites 为空，占位符已移除（缺文献）")
             return ""
-        return "（" + "；".join(f"[@{k}]" for k in cites) + "）"
+        # 单个 [@a; @b] 引用块（多键同块）：写 ([@a]; [@b]) 会被 citeproc
+        # 渲染成双层括号（e2e 实测 docx）
+        return "[" + "; ".join(f"@{k}" for k in cites) + "]"
 
     text = _PLACEHOLDER.sub(_sub, text)
-    # 模型常自己给占位符包中文括号，填充后再加一层 → 塌缩去重（e2e 实测）
-    # 模型常自己包中文括号，填充后再加一层：直接塌缩（学术文本无合法双括号）
-    text = text.replace("（（", "（").replace("））", "）")
+    # 模型常自己给占位符包括号（英文稿 ASCII 括号、中文习惯全角括号），
+    # 填充后再加一层 → 塌缩为单层 ASCII 括号（学术文本无合法双括号，e2e 实测）
+    text = (text.replace("（(", "(").replace(")）", ")")
+                .replace("（（", "（").replace("））", "）")
+                .replace("((", "(").replace("))", ")"))
+    # 占位符移除/去重留下的残迹清理（e2e 实测 "; )"、" )"、" ."、"MBGS-S ."）
+    text = (text.replace("; )", ")").replace(" )", ")")
+                .replace("(; ", "(").replace("( ", "(")
+                .replace("( )", "").replace("()", ""))
+    # 审查节点曾在 fix 文本自行写"字面图号"并与填充结果并列（e2e 实测）：
+    # 相邻括注合并 + 括注内重复图号去重（只触碰含 Fig./Table. 的括注，不动散文括号）
+    text = re.sub(r"\(((?:Fig|Table)\.[^()]*)\)\s*\(([^()]*\b(?:Fig|Table)\.[^()]*)\)",
+                  r"(\1; \2)", text)
+
+    def _dedupe_fig_paren(m: re.Match) -> str:
+        parts = [p.strip() for p in m.group(1).split(";")]
+        seen: set[str] = set()
+        out = []
+        for p in parts:
+            if p and p not in seen:
+                seen.add(p)
+                out.append(p)
+        return "(" + "; ".join(out) + ")"
+
+    text = re.sub(r"\(([^()]*\b(?:Fig|Table)\.[^()]*)\)", _dedupe_fig_paren, text)
+    text = re.sub(r"  +", " ", text)
+    text = re.sub(r" +([.,;])", r"\1", text)
     leftover = _PLACEHOLDER.search(text)
     if leftover:
         raise DraftRuleError(_diag("E-DRAFT-SHAPE", node.id, part_id, "paragraph",

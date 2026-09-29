@@ -74,6 +74,52 @@ def test_check_link_polish_prompts_inject_views(tmp_path):
     assert "润色后复检" in tl.tasks["c2"].prompt and "{p}" in tl.tasks["c2"].prompt
 
 
+def test_check_prompts_treat_node_logic_as_consistency_basis(tmp_path):
+    """e2e 实测（methods 空 uses）：c1 以"不得引入 uses 之外的事实"为审查项会
+    把 logic 承载素材判为违规 → fix 空段（E-DRAFT-SHAPE）或编造"修正"。
+    一致性基准必须是 uses 实体 + 节点 logic，且 c2 不得出现悬空的"同前"。"""
+    project, part, node, spec = _spec(tmp_path)
+    tl = build_tasklist(project, node, spec, "", "", {})
+    assert "节点 logic" in tl.tasks["c1"].prompt
+    assert "节点 logic" in tl.tasks["c2"].prompt
+    assert "同前" not in tl.tasks["c2"].prompt
+    assert "节点 logic" in tl.tasks["p"].prompt
+
+
+def test_placeholder_rules_guard_grammar_and_uniqueness(tmp_path):
+    """e2e 实测：模型把占位符写成句子主语（移除后残句）、同一占位符写两遍
+    （(Fig. 1a; Fig. 1a)）。g 的占位符规则须钉死括注语义，c1 须纳入审查。"""
+    project, part, node, spec = _spec(tmp_path)
+    tl = build_tasklist(project, node, spec, "", "", {})
+    g_prompt = tl.tasks["g"].prompt
+    assert "只写一次" in g_prompt
+    assert "不是句子成分" in g_prompt
+    c1_prompt = tl.tasks["c1"].prompt
+    assert "只出现一次" in c1_prompt
+    assert "句子仍完整" in c1_prompt
+
+
+def test_check_prompts_forbid_literal_figure_labels(tmp_path):
+    """e2e 实测（results 第 4 轮）：c1 在 fix 文本里自行写出字面图号
+    "(Fig. 1a)"（真实编号只能由 f 脚本填充）→ 审查提示词必须明令禁止。"""
+    project, part, node, spec = _spec(tmp_path)
+    tl = build_tasklist(project, node, spec, "", "", {})
+    assert "字面图表编号" in tl.tasks["c1"].prompt
+    assert "字面图表编号" in tl.tasks["c2"].prompt
+    assert "字面图号" in tl.tasks["g"].prompt
+
+
+def test_link_prompt_methods_suppresses_transitions(tmp_path):
+    """e2e 实测：衔接节点给方法段加了 "To address this gap," 承接开头。
+    methods 工作流应抑制承接性开头，其余工作流保持衔接优化。"""
+    project, part, node, spec = _spec(tmp_path)
+    tl = build_tasklist(project, node, spec, "", "",
+                        {"workflow": "methods"})
+    assert "方法" in tl.tasks["l"].prompt
+    tl_default = build_tasklist(project, node, spec, "", "", {})
+    assert "方法" not in tl_default.tasks["l"].prompt
+
+
 def test_node_spec_drops_unapproved_uses(tmp_path):
     from tests.helpers import write_card
     project, _ = load_project(make_minimal_project(tmp_path))

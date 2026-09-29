@@ -21,7 +21,11 @@ _PLACEHOLDER_RULES = (
     "2. claim_type=cited 的 claim 被本段陈述时，在其论断处写 {{claim-xx}}，"
     "代表此处插入该 claim 的文献引用（[@key] 由系统填充）；\n"
     "3. claim_type=uncited 的 claim 直接陈述结论，禁止为其写占位符或任何 [@key]；\n"
-    "4. 全文禁止出现真实 [@key] 引用与 {{…}} 以外的标记。\n"
+    "4. 占位符只是括注位置，不是句子成分：不得充当主语、宾语或谓语"
+    "（占位符被系统替换或移除后，句子必须仍然语法完整）；\n"
+    "5. 同一占位符在本段只写一次，不要为同一图表或同一文献重复书写；\n"
+    "6. 禁止自行写出字面图号/表号（Fig. 1a、Table 1 等）——真实编号由系统填充；\n"
+    "7. 全文禁止出现真实 [@key] 引用与 {{…}} 以外的标记。\n"
 )
 
 _CLAIM_CLASS_EXPLAIN = (
@@ -96,17 +100,32 @@ def gen_prompt(overview: str, spec: dict, workflow_core: str) -> str:
     )
 
 
+_CONSISTENCY_BASIS = (
+    "一致性基准 = uses 实体全文 + 节点 logic（两者共同构成本段合法素材来源；"
+    "method/param 管线的协议与参数全部承载于节点 logic，同样是一致性基准）。"
+)
+
 def check_prompt(spec: dict, gen_text: str, stage: str) -> str:
     return (
         f"【draft·校验】\n任务（{stage}）：逐项审查并只输出 JSON"
         ' {"verdict": "pass"} 或 {"verdict": "fix", "paragraph": "修正后全文"}。\n'
-        "审查项：① 内容与卡片一致（不得引入 uses 之外的事实或改写数据）；"
-        "② 覆盖 uses 的全部要点，不遗漏；③ 占位符只使用 uses 内的"
-        " {{fact-xx}}/{{claim-xx}}，cited claim 的论断处有占位符、"
-        "uncited claim 无占位符；④ 无 [@key]。"
-        "通过则 verdict=pass 且只输出 pass；不通过则 verdict=fix 并给出修正后全文"
-        "（宁可 fix 不要放过事实偏移）。\n"
+        "审查项：① 内容与 uses 实体及节点 logic 一致"
+        "（不得引入两者之外的事实，不得改写数据与数值）；"
+        "② 覆盖 uses 与节点 logic 的全部要点，不遗漏；"
+        "③ 占位符只使用 uses 内的"
+        " {{fact-xx}}/{{claim-xx}}、同一占位符只出现一次、且只是括注位置"
+        "（替换或移除后句子仍完整），cited claim 的论断处有占位符、"
+        "uncited claim 无占位符；"
+        "④ 无 [@key]，也不得自行写出字面图表编号"
+        "（如 Fig. 1a / Table 1）——真实编号只能由系统经占位符填充，"
+        "正文出现字面图表编号即为违规。"
+        "若段落忠实、完整地展开了 uses 实体与节点 logic 的要点，判 pass；"
+        "不通过则 verdict=fix 并给出修正后全文（fix 的 paragraph 必须是完整的修正段落，"
+        "不得留空——无法给出修正全文时宁可通过不判 fix；"
+        "宁可 fix 不要放过事实偏移）。\n"
+        f"{_CONSISTENCY_BASIS}\n"
         f"uses（JSON）：\n{_uses_json(spec)}\n"
+        f"节点 logic：{spec['node']['logic'] or '（无）'}\n"
         f"待审段落：\n<<<PARAGRAPH\n{gen_text}\nPARAGRAPH>>>"
     )
 
@@ -115,10 +134,17 @@ def link_prompt(spec: dict, gen_text: str, check_json: str, context: dict) -> st
     prior = "\n".join(f"- {t}" for t in context.get("prior", [])) or "（无）"
     prev_tail = context.get("prev_tail") or "（无）"
     next_head = context.get("next_head") or "（无）"
+    methods_note = ""
+    if context.get("workflow") == "methods":
+        methods_note = (
+            "本段是方法学描述：不要添加承接性开头或与前后文的论证过渡"
+            "（如 To address this gap / Building on this），"
+            "以直接的陈述句开头，只在不自然处做最小调整。\n")
     return (
         "【draft·衔接】\n"
         "任务：基于起草稿与审查结论做跨段衔接优化（首尾过渡、指代一致），"
         "不得改变事实内容与占位符。输出：仅输出优化后的段落全文（纯文本，无 JSON）。\n"
+        f"{methods_note}"
         f"本 part 已生成的前文段落：\n{prior}\n"
         f"前一个 part 的末段：{prev_tail}\n"
         f"后一个 part 的首段：{next_head}\n"
@@ -131,20 +157,28 @@ def polish_prompt(spec: dict, text: str) -> str:
     return (
         "【draft·润色】\n"
         "任务：学术写作语言润色。重点：① 事实不偏移——数据、结论、限定词"
-        "必须与 uses 完全一致，不得加强或弱化；② 学术风格——正式、克制、"
-        "逻辑连接清晰；③ 保留全部 {{fact-xx}}/{{claim-xx}} 占位符原样。\n"
+        "必须与 uses 及节点 logic 完全一致，不得加强或弱化；"
+        "② 学术风格——正式、克制、逻辑连接清晰；"
+        "③ 保留全部 {{fact-xx}}/{{claim-xx}} 占位符原样。\n"
         "输出：仅输出润色后的段落全文（纯文本，无 JSON）。\n"
         f"uses（JSON）：\n{_uses_json(spec)}\n"
+        f"节点 logic：{spec['node']['logic'] or '（无）'}\n"
         f"当前工作文本：\n<<<PARAGRAPH\n{text}\nPARAGRAPH>>>"
     )
 
 
 def recheck_prompt(spec: dict, text: str) -> str:
     return (
-        "【draft·校验】\n任务（润色后复检）：重点防润色引入的事实偏移，"
-        "其余同前。只输出 JSON {\"verdict\": \"pass\"} 或 "
+        "【draft·校验】\n任务（润色后复检）：重点防润色引入的事实偏移。"
+        "只输出 JSON {\"verdict\": \"pass\"} 或 "
         "{\"verdict\": \"fix\", \"paragraph\": \"修正后全文\"}。\n"
+        f"{_CONSISTENCY_BASIS}\n"
+        "审查项与起草稿审查相同：内容与 uses 实体及节点 logic 一致"
+        "（不得引入两者之外的事实，不得改写数据与数值）；"
+        "正文不得出现字面图表编号（Fig. 1a / Table 1 等由系统经占位符填充）；"
+        "若段落忠实，判 pass；verdict=fix 时 paragraph 必须是完整的修正段落，不得留空。\n"
         f"uses（JSON）：\n{_uses_json(spec)}\n"
+        f"节点 logic：{spec['node']['logic'] or '（无）'}\n"
         f"当前工作文本：\n<<<PARAGRAPH\n{text}\nPARAGRAPH>>>"
     )
 

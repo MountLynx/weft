@@ -114,7 +114,8 @@ def run_draft(project: Project, part: NarrativePart, node: Node, *, client,
     node_spec = build_node_spec(project, node)
     run_id = uuid.uuid4().hex[:8]
     context = {"prior": list(prior_paragraphs or []),
-               "prev_tail": prev_tail, "next_head": next_head}
+               "prev_tail": prev_tail, "next_head": next_head,
+               "workflow": workflow}
     tasklist = build_tasklist(project, node, node_spec, overview,
                               workflow_spec["prompt_core"], context)
 

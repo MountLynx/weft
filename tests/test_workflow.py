@@ -48,3 +48,11 @@ def test_prompt_core_has_no_v1_citation_or_output_rules():
         assert "[@key]" not in core, name
         assert "JSON" not in core, name
     assert "方法章不写文献引注" in WORKFLOW_SPECS["methods"]["prompt_core"]
+
+
+def test_prompt_core_manuscript_language_is_english():
+    """成稿语言钉：四个工作流的 prompt_core 一律指定英文文稿，不得再出现中文成稿。"""
+    for name in WORKFLOW_VOCAB:
+        core = WORKFLOW_SPECS[name]["prompt_core"]
+        assert "（英文，" in core, name
+        assert "（中文，" not in core, name
