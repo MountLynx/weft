@@ -61,3 +61,23 @@ def test_propose_note_invalid_schema():
 
     with pytest.raises(BibProposeError):
         asyncio.run(propose_note(_project_with("key2020"), "x", _NoYearClient()))
+
+
+def test_propose_note_llm_error_translated():
+    class _BoomClient:
+        async def complete(self, **kwargs):
+            raise RuntimeError("网络抖动")
+
+    with pytest.raises(BibProposeError, match="LLM 调用失败"):
+        asyncio.run(propose_note(_project_with("key2020"), "x", _BoomClient()))
+
+
+def test_propose_note_fields_passthrough():
+    class _FieldsClient:
+        async def complete(self, **kwargs):
+            return LLMResponse(
+                content='{"title": "T", "year": 2020, "editor": "Ed, Itor"}',
+                usage={}, finish_reason="end_turn")
+
+    _, fields = asyncio.run(propose_note(_project_with("key2020"), "x", _FieldsClient()))
+    assert fields["entry"]["fields"] == {"editor": "Ed, Itor"}
