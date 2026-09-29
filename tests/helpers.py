@@ -64,6 +64,20 @@ def make_minimal_project(root: Path) -> Path:
     return root
 
 
+NOTE_ENTRY = {"type": "article", "title": "T", "author": ["A, B"], "year": 2020,
+              "journal": "J", "volume": "1"}
+
+
+def make_managed_project(root: Path) -> Path:
+    """make_minimal_project + bib.managed: true + note key2020 带 entry（bibgen 测试用）。"""
+    make_minimal_project(root)
+    write_yaml(root / "weft.yaml", {"bib": {"managed": True}})
+    write_card(root / "metadata" / "notes", "key2020",
+               {"id": "key2020", "summary": "文献概括。", "status": "approved",
+                "entry": NOTE_ENTRY})
+    return root
+
+
 def build_project(root: Path | None = None, *, data=None, facts=None, claims=None,
                   notes=None, methods=None, params=None, parts=None, figures=None,
                   bib_keys=None, figures_dir: str = "figures") -> Project:

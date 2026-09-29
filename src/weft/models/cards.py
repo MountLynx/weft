@@ -3,6 +3,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from weft.models.bib import BibEntryFields
+
 ReviewStatus = Literal["draft", "approved", "rejected"]
 
 
@@ -41,10 +43,14 @@ class ClaimCard(_Card):
 
 
 class NoteCard(_Card):
-    """note 卡：id = bib key。summary 缺省容忍，由校验层提醒。"""
+    """note 卡：id = bib key。summary 缺省容忍，由校验层提醒。
+
+    entry（bibgen）：可选书目字段；managed 模式下 approved + entry 进 bib。
+    """
 
     summary: str = ""
     pdf: str | None = None
+    entry: BibEntryFields | None = None
 
 
 class MethodCard(_Card):

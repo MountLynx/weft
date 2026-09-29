@@ -6,11 +6,15 @@ from __future__ import annotations
 
 import re
 
+import yaml
 from pydantic import ValidationError
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
+from weft.engine.bib_propose import BibProposeError, propose_note
+from weft.engine.clients import make_client
+from weft.engine.draft_rules import DraftError
 from weft.store.writer import create_card, next_card_id, save_card
 from weft.web.card_forms import (
     FIELD_SPECS,
@@ -33,6 +37,40 @@ _CARD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 # 列表页展示的"关键字段"（有则显示），按卡种
 _KEY_FIELD = {"data": "description", "fact": "statement", "claim": "statement",
               "note": "summary", "method": "statement", "param": "method"}
+
+
+def _sync_managed_bib(project_root) -> str | None:
+    """note 卡写盘后重渲 managed bib；返回重定向标记（None = unmanaged/形状不齐，P-D1）。"""
+    from weft import bibgen
+    from weft.store.loader import load_project
+
+    project, _ = load_project(project_root)
+    if not project.bib_managed or len(project.bib_files) != 1:
+        return None
+    try:
+        bibgen.sync_bib(project)
+    except (bibgen.BibValueError, OSError, UnicodeDecodeError):
+        return "bib_error"
+    return "bib_updated"
+
+
+def _entry_value_error(project, card) -> str | None:
+    """预检：假设卡写盘后渲染 bib 是否合法（E-BIB-VALUE 前置，避免毒化项目）。"""
+    from dataclasses import replace
+
+    from weft import bibgen
+
+    if not project.bib_managed:
+        return None
+    if card.entry is None:
+        return None
+    notes = dict(project.notes)
+    notes[card.id] = card
+    try:
+        bibgen.render_bib(replace(project, notes=notes))
+    except bibgen.BibValueError as exc:
+        return str(exc)
+    return None
 
 
 def _table(request: Request, pid: str, kind: str):
@@ -128,6 +166,11 @@ async def card_new_post(request: Request, pid: str, kind: str):
         # id 是用户可控的落盘路径组件：拒绝空串/路径片段（模型层 id 无约束且 schema 冻结）
         errors = {"id": "id 非法：须以字母或数字开头，仅含 A-Z a-z 0-9 . _ : -，且不含 '..'"}
         card = None
+    if card is not None and kind == "note":
+        err = _entry_value_error(entry.project, card)
+        if err:
+            errors = {"entry": f"[E-BIB-VALUE] {err}"}
+            card = None
     if card is not None:
         try:
             create_card(entry.project.root, card)
@@ -136,7 +179,43 @@ async def card_new_post(request: Request, pid: str, kind: str):
             card = None
     if card is None:
         return rerender(errors)
-    return RedirectResponse(f"/p/{pid}/cards/{kind}/{card.id}", status_code=303)
+    url = f"/p/{pid}/cards/{kind}/{card.id}"
+    if kind == "note" and card.status == "approved":
+        flag = _sync_managed_bib(entry.project.root)
+        if flag:
+            url += f"?bib={flag}"
+    return RedirectResponse(url, status_code=303)
+
+
+@router.get("/p/{pid}/notes/propose")
+def bib_propose_get(request: Request, pid: str):
+    load_project_or_404(request, pid)
+    return templates.TemplateResponse(
+        request, "bib_propose.html",
+        {"pid": pid, "action": f"/p/{pid}/notes/propose",
+         "cancel_url": f"/p/{pid}/cards/note", "clues": "", "error": ""})
+
+
+@router.post("/p/{pid}/notes/propose")
+async def bib_propose_post(request: Request, pid: str):
+    entry = load_project_or_404(request, pid)
+    form = await request.form()
+    clues = str(form.get("clues") or "")
+
+    def rerender(error: str):
+        return templates.TemplateResponse(
+            request, "bib_propose.html",
+            {"pid": pid, "action": f"/p/{pid}/notes/propose",
+             "cancel_url": f"/p/{pid}/cards/note", "clues": clues, "error": error})
+
+    try:
+        client = make_client(mock=False, project_root=entry.project.root)
+        key, fields = await propose_note(entry.project, clues, client)
+    except (BibProposeError, DraftError) as exc:
+        return rerender(str(exc))
+    from weft.engine.card_writer import write_proposed_cards
+    write_proposed_cards(entry.project, [("note", fields)])
+    return RedirectResponse(f"/p/{pid}/cards/note/{key}", status_code=303)
 
 
 @router.get("/p/{pid}/cards/{kind}/{card_id}")
@@ -149,9 +228,11 @@ def card_detail(request: Request, pid: str, kind: str, card_id: str):
         request, "card_detail.html",
         {"entry": entry, "kind": kind, "card": card,
          "rel": entry.project.card_paths[card_id].as_posix(),
-         "fields": {k: ("" if v is None else v)
+         "fields": {k: (yaml.safe_dump(v, allow_unicode=True, sort_keys=False)
+                        if k == "entry" and v else ("" if v is None else v))
                     for k, v in card.model_dump().items()
-                    if k not in ("id", "status", "comment")}})
+                    if k not in ("id", "status", "comment")},
+         "bib_flag": request.query_params.get("bib"),})
 
 
 @router.post("/p/{pid}/cards/{kind}/{card_id}/status")
@@ -166,9 +247,18 @@ async def card_review(request: Request, pid: str, kind: str, card_id: str):
         raise HTTPException(status_code=400, detail="非法 status")
     new_card = card.model_copy(update={"status": status,
                                        "comment": str(form.get("comment", ""))})
+    if kind == "note":
+        err = _entry_value_error(entry.project, new_card)
+        if err:
+            raise HTTPException(status_code=400, detail=f"[E-BIB-VALUE] {err}")
     save_card(entry.project.root, new_card,
               old_rel=entry.project.card_paths[card_id].as_posix())
-    return RedirectResponse(f"/p/{pid}/cards/{kind}/{card_id}", status_code=303)
+    url = f"/p/{pid}/cards/{kind}/{card_id}"
+    if kind == "note":
+        flag = _sync_managed_bib(entry.project.root)
+        if flag:
+            url += f"?bib={flag}"
+    return RedirectResponse(url, status_code=303)
 
 
 @router.get("/p/{pid}/cards/{kind}/{card_id}/edit")
@@ -215,11 +305,21 @@ async def card_edit_post(request: Request, pid: str, kind: str, card_id: str):
         except ValidationError as exc:
             errors = validation_errors(exc)
             card = None
+    if card is not None and kind == "note":
+        err = _entry_value_error(entry.project, card)
+        if err:
+            errors = {"entry": f"[E-BIB-VALUE] {err}"}
+            card = None
     if card is None:
         return rerender(errors)
     save_card(entry.project.root, card,
               old_rel=entry.project.card_paths[card_id].as_posix())
-    return RedirectResponse(f"/p/{pid}/cards/{kind}/{card_id}", status_code=303)
+    url = f"/p/{pid}/cards/{kind}/{card_id}"
+    if kind == "note":
+        flag = _sync_managed_bib(entry.project.root)
+        if flag:
+            url += f"?bib={flag}"
+    return RedirectResponse(url, status_code=303)
 
 
 def register(app: FastAPI) -> None:

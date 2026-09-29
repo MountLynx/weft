@@ -26,6 +26,9 @@ class Project:
     parts: list[NarrativePart] = field(default_factory=list)  # 按相对路径字典序
     figures: dict[str, FigureEntry] = field(default_factory=dict)
     bib_keys: set[str] = field(default_factory=set)
+    bib_files: list[str] = field(default_factory=list)  # _quarto.yml bibliography 声明（bibgen）
+    bib_managed: bool = False         # weft.yaml bib.managed（bibgen 设计 §3）
+    bib_cfg_error: str | None = None  # bib 段形状错误（validate 转 E-BIB-SHAPE）
     figures_dir: str = "figures"          # weft.yaml figures_dir 可覆盖
     card_paths: dict[str, Path] = field(default_factory=dict)   # 实体 id -> 相对路径
     part_paths: dict[str, Path] = field(default_factory=dict)   # part id -> 相对路径

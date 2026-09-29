@@ -1,4 +1,5 @@
 """parse A1 聚合：note 三档、落盘闭包、归档、报告、一致性 fail-closed。"""
+import frontmatter
 import pytest
 
 from weft.engine.parse.apply import apply_article
@@ -14,8 +15,9 @@ from weft.engine.parse.schemas import (
     ArticleReviewOutput,
     NoteReview,
 )
-from tests.helpers import build_project, write_card
+from tests.helpers import build_project, write_card, write_yaml
 from weft.models.cards import ClaimCard, DataCard, FactCard, NoteCard
+from weft.store.loader import load_project
 
 
 def _project(root=None, *, with_note=True):
@@ -204,3 +206,47 @@ def test_archive_name_collision_rejected(tmp_path):
     with pytest.raises(ValueError, match="归档重名"):
         _apply(project, source, note=NoteReview(verdict="new"))
     assert source.exists()   # fail-closed：零写盘
+
+
+def test_apply_note_new_with_entry(tmp_path):
+    from weft.models.bib import BibEntryFields
+    source = _source(tmp_path)
+    project = _project(tmp_path, with_note=False)
+    base = _extract()
+    extract = ArticleExtractOutput(
+        summary=base.summary, cards=base.cards, links=base.links,
+        entry=BibEntryFields(type="article", title="T", author=["A, B"], year=2020))
+    _apply(project, source, note=NoteReview(verdict="new"), extract=extract)
+    meta = frontmatter.load(tmp_path / "metadata" / "notes" / "key2020.md").metadata
+    assert meta["entry"]["title"] == "T"
+    assert meta["entry"]["author"] == ["A, B"]
+
+
+def test_apply_note_new_without_entry(tmp_path):
+    source = _source(tmp_path)
+    project = _project(tmp_path, with_note=False)
+    _apply(project, source, note=NoteReview(verdict="new"))
+    meta = frontmatter.load(tmp_path / "metadata" / "notes" / "key2020.md").metadata
+    assert "entry" not in meta
+
+
+def test_literature_supplement_proposal_inherits_entry(tmp_path):
+    """supplement 提案继承原卡全部字段（含 entry）——bib 载荷不因提案丢失。"""
+    source = _source(tmp_path)
+    _project(tmp_path)   # key2020 approved 已在盘（返回值丢弃，apply 用重载后的）
+    write_card(tmp_path / "metadata" / "notes", "key2020",
+               {"id": "key2020", "summary": "旧摘要。", "status": "approved",
+                "entry": {"type": "article", "title": "T", "year": 2020}})
+    # load_project 从盘上读 bib：补 _quarto.yml + references.bib（同 make_minimal_project）
+    write_yaml(tmp_path / "_quarto.yml", {"project": {"type": "default"},
+                                          "bibliography": "references.bib"})
+    (tmp_path / "references.bib").write_text(
+        "@article{key2020,\n  title = {T},\n  year = {2020},\n}\n", encoding="utf-8")
+    project, _ = load_project(tmp_path)
+    note = NoteReview(verdict="supplement", reason="补了实验",
+                      merged_summary="旧摘要。新版补充：实验细节。")
+    outcome = _apply(project, source, note=note)
+    proposal = tmp_path / "inspirations" / "proposals" / "key2020.md"
+    assert proposal.is_file()
+    meta = frontmatter.load(proposal).metadata
+    assert meta["entry"]["title"] == "T"

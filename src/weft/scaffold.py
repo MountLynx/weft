@@ -35,6 +35,8 @@ _WEFT_YAML = """\
 # figures_dir: figures      # 图表目录（data 卡 refs 指向其中的 Quarto label）
 # assemble_mode: strict     # strict | lenient：part 拼装失败是否阻断 assemble
 # paper_file: paper.qmd     # assemble 拼装产物（weft render 的渲染对象）
+bib:
+  managed: false            # true：assets/references.bib 由 weft 从已批准文献卡生成（勿手改）
 """
 
 _INDEX_QMD = """\

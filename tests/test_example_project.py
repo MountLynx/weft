@@ -87,3 +87,20 @@ def test_sample_assemble_paper_qmd_matches_golden(tmp_path):
     assert b"\r" not in raw and raw.endswith(b"\n")
     golden = (GOLDEN / "paper.qmd").read_text(encoding="utf-8").replace("\r\n", "\n")
     assert raw.decode("utf-8") == golden
+
+
+def test_paper_demo_is_managed_with_generated_bib():
+    from weft import bibgen
+    from weft.store.loader import load_project
+    project, diags = load_project(SAMPLE)
+    assert project.bib_managed is True
+    bib_text = (SAMPLE / "assets" / "references.bib").read_text(encoding="utf-8")
+    assert bib_text.startswith("%")            # 生成物头注释
+    assert bib_text == bibgen.render_bib(project)   # 与真源字节一致（不 stale）
+
+
+def test_paper_demo_bib_keys_unchanged():
+    from weft.store.loader import load_project
+    project, diags = load_project(SAMPLE)
+    assert project.bib_keys == {"smith2020", "doe2021"}
+    assert not any(d.is_error for d in diags)

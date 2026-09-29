@@ -39,7 +39,8 @@ FIELD_SPECS: dict[str, list[FieldSpec]] = {
               FieldSpec("statement", "statement", "textarea", required=True),
               FieldSpec("cites", "cites（bib key）", "multiselect", "bib_keys")],
     "note": [FieldSpec("summary", "summary", "textarea"),
-             FieldSpec("pdf", "pdf（文件路径，可选）", "text")],
+             FieldSpec("pdf", "pdf（文件路径，可选）", "text"),
+             FieldSpec("entry", "entry（书目字段，YAML 映射；managed 批准后进 bib）", "yaml_map")],
     "method": [FieldSpec("statement", "statement", "textarea", required=True),
                FieldSpec("protocol", "protocol", "textarea", required=True),
                FieldSpec("derived_from", "derived_from（bib key）", "multiselect", "bib_keys")],
@@ -90,6 +91,8 @@ def form_to_meta(kind: str, form, *, is_new: bool, card_id: str | None
             meta[spec.name] = str(form.get(spec.name) or "").strip()
     meta["status"] = str(form.get("status", "draft")) or "draft"
     meta["comment"] = str(form.get("comment", ""))
+    if kind == "note" and not meta.get("entry"):
+        meta["entry"] = None   # 空映射 = 无书目字段（避免 BibEntryFields 必填校验误伤，P-D2）
     meta["id"] = str(form.get("id") or "").strip() if is_new else (card_id or "")
     return meta, errors
 
@@ -110,6 +113,9 @@ def values_for_template(kind: str, card) -> dict:
     if kind == "param":
         values["values"] = yaml.safe_dump(values.get("values") or {},
                                           allow_unicode=True, sort_keys=False)
+    if kind == "note" and values.get("entry"):
+        values["entry"] = yaml.safe_dump(values["entry"], allow_unicode=True,
+                                         sort_keys=False)
     return values
 
 

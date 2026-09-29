@@ -5,8 +5,10 @@ rejected 卡片跳过全部提醒；错误不受豁免（见计划设计决策 2
 """
 from __future__ import annotations
 
+from weft import bibgen
 from weft.diagnostics import Diagnostic, Level
 from weft.graphgen.index import build_index
+from weft.models.bib import BIB_TYPES
 from weft.store.project import Project
 from weft.workflow import WORKFLOW_VOCAB
 
@@ -84,11 +86,48 @@ def _check_derived_from_in_bib(project: Project) -> list[Diagnostic]:
 
 def _check_notes_in_bib(project: Project) -> list[Diagnostic]:
     out: list[Diagnostic] = []
-    for nid in project.notes:
+    for nid, note in project.notes.items():
+        if project.bib_managed and note.status != "approved":
+            continue  # managed：draft/rejected 豁免（未批准提案本就不在 bib，设计 §7）
         if nid not in project.bib_keys:
+            hint = ("（approved 文献卡应有 entry 并已同步进 bib：缺 entry 或未跑 "
+                    "weft bib sync）" if project.bib_managed else "")
             out.append(Diagnostic(Level.ERROR, "E-NOTE-NOT-IN-BIB",
                                   _card_rel(project, nid), "id",
-                                  f"note 的 id（bib key）不在 bib 中：{nid}"))
+                                  f"note 的 id（bib key）不在 bib 中：{nid}{hint}"))
+    return out
+
+
+def _check_bib_managed(project: Project) -> list[Diagnostic]:
+    """bibgen 设计 §7：managed 形状 / 过期 / 词表提醒。unmanaged 项目不查形状/过期（bib_cfg_error 除外）。"""
+    out: list[Diagnostic] = []
+    if project.bib_cfg_error:
+        out.append(Diagnostic(Level.ERROR, "E-BIB-SHAPE", "weft.yaml", "bib",
+                              project.bib_cfg_error))
+    if project.bib_managed:
+        if len(project.bib_files) != 1:
+            out.append(Diagnostic(
+                Level.ERROR, "E-BIB-SHAPE", "_quarto.yml", "bibliography",
+                "managed 项目 bibliography 必须恰好指向一个文件（生成目标）"))
+        else:
+            try:
+                stale = bibgen.bib_is_stale(project)
+            except bibgen.BibValueError as exc:
+                out.append(Diagnostic(
+                    Level.ERROR, "E-BIB-VALUE", project.bib_files[0], "entry",
+                    str(exc)))
+            else:
+                if stale:
+                    out.append(Diagnostic(
+                        Level.WARNING, "W-BIB-STALE", project.bib_files[0], None,
+                        "bib 文件与已批准文献卡不一致（运行 weft bib sync）"))
+    for nid, note in project.notes.items():
+        if note.status == "rejected" or note.entry is None:
+            continue
+        if note.entry.type not in BIB_TYPES:
+            out.append(Diagnostic(
+                Level.WARNING, "W-BIB-ETYPE", _card_rel(project, nid), "entry.type",
+                f"entry.type 不在受控词表 {sorted(BIB_TYPES)}：{note.entry.type}"))
     return out
 
 
@@ -248,6 +287,7 @@ def validate_project(project: Project) -> list[Diagnostic]:
     diagnostics += _check_cites_in_bib(project)
     diagnostics += _check_derived_from_in_bib(project)
     diagnostics += _check_notes_in_bib(project)
+    diagnostics += _check_bib_managed(project)
     diagnostics += _check_refs_in_figures(project)
     diagnostics += _check_claims(project)
     diagnostics += _check_figures_files(project)

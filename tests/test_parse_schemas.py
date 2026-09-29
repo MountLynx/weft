@@ -49,3 +49,10 @@ def test_match_output_claim_type_literal():
                                            "cites": ["k1"]}],
          "placeholders": [{"text": "xx", "matched_fact": None}]})
     assert out.placeholders[0].matched_fact is None
+
+
+def test_extract_entry_optional_and_roundtrip():
+    out = ArticleExtractOutput.model_validate({"summary": "s", "entry": {
+        "type": "article", "title": "T", "year": 2020, "author": ["A, B"]}})
+    assert out.entry.title == "T"
+    assert ArticleExtractOutput.model_validate({"summary": "s"}).entry is None

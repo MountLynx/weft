@@ -1,4 +1,4 @@
-"""typer 入口：weft init / validate / graph / review / draft / assemble / render / inspire / parse / replace / missing-cites / serve。"""
+"""typer 入口：weft init / validate / graph / review / draft / assemble / render / inspire / parse / replace / missing-cites / bib / serve。"""
 from __future__ import annotations
 
 import sys
@@ -14,6 +14,9 @@ from weft.validation import validate_project
 
 app = typer.Typer(add_completion=False,
                   help="weft —— 元数据为经线、叙事流为纬线的 AI 学术写作引擎")
+
+bib_app = typer.Typer(add_completion=False, help="bib 生成与维护（managed 模式，bibgen 设计）")
+app.add_typer(bib_app, name="bib")
 
 
 def _ensure_utf8_stdout() -> None:
@@ -423,3 +426,55 @@ def serve(
         typer.echo(f"ERROR 项目根目录不存在：{projects_root}")
         raise typer.Exit(code=1)
     uvicorn.run(create_app(projects_root), host=host, port=port)
+
+
+@bib_app.command("sync")
+def bib_sync(
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+    check: bool = typer.Option(False, "--check", help="不写文件：不一致时 W-BIB-STALE 且退出 1"),
+) -> None:
+    """把已批准文献卡（approved + entry）渲染为 bibliography 目标文件。"""
+    from weft import bibgen
+
+    project, load_diags = load_project(project_dir)
+    if project.bib_managed:
+        load_diags = [d for d in load_diags
+                      if not (d.code == "E-BIB-MISSING" and d.path in project.bib_files)]
+    if any(d.is_error for d in load_diags):
+        _print_diagnostics(load_diags)
+        raise typer.Exit(code=1)
+    if not project.bib_managed:
+        typer.echo("ERROR 未启用 bib.managed（weft.yaml），本命令仅用于 managed 项目")
+        raise typer.Exit(code=1)
+    if project.bib_cfg_error:
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-BIB-SHAPE", "weft.yaml", "bib", project.bib_cfg_error)])
+        raise typer.Exit(code=1)
+    if len(project.bib_files) != 1:
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-BIB-SHAPE", "_quarto.yml", "bibliography",
+            "managed 项目 bibliography 必须恰好指向一个文件（生成目标）")])
+        raise typer.Exit(code=1)
+    try:
+        if check:
+            target = bibgen.managed_target(project)
+            if not target.exists():
+                _print_diagnostics([Diagnostic(
+                    Level.ERROR, "E-BIB-MISSING", project.bib_files[0], "bibliography",
+                    "bib 文件不存在，先运行 weft bib sync 生成")])
+                raise typer.Exit(code=1)
+            if bibgen.bib_is_stale(project):
+                _print_diagnostics([Diagnostic(
+                    Level.WARNING, "W-BIB-STALE", project.bib_files[0], None,
+                    "bib 文件与已批准文献卡不一致")])
+                raise typer.Exit(code=1)
+            n = len(bibgen.bib_keys_in(target.read_text(encoding="utf-8")))
+            typer.echo(f"bib 与已批准文献卡一致（{n} 条）：{project.bib_files[0]}")
+            return
+        _, stats = bibgen.sync_bib(project)
+    except bibgen.BibValueError as exc:
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-BIB-VALUE", project.bib_files[0], "entry", str(exc))])
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"已写入 {project.bib_files[0]}"
+               f"（{stats['total']} 条，+{stats['added']} / -{stats['removed']}）")

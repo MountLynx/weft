@@ -38,10 +38,17 @@ _EXTRACT_LITERATURE_SCHEMA = (
     '输出 JSON：{"summary": "结构化文献摘要（研究问题、方法、核心发现、局限；'
     '200-400 字）", "cards": [{"key": "f1/c1/…临时编号", "kind": "fact|claim",'
     ' "statement": "原子陈述", "placeholder": false, "needs_citation": true}],'
-    ' "links": [{"from": "f1", "to": "c1"}]}。'
+    ' "links": [{"from": "f1", "to": "c1"}],'
+    ' "entry": {"type": "article|book|inproceedings|…", "title": "本文题名",'
+    ' "author": ["姓, 名"], "year": 2020, "journal": "期刊名", "volume": "卷",'
+    ' "number": "期", "pages": "45--58", "doi": "…"}}。'
     "规则：summary 以第三人称概括本篇文献（将作为 note 卡的摘要）；"
     "本文的数据表述→fact，本文的发现/结论/论断→claim（needs_citation 通常为 true）；"
-    "\"xxx/某值\"类占位数据置 placeholder=true；links 只表达新 fact 支持新 claim。"
+    "\"xxx/某值\"类占位数据置 placeholder=true；links 只表达新 fact 支持新 claim；"
+    "entry 仅在 title 与 year 都有原文依据时输出（任缺其一或整条提不出就"
+    "整体省略），字段从原文提取（题名/作者/年份/期刊卷期页/DOI），"
+    "只填有依据的；其余 BibTeX 字段（editor/eprint 等）放进 entry 的 "
+    "\"fields\" 对象（键值均为字符串）。"
 )
 
 _REVIEW_DECOMPOSE_SCHEMA = (

@@ -140,3 +140,66 @@ def test_paper_file_override(tmp_path):
     project, diagnostics = load_project(tmp_path)
     assert diagnostics == []
     assert project.paper_file == "manuscript.qmd"
+
+
+def test_bib_managed_flag_and_files_loaded(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"bib": {"managed": True}})
+    project, diagnostics = load_project(tmp_path)
+    assert not any(d.is_error for d in diagnostics)
+    assert project.bib_managed is True
+    assert project.bib_cfg_error is None
+    assert project.bib_files == ["references.bib"]
+
+
+def test_bib_files_loaded_without_weft_yaml(tmp_path):
+    make_minimal_project(tmp_path)
+    project, _ = load_project(tmp_path)
+    assert project.bib_managed is False
+    assert project.bib_cfg_error is None
+    assert project.bib_files == ["references.bib"]
+
+
+def test_bib_unknown_key_reports_cfg_error(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"bib": {"managed": True, "wat": 1}})
+    project, _ = load_project(tmp_path)
+    assert project.bib_managed is True          # 已知键仍生效
+    assert project.bib_cfg_error is not None and "wat" in project.bib_cfg_error
+
+
+def test_bib_managed_non_bool_reports_cfg_error(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"bib": {"managed": 1}})   # P-D4：避开 yes/on 布尔陷阱
+    project, _ = load_project(tmp_path)
+    assert project.bib_managed is False
+    assert project.bib_cfg_error is not None
+
+
+def test_bib_non_dict_reports_cfg_error(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"bib": ["not", "a", "map"]})
+    project, _ = load_project(tmp_path)
+    assert project.bib_managed is False
+    assert project.bib_cfg_error == "bib 段必须是映射"
+
+
+def test_bib_files_drops_blank_entries(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "_quarto.yml",
+               {"project": {"type": "default"},
+                "bibliography": ["references.bib", "  "]})
+    project, diagnostics = load_project(tmp_path)
+    assert project.bib_files == ["references.bib"]
+    miss = [d for d in diagnostics if d.code == "E-BIB-MISSING"]
+    assert miss == []
+
+
+def test_bib_mixed_type_keys_no_crash(tmp_path):
+    """红线 3：bib 段出现非字符串键（YAML 合法）不得让加载崩溃。"""
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "weft.yaml", {"bib": {1: "x", "wat": "y"}})
+    project, _ = load_project(tmp_path)
+    assert project.bib_managed is False
+    assert project.bib_cfg_error is not None
+    assert "wat" in project.bib_cfg_error and "1" in project.bib_cfg_error

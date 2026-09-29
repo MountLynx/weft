@@ -8,30 +8,30 @@
 
 **Tech Stack:** Python 3.11+ / pydantic v2（`extra="forbid"`）/ typer / FastAPI+Jinja2 / pytest。无新依赖。
 
-**基线计数：392 passed, 2 deselected**（2026-09-29 实测，含工作区未提交的 test_workflow 新测试）。本计划完成后预期：**446 passed, 2 deselected**。
+**基线计数：391 passed, 2 deselected**（worktree 实测；主检出 392 含 1 个未提交测试，见 P-D6）。本计划完成后预期（worktree）：**470 passed, 2 deselected**。
 
 **执行约定：**
 - 在 git worktree `.worktrees/bibgen` 中开发（superpowers:using-git-worktrees），合回 main 后删除。
 - 测试命令：`.venv/Scripts/python.exe -m pytest tests -q`；聚焦：`... -v tests/test_xxx.py::test_yyy`。
-- 每任务：先写失败测试 → 跑红 → 最小实现 → 跑绿 → 全量回归 → 中文 conventional commit（只 add 本任务文件；工作区另有进行中改动 workflow.py / tests/test_workflow.py / examples/paper-demo/metadata/data/data-01.md / docs/manual.md，**严禁**卷入提交）。
+- 每任务：先写失败测试 → 跑红 → 最小实现 → 跑绿 → 全量回归 → 中文 conventional commit（只 add 本任务文件；主检出的进行中改动 workflow.py / tests/test_workflow.py / examples/paper-demo/metadata/data/data-01.md / docs/manual.md 不在 worktree 内，无卷入风险）。
 - 生成文件固定 LF。
 
-## 任务与计数总览
+## 任务与计数总览（worktree 实际数字，P-D6/P-D7 勘误后）
 
 | 任务 | 内容 | 新增测试 | 累计 passed |
 |---|---|---|---|
-| T1 | `models/bib.py` + NoteCard.entry | 5 | 397 |
-| T2 | loader/Project：bib_files / bib_managed / bib_cfg_error | 4 | 401 |
-| T3 | `bibgen.py` 渲染器 + key minting | 8 | 409 |
-| T4 | validate：E-BIB-SHAPE / W-BIB-ETYPE / W-BIB-STALE / E-NOTE-NOT-IN-BIB managed 语义 | 9 | 418 |
-| T5 | scaffold init 模板 `bib: managed: false` | 1 | 419 |
-| T6 | CLI `weft bib sync [--check]` | 5 | 424 |
-| T7 | WebUI：note 表单 entry 字段 + 批准/编辑后自动同步 | 5 | 429 |
-| T8 | engine `bib_propose.py` + ScriptedLLMClient 分支 | 5 | 434 |
-| T9 | WebUI AI 提案路由 + 模板 | 5 | 439 |
-| T10 | parse 文献模式 entry 提取联动 | 5 | 444 |
-| T11 | paper-demo 转 managed | 2 | 446 |
-| T12 | AGENTS.md / roadmap 登记（诊断码总表、红线 4、必读清单） | 0 | 446 |
+| T1 | `models/bib.py` + NoteCard.entry | 5 | 396 |
+| T2 | loader/Project：bib_files / bib_managed / bib_cfg_error | 7（4 计划 + 3 审查补） | 403 |
+| T3 | `bibgen.py` 渲染器 + key minting | 13（8 计划 + 5 审查补） | 416 |
+| T4 | validate：E-BIB-SHAPE / W-BIB-ETYPE / W-BIB-STALE / E-NOTE-NOT-IN-BIB managed 语义 | 10（9 计划 + 1 审查补） | 426 |
+| T5 | scaffold init 模板 `bib: managed: false` | 1 | 427 |
+| T6 | CLI `weft bib sync [--check]` | 9（5 计划 + 4 审查补） | 436 |
+| T7 | WebUI：note 表单 entry 字段 + 批准/编辑后自动同步 | 12（5 计划 + 7 审查补；1 旧测试契约改写不增减） | 448 |
+| T8 | engine `bib_propose.py` + ScriptedLLMClient 分支 | 8（5 计划 + 3 审查补） | 456 |
+| T9 | WebUI AI 提案路由 + 模板 | 6（5 计划 + 1 审查补） | 462 |
+| T10 | parse 文献模式 entry 提取联动 | 6（计划 4 + 1 确认补 + 1 审查补） | 468 |
+| T11 | paper-demo 转 managed | 2 | 470 |
+| T12 | AGENTS.md / roadmap 登记（诊断码总表、红线 4、必读清单） | 0 | 470 |
 
 ## 设计决策（计划期定案，执行期偏离继续回填此处）
 
@@ -42,6 +42,15 @@
 | P-D3 | bibgen 复用 loader 的 key 提取正则：`from weft.store.loader import _BIB_ENTRY, _BIB_IGNORED`（weft→store 单向，无环；不复制正则）。 |
 | P-D4 | YAML 1.1 陷阱：`yes/on/true` 裸写都会解析成布尔，`bib.managed` 非布尔测试用 `1` 构造。 |
 | P-D5 | spec §4 示例 `author: [Smith, Jane, Lee, Kyung]` 未加引号会被 YAML 拆成 4 项——实现与测试一律用 `["Smith, Jane", "Lee, Kyung"]` 引号形式（spec 笔误，实现不随；spec 后续修订时更正示例）。 |
+| P-D6 | 计数基线勘误（T1 质量审查）：计划写基线 392，含主检出**未提交**的 `test_prompt_core_manuscript_language_is_english`；worktree（干净 HEAD）实测基线 **391 passed, 2 deselected**。worktree 内各任务累计验收 = 总览表数字 **−1**（T1=396 … T11=445）；合回主检出后即计划数字（446）。另：T1 审查补齐 spec §11 承诺的 year str/int 双收与缺 title 断言（加强既有测试，不增计数）。 |
+| P-D7 | T2 质量审查三项登记：① 计划 Step 3 代码自带 bug——未知键 `sorted(set(...))` 撞混合类型 YAML 键（如 `{1: x, wat: y}`）抛 TypeError 违反红线 3，改为 `sorted(str(k) for k in ...)` 并补回归测试（计划文本的偏离，正当）；② `bib_cfg_error` 无条件转 E-BIB-SHAPE——unmanaged 项目 bib 段有未知键也报（spec §7 表述只提 managed，此处更宽是有意的：拼写错误无论如何都该看见）；③ `bib_files` 过滤空白项但**不**去首尾空格——保持 Quarto 对 bibliography 的字面语义，与既有 key 提取循环一致。补 3 个分支测试（非 dict bib / 空白项过滤 / 混合类型键），总览表计数已同步更新。 |
+| P-D8 | T3 计划文本与审查加固登记：① 计划 Step 3 `render_bib` 连接公式与自家 golden 矛盾（BIB_HEADER 自带结尾换行），以 golden 为准改为 `BIB_HEADER + "\n" + "\n\n".join(blocks) + "\n"`；② 质量审查补 4 道加固：零字段条目（title/year 为空串，schema 合法）渲染畸形 bib → `BibValueError`；fields 逃生舱与标准字段重名 → `BibValueError`（拒绝而非静默）；空白题名 `key_base_from_entry` IndexError → `(split() or [""])[0]`；写盘失败清理 `.tmp` 残留。③ `bib_is_stale` docstring 引用的 E-BIB-MISSING 真实存在（loader v1 代码），审查者误报，不改；`managed_target` 空 `bib_files` 不设防（所有调用方先查形状，T4/T6/T7 一致）。补 5 个测试，总览表计数同步。 |
+| P-D9 | T4 质量审查 Critical 登记：计划 Step 3 自带缺陷——`_check_bib_managed` 直调 `bib_is_stale` 会把 `BibValueError`（approved 卡花括号不平衡，schema 合法、loader 正常）裸抛给所有 validate 消费方（validate/graph/draft/assemble/serve 全崩），使 spec §8"W-BIB-STALE 可见"承诺不可达。修复：try/except 转 `E-BIB-VALUE` ERROR 诊断（path=bib 文件、field=entry）——E-BIB-VALUE 由此获得第二个发射点（validate 侧，与渲染器侧同码）。补 1 回归测试；形状错时仍跳过 stale 检查（if/else 语义不变）；unmanaged hint 缺席与两文件无 STALE 各加锁断言。 |
+| P-D10 | T6 质量审查登记（计划级缺口）：① **bootstrap 缺口**——managed 项目 bib 文件不存在时，loader 的 E-BIB-MISSING（v1 语义）把 `weft bib sync` 挡在 load 闸，"生成文件的命令不能创建文件"；修复：load 后对 managed 项目豁免指向声明 bib 文件的 E-BIB-MISSING（sync 负责创建；T7 WebUI 直调 sync_bib 本就无此闸，CLI 对齐后分叉消除）；② CLI 形状闸补 `bib_cfg_error` 分支（与 validate 的 E-BIB-SHAPE 覆盖对齐，未知键在 sync 时也拦）；③ 补 3 测试（缺文件引导/两文件形状/cfg 拼写错误）。诊断构造 rules.py 与 cli.py 各一份维持现状（YAGNI，第三个发射点出现再提取）。④ 实现者补充（已裁定保留）：①使 `--check` 遇缺失文件裸抛 FileNotFoundError——check 分支加守卫：目标缺失 → E-BIB-MISSING 干净退 1（check 不负责创建，与 `bib_is_stale` 缺失≠stale 语义闭环）+ 1 回归测试。 |
+| P-D11 | T7 执行与审查登记：① 计划测试代码两处笔误修正（获批）：URL kind 段是单数 `note`（计划写 `notes` 必 404）；bib_error 触发改为 draft 落盘→批准动作（approved 直落坏值会被 T4 的 E-BIB-VALUE 判项目不可用 404，原写法到不了路由）。② 质量审查 Critical 处置——bib_error 横幅是 UI 死胡同（approved 坏值落盘后全站 404），**E-BIB-VALUE 前置为落盘前拒绝**：`_entry_value_error` 预检（dataclasses.replace 假设态渲染）在 review 400 拒绝 / edit/new 转表单字段错误；spec §8"批准失败不回滚"语义保持成立（无需回滚——什么都没落盘）；bib_error 旗标降级为纯防御路径（实测正常流不可达）。③ 审查缺口修补：`card_new_post` 新建即批准（note+approved）补同步钩子（draft/rejected 新建不挂——本就不在 bib）；`_sync_managed_bib` 捕获扩至 OSError/UnicodeDecodeError；banner 文案泛化+`&lt;id&gt;` 转义+`banner success` 绿色变体（webui.css 组件层）+entry 单元格 pre-wrap。④ 补 6 测试；1 旧测试（bib_error 旗标）契约改写为 400 预检契约。⑤ 复审 Minor：`_entry_value_error` 按 `bib_managed` 设门（unmanaged 的 entry 坏值无消费方，预检不得挡无关编辑）+ 1 测试。 |
+| P-D12 | T8 质量审查三项 + 实现者一项补充：① `client.complete` 加 `output_format={"type": "json_object"}`（与全部既有 JSON 管线一致；真实客户端映射 response_format，裸 prompt 高频 ```json 栅栏致解析炸）；② llm 层异常在引擎层翻译为 `BibProposeError("LLM 调用失败：…")`（红线 1 决定 web 层接不住 LLMError，与 E-*-FAILED 先例同哲学；边界宽 except 正当）；③ prompt 告知 fields 逃生舱；④ 实现者补充 `_sink_extras`：LLM 顶层未知键字符串化沉入 `fields`（显式 fields 优先；models 冻结不动 schema，LLM 不可靠守嵌套约定——整单报废的兜底）。补 2 测试（异常翻译/fields 透传）。⑤ 复审修正：`_sink_extras` 原实现 `setdefault("fields", {})` 在「fields 非 dict（null/str/list）+ 顶层未知键」组合下泄漏 AttributeError——改为 get+isinstance 守卫（坏 fields 值丢弃换新 dict）+ 1 组合回归测试。 |
+| P-D13 | T9 执行与审查登记：① 计划测试/模板三处复数 `notes` 笔误（重定向/cancel_url/入口链接条件）按 P-D11① 同款修正为单数 `note`；② conflict 测试夹具修正（获批）：计划手写 approved `smith2020.md` 而不补 bib 条目，撞 v1.1 `E-NOTE-NOT-IN-BIB` → WebUI discovery 判项目不可用 404——夹具在 references.bib 补 smith2020 条目，断言不变；③ 质量审查：`make_client` 的 `DraftError` 移入 try 捕获面（`except (BibProposeError, DraftError)`，与 parts/inspire 姊妹路由惯例一致，配置缺失呈页面错误而非 500）+ 1 测试；模板补 unmanaged 半句提示；④ 已知行为（有意保留）：unmanaged 项目提案出的 draft note 不在 bib → 项目暂时不可用（v1.1 规则原样，演示主路径 managed 无此问题）。 |
+| P-D14 | T10 审查登记：① I1 修复——prompt 原文"title 与 year 必给"与"提取不到整体省略"自相矛盾（无明确年份的文章会产出缺 year 的 entry → E-ARTICLE-SHAPE 炸整链），且缺 fields 逃生舱；按 T8 已验证措辞改为"entry 仅在 title 与 year 都有原文依据时输出（任缺其一或整条提不出就整体省略）+ 其余字段进 fields"。② I2 裁定（登记接受，不加代码）：不合规模型输出畸形 entry → E-ARTICLE-SHAPE 整链不落盘，与 parse 管线所有节点输出的 fail-closed 常态一致（坏 cards JSON 同样炸整链），不引入 parse 专属 schema 抢救。③ M1：supplement 提案继承原卡 entry 补锁测试（+1，夹具按 P-D13② 同款补 _quarto.yml + references.bib——build_project 纯内存重载后 bib_keys 为空）。另：T10 测试计数 4+1（实现期确认补的拆解模式锁测试）+1（审查补）= 6。 |
 
 ---
 

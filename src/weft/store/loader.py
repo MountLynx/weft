@@ -270,3 +270,20 @@ def _load_config(root: Path, project: Project, diagnostics: list[Diagnostic]) ->
         for match in _BIB_ENTRY.finditer(text):
             if match.group("etype").lower() not in _BIB_IGNORED:
                 project.bib_keys.add(match.group("key"))
+
+    project.bib_files = [b for b in bib_files if b.strip()]
+
+    bib_cfg = weft_cfg.get("bib")
+    if bib_cfg is None:
+        bib_cfg = {}
+    if not isinstance(bib_cfg, dict):
+        project.bib_cfg_error = "bib 段必须是映射"
+    else:
+        managed = bib_cfg.get("managed", False)
+        if not isinstance(managed, bool):
+            project.bib_cfg_error = "bib.managed 必须是布尔值"
+        else:
+            project.bib_managed = managed
+            unknown = sorted(str(k) for k in set(bib_cfg) - {"managed"})
+            if unknown:
+                project.bib_cfg_error = f"bib 段未知键：{unknown}"

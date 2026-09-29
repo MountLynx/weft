@@ -40,6 +40,7 @@
 - WebUI（比赛展示）：`weft serve` 服务器端 Web 应用（FastAPI+htmx，全流程含卡片编辑与生成）✅；项目列表页内嵌表单新建项目（复用 `init_project` 骨架、名称黑名单守卫、中文 pid、冲突零写入，2026-09-08，见 `docs/superpowers/plans/2026-09-08-weft-webui-new-project.md`）
 - 断点续跑/回滚接入 CLI（复用 SpecModule 原生能力）。
 - 溯源注释完善与用户文档。
+- bib 自动生成（bibgen）✅（2026-09-29）：`weft bib sync`；managed 模式以已批准文献卡为真源（note 卡 entry 书目字段，spec 2026-09-29-weft-bibgen），WebUI 批准/编辑即同步，AI 提案与 parse 文献模式两条草案入口。
 
 ## 扩展场景（M4 后，架构已预留）
 

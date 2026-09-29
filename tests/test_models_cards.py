@@ -1,6 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
+from weft.models.bib import BIB_TYPES
 from weft.models.cards import (
     ClaimCard,
     DataCard,
@@ -114,3 +115,46 @@ def test_param_card_unknown_key_rejected():
     with pytest.raises(ValidationError):
         ParamCard.model_validate({"id": "p", "method": "m", "value": {"a": "b"},
                                   "status": "draft"})
+
+
+def test_note_card_without_entry_loads():
+    """向后兼容：旧 note 卡不含 entry 照常加载（红线 2 加法演进）。"""
+    card = NoteCard.model_validate({"id": "k1", "status": "approved"})
+    assert card.entry is None
+
+
+def test_note_card_entry_roundtrip():
+    card = NoteCard.model_validate({
+        "id": "k1", "status": "approved",
+        "entry": {"type": "article", "title": "T",
+                  "author": ["Smith, Jane", "Lee, Kyung"],
+                  "year": 2020, "journal": "J", "volume": "12"},
+    })
+    assert card.entry.title == "T"
+    assert card.entry.year == 2020
+    assert card.entry.author == ["Smith, Jane", "Lee, Kyung"]
+    # str year 双收：保住 "c. 1850" / "in press" 这类合法值不被收紧成纯 int
+    card2 = NoteCard.model_validate({
+        "id": "k1", "status": "approved",
+        "entry": {"title": "T", "year": "2020"}})
+    assert card2.entry.year == "2020"
+
+
+def test_note_card_entry_forbids_unknown_field():
+    with pytest.raises(ValidationError):
+        NoteCard.model_validate({
+            "id": "k1", "status": "approved",
+            "entry": {"title": "T", "year": 2020, "wat": 1}})
+
+
+def test_note_card_entry_requires_title_and_year():
+    with pytest.raises(ValidationError):
+        NoteCard.model_validate({
+            "id": "k1", "status": "approved", "entry": {"title": "T"}})
+    with pytest.raises(ValidationError):
+        NoteCard.model_validate({
+            "id": "k1", "status": "approved", "entry": {"year": 2020}})
+
+
+def test_bib_types_vocab():
+    assert {"article", "book", "inproceedings", "misc"} <= BIB_TYPES

@@ -288,6 +288,11 @@ button.btn-danger:hover, button.bad:hover { background: var(--danger); border-co
   border-radius: var(--radius);
   margin: var(--space-3) 0;
 }
+.banner.success {
+  border-color: var(--success-border);
+  background: var(--success-subtle);
+  color: var(--success-fg);
+}
 .field-error { color: var(--danger-fg); font-size: 12px; }
 .subtitle { color: var(--fg-muted); font-size: 13px; }
 .label { font-size: 12px; font-weight: 600; color: var(--fg-muted); }

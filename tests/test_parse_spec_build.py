@@ -47,3 +47,13 @@ def test_decompose_mode_prompts():
 def test_literature_requires_bib_key():
     with pytest.raises(ValueError, match="bib_key"):
         _tasklist(mode="literature")
+
+
+def test_literature_extract_schema_mentions_entry():
+    from weft.engine.parse.spec_build import _EXTRACT_LITERATURE_SCHEMA
+    assert '"entry"' in _EXTRACT_LITERATURE_SCHEMA
+
+
+def test_decompose_extract_schema_omits_entry():
+    from weft.engine.parse.spec_build import _EXTRACT_DECOMPOSE_SCHEMA
+    assert '"entry"' not in _EXTRACT_DECOMPOSE_SCHEMA
