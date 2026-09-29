@@ -1,2 +1,3 @@
+# weft 项目配置（样例）。
 bib:
-  managed: true
+  managed: true             # true：assets/references.bib 由 weft 从已批准文献卡生成（勿手改）
