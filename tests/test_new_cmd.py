@@ -270,3 +270,30 @@ def test_cli_new_card_bad_id_exit_1(project):
 def test_cli_new_card_unknown_kind_rejected(project):
     result = runner.invoke(app, ["new", "card", "story", "s-01", str(project)])
     assert result.exit_code != 0
+
+
+# ---------------------------------------------------------------- 防漂移守卫
+
+def test_card_kind_dirs_match_writer():
+    """CARD_KIND_DIRS 与 store/writer.card_relpath 单一来源对齐（防两处目录约定漂移）。"""
+    from weft.models.cards import (
+        ClaimCard,
+        DataCard,
+        FactCard,
+        MethodCard,
+        NoteCard,
+        ParamCard,
+    )
+    from weft.scaffold import CARD_KIND_DIRS
+    from weft.store.writer import card_relpath
+
+    samples = {
+        "data": DataCard(id="x", status="draft"),
+        "fact": FactCard(id="x", status="draft", data=["data-01"], statement="s"),
+        "claim": ClaimCard(id="x", status="draft", claim_type="uncited", statement="s"),
+        "note": NoteCard(id="x", status="draft"),
+        "method": MethodCard(id="x", status="draft", statement="s", protocol="p"),
+        "param": ParamCard(id="x", status="draft", method="m"),
+    }
+    for kind, card in samples.items():
+        assert card_relpath(card) == f"{CARD_KIND_DIRS[kind]}/x.md"

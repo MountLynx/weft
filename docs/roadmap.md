@@ -37,6 +37,7 @@
 ## M4 打磨 🔨
 
 - `weft init` 项目模板 ✅（2026-09-04）：最小合法骨架（init 后 `weft validate` 0 错 0 提醒；六类卡片目录、figures.yaml/weft.yaml 全注释模板、起步 part）；非空目录拒绝（`E-INIT-COLLISION`，零写入 fail-closed）。骨架文件内注释即格式参考，计划与设计决策见 `docs/superpowers/plans/2026-09-04-weft-init.md`。
+- `weft new` 模板化创建 ✅（2026-10-10）：`weft new part <chapter> <section> [--id]`（part id 全局 sec-NN 自动编号、文件名章节内 part-NN 自动编号）与 `weft new card <kind> <id>`（六类卡片，落盘目录对齐 writer 规范）；碰撞 fail-closed 零写入（`E-NEW-COLLISION`）、路径成分校验（`E-NEW-NAME`）；桩卡"最小合法+注释示例"，fact/param/note 的待填错误由校验器指路。设计见 `docs/superpowers/specs/2026-10-10-weft-new-template-design.md`。
 - WebUI（比赛展示）：`weft serve` 服务器端 Web 应用（FastAPI+htmx，全流程含卡片编辑与生成）✅；项目列表页内嵌表单新建项目（复用 `init_project` 骨架、名称黑名单守卫、中文 pid、冲突零写入，2026-09-08，见 `docs/superpowers/plans/2026-09-08-weft-webui-new-project.md`）
 - 断点续跑/回滚接入 CLI（复用 SpecModule 原生能力）。
 - 溯源注释完善与用户文档。

@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.11 + Typer + PyYAML + pytest。设计依据：`docs/superpowers/specs/2026-10-10-weft-new-template-design.md`（决策 N1–N10）。
 
-**基线：** 全量 556 passed, 2 deselected。新增守卫/功能测试后回填精确计数到本计划末尾。
+**基线：** 全量 556 passed, 2 deselected。**执行后实绩：全量 602 passed, 2 deselected**（`tests/test_new_cmd.py` 新增 46 例：5 模板 + 22 规划（含参数化展开）+ 18 CLI + 1 守卫）。
 
 ---
 
@@ -671,4 +671,10 @@ def test_card_kind_dirs_match_writer():
 
 ## 执行期决策回填
 
-（执行中偏离设计处记录于此——当前无。）
+| # | 偏离/发现 | 处置 |
+|---|---|---|
+| E1 | Task 1 的 scaffold 整文件重写把 Task 2 规划纯函数一并落地，Task 2 的红灯步骤被合并 | 测试先于验证补齐即绿；提交拆分保留（3aa986c / 5b05851） |
+| E2 | note 桩并非"无新增错误"：校验层 `E-NOTE-NOT-IN-BIB` 要求 note id 已在 bib | 并入"待填指路"错误（共三类：fact E-PARSE / param E-DANGLING-REF / note E-NOTE-NOT-IN-BIB），spec N6 与测试策略、模板注释、manual 同步修订 |
+| E3 | part 自动 id 是**全局** sec-NN 编号，文件名是**章节内** part-NN 编号；新章节首 part 的 id 通常非 sec-01 | 行为符合设计 N3，测试断言据此修正（CLI 用例改断言 sec-02） |
+| E4 | 主仓 venv editable 安装指向主仓 src，worktree 测试需 `PYTHONPATH=<worktree>/src` 前缀执行 | 全程按此约定跑 worktree 测试；Task 0 操作约定已写明 |
+| E5 | 手册实际路径为 `docs/manual.md`（commit 43e0176 所述 manual.md 在 docs/ 下） | Task 4 Step 4 按 `docs/manual.md` 执行 |

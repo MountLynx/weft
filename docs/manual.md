@@ -412,6 +412,21 @@ weft init [项目目录]        # 缺省当前目录
 
 生成最小合法项目骨架（第 4 节的目录树），init 后即可通过 `weft validate`（0 错误 0 提醒）。目标目录已存在且**非空**（或是文件）→ 报 `E-INIT-COLLISION`，退出码 1，**不写入任何文件**。
 
+### weft new
+
+```
+weft new part <chapter> <section> [--id <part_id>] [project_dir]
+weft new card <kind> <id> [project_dir]     # kind ∈ data|fact|claim|note|method|param
+```
+
+按内置模板在既有项目内创建空白文件（"最小合法 + 注释示例"，`status: draft`）：
+
+- **part**：落盘 `narrative/<chapter>/part-NN.md`（文件名按章节内现有编号自动 +1）；part id 缺省按全局 `sec-NN` 最大编号 +1 自动取号，`--id` 可显式指定；章节目录不存在则自动创建。`section` 必填——它就是最终标题。
+- **card**：落盘目录随种类（data→`metadata/data`、fact→`metadata/facts`、claim→`metadata/claims/uncited`、note→`metadata/notes`、method→`metadata/methods`、param→`metadata/methods/params`），文件名 = id（note 卡 id = bib key，建议直接用文献引用键如 `smith2020`）。
+- 命名非法（空、路径分隔符、`.`/`..`、Windows 保留字符等）→ `E-NEW-NAME`；目标文件已存在或 id 已被占用 → `E-NEW-COLLISION`；两者都退出码 1 且零写入。
+- 桩卡填写提示：fact 的 `data`、param 的 `method`、note 的 id（须在 bib 中）填好之前 `weft validate` 会报错指路，属预期；data/claim/method 桩创建即可过校验。
+- 卡片新建后建议走 WebUI 表单或手写补全字段；`weft new` 与 WebUI 新建表单可混用。
+
 ### weft validate
 
 ```
@@ -693,11 +708,13 @@ format:
 
 rejected 卡/节点豁免全部 W 级校验；E 级不豁免。
 
-### init / draft 管线
+### init / new / draft 管线
 
 | 码 | 级别 | 含义 |
 |----|------|------|
 | `E-INIT-COLLISION` | E | `weft init` 目标目录非空，未写入任何文件 |
+| `E-NEW-NAME` | E | `weft new` 的 chapter/卡片 id 含非法路径成分 |
+| `E-NEW-COLLISION` | E | `weft new` 目标文件已存在或 id 已被占用（零写入） |
 | `E-PART-NOT-FOUND` | E | `weft draft` 的 part id 不存在 |
 | `E-NOTHING-TO-DRAFT` | E | part 内没有 approved 节点 |
 | `E-DRAFT-SHAPE` | E | LLM 输出不合 schema / 存在未解析占位符 / harness 节点 failed |
