@@ -105,7 +105,7 @@ statement: ""        # 必填：论点陈述
 # cites: []          # claim_type: cited 时填 bib key（须已在 assets/references.bib）
 """,
     "note": """\
-id: {card_id}        # note 卡 id = bib key
+id: {card_id}        # note 卡 id = bib key；须已登记进 assets/references.bib（否则报 E-NOTE-NOT-IN-BIB）
 status: draft
 # summary: 文献要点（缺省报 W-NOTE-NO-SUMMARY 提醒）
 # pdf: 文献 PDF 路径（可选）

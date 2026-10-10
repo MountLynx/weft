@@ -42,7 +42,7 @@ weft new card <kind> <id> [PROJECT_DIR]
 1. `id` 位置参数必填，显式不自动编号：note 卡 id = bib key、method/param 为 slug，语义性命名不该被序号替代（N4）。
 2. id 安全成分校验同 N9 → `E-NEW-NAME`；id 已被**任何种类**卡片占用（全局命名空间，`project.card_paths`）→ `E-NEW-COLLISION`。
 3. 落盘路径对齐 `store/writer.card_relpath` 规范映射：data→`metadata/data`、fact→`metadata/facts`、note→`metadata/notes`、method→`metadata/methods`、param→`metadata/methods/params`、claim→`metadata/claims/uncited`（新建 claim 默认 `claim_type: uncited`）。文件名 = `<id>.md`（loader 强制 `E-FILENAME-MISMATCH` 一致性）。目标已存在 → `E-NEW-COLLISION`。
-4. 模板 per kind（N6）：`id` + `status: draft` 为实体键；模型层可缺省的字段全部以注释示例给出；模型层必填字段（fact.data/fact.statement、claim.claim_type/claim.statement、method.statement/protocol、param.method）以空占位实体键给出。**明确接受**两类"待填指路"错误：fact 桩 `data: []` 在填写前过不了 `min_length=1`（loader 层 E-PARSE）；param 桩 `method: ""` 悬空（校验层 E-DANGLING-REF）。两者都会被 `weft validate` 指出、被 `weft draft` 闸门挡住——schema 冻结（红线 2）下这是"模板给骨架、人填血肉"的自然结果。
+4. 模板 per kind（N6）：`id` + `status: draft` 为实体键；模型层可缺省的字段全部以注释示例给出；模型层必填字段（fact.data/fact.statement、claim.claim_type/claim.statement、method.statement/protocol、param.method）以空占位实体键给出。**明确接受**三类"待填指路"错误：fact 桩 `data: []` 过不了 `min_length=1`（loader 层 E-PARSE）；param 桩 `method: ""` 悬空（校验层 E-DANGLING-REF）；note 桩 id 未登记进 bib（校验层 E-NOTE-NOT-IN-BIB）。三者都会被 `weft validate` 指出、被 `weft draft` 闸门挡住——schema 冻结（红线 2）下这是"模板给骨架、人填血肉"的自然结果。data/claim/method 桩无新增错误。
 5. 不经过 `create_card`/`_dump`：模板含注释，直接由 scaffold 写文本（固定 LF、UTF-8、写前归一化不适用——模板本身无 CRLF）。
 
 ## 命名安全成分（N9）
@@ -72,7 +72,7 @@ weft new card <kind> <id> [PROJECT_DIR]
 
 - scaffold 纯函数：`render_part_template("sec-01", "Introduction")` 与原 `_PART_01_MD` 逐字节一致（init 守卫）；参数化 id/section/YAML 引用正确。
 - part：全新项目自动编号 sec-01/part-01；已有 sec-01 → sec-02、章节内 part-01 → part-02；显式 `--id`；跨章节 id 冲突 E-NEW-COLLISION；目标文件已存在；chapter 非法（`../x`、空、含 `\`）E-NEW-NAME；产物 load_project 无新增错误。
-- card：六 kind 参数化落盘路径；claim → uncited 目录且 claim_type 一致；id 冲突；非法 id；fact 桩 validate 恰好一条 E-PARSE（data）；param 桩 validate 出 E-DANGLING-REF（method 悬空）；data/note 桩 validate 无新增错误；产物文件名 = id。
+- card：六 kind 参数化落盘路径；claim → uncited 目录且 claim_type 一致；id 冲突；非法 id；fact 桩恰好一条 E-PARSE（data）；param 桩出 E-DANGLING-REF（method 悬空）；note 桩出 E-NOTE-NOT-IN-BIB（id 未入 bib）；data 桩无新增错误；产物文件名 = id。
 - CLI：成功输出与退出码 0；失败退出码 1 + 诊断码出现。
 
 init 现有测试（含 golden）保证改造不回归。计划文档登记精确计数（预期全量 ~582 passed）。
@@ -86,7 +86,7 @@ init 现有测试（含 golden）保证改造不回归。计划文档登记精�
 | N3 | part 章节优先寻址，id/文件名自动编号 | 新章节是高频操作，敲起来最短 |
 | N4 | 卡片 id 显式必填，不复用 `next_card_id` | note id = bib key，语义命名优先 |
 | N5 | 模板层放 scaffold.py；init 模板改由参数化函数派生（字节不变） | 模板单一来源，init 行为守卫锁定 |
-| N6 | 桩卡 = id+status:draft+必填空占位+注释示例；fact E-PARSE 接受 | schema 冻结下的最优折衷，校验器指路 |
+| N6 | 桩卡 = id+status:draft+必填空占位+注释示例；fact/param/note 的"待填指路"错误接受 | schema 冻结下的最优折衷，校验器指路 |
 | N7 | 落盘路径对齐 `card_relpath`（param → methods/params；claim → uncited） | loader 强制目录一致性，杜绝 E-CLAIM-DIR-MISMATCH |
 | N8 | 只做目标碰撞 + 命名检查，不跑全项目闸门 | 新建文件不应被项目既有错误绑架 |
 | N9 | 安全成分规则（Windows 兼容），违者 E-NEW-NAME | id 是落盘路径组件，fail-closed |

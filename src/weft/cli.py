@@ -1,7 +1,8 @@
-"""typer 入口：weft init / validate / graph / review / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve。"""
+"""typer 入口：weft init / new / validate / graph / review / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve。"""
 from __future__ import annotations
 
 import sys
+from enum import Enum
 from pathlib import Path
 
 import typer
@@ -21,6 +22,10 @@ app.add_typer(bib_app, name="bib")
 projects_app = typer.Typer(add_completion=False,
                            help="全局项目注册表管理（projects registry 设计）")
 app.add_typer(projects_app, name="projects")
+
+new_app = typer.Typer(add_completion=False,
+                      help="按内置模板创建空白叙事 part / 元数据卡片（new-template 设计）")
+app.add_typer(new_app, name="new")
 
 
 def _ensure_utf8_stdout() -> None:
@@ -651,3 +656,64 @@ def bib_sync(
         raise typer.Exit(code=1) from exc
     typer.echo(f"已写入 {project.bib_files[0]}"
                f"（{stats['total']} 条，+{stats['added']} / -{stats['removed']}）")
+
+
+class _CardKind(str, Enum):
+    data = "data"
+    fact = "fact"
+    claim = "claim"
+    note = "note"
+    method = "method"
+    param = "param"
+
+
+@new_app.command("part")
+def new_part(
+    chapter: str = typer.Argument(..., help="章节目录名（narrative/<chapter>/），如 02-methods"),
+    section: str = typer.Argument(..., help="节标题（part 的 section 字段）"),
+    part_id: str | None = typer.Option(None, "--id", help="part id（缺省按 sec-NN 自动编号）"),
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+) -> None:
+    """按模板新建叙事 part（narrative/<chapter>/part-NN.md）。"""
+    from weft.scaffold import NewCollisionError, NewNameError, plan_new_part, render_part_template
+
+    project, _ = load_project(project_dir)
+    try:
+        target, pid = plan_new_part(
+            project.root / "narrative", project.part_paths.keys(), chapter, part_id)
+    except NewNameError as exc:
+        _print_diagnostics([Diagnostic(Level.ERROR, "E-NEW-NAME", ".", None, str(exc))])
+        raise typer.Exit(code=1) from exc
+    except NewCollisionError as exc:
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-NEW-COLLISION", exc.rel or ".", None, str(exc))])
+        raise typer.Exit(code=1) from exc
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(render_part_template(pid, section), encoding="utf-8", newline="\n")
+    typer.echo(f"已创建 {target.relative_to(project.root).as_posix()}")
+    typer.echo(f"下一步：填写 nodes，approved 后 weft draft {pid}")
+
+
+@new_app.command("card")
+def new_card(
+    kind: _CardKind = typer.Argument(..., help="卡片种类"),
+    card_id: str = typer.Argument(..., help="卡片 id（文件名 = id；note 卡 id = bib key）"),
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+) -> None:
+    """按模板新建空白元数据卡片（status: draft，人填写后人审）。"""
+    from weft.scaffold import NewCollisionError, NewNameError, plan_new_card, render_card_template
+
+    project, _ = load_project(project_dir)
+    try:
+        target = plan_new_card(project.root, project.card_paths.keys(), kind.value, card_id)
+    except NewNameError as exc:
+        _print_diagnostics([Diagnostic(Level.ERROR, "E-NEW-NAME", ".", None, str(exc))])
+        raise typer.Exit(code=1) from exc
+    except NewCollisionError as exc:
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-NEW-COLLISION", exc.rel or ".", None, str(exc))])
+        raise typer.Exit(code=1) from exc
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(render_card_template(kind.value, card_id), encoding="utf-8", newline="\n")
+    typer.echo(f"已创建 {target.relative_to(project.root).as_posix()}")
+    typer.echo("下一步：填写字段后 weft validate 检查，approved 进入生成闸门")
