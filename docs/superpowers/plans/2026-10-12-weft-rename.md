@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 + pydantic、typer（CLI）、FastAPI + Jinja2（WebUI）、pytest。
 
-**基线：** 625 passed, 2 deselected。**完成预期：650 passed, 2 deselected**（新增 25 个测试项：引擎 17 含参数化 + CLI 6 + WebUI 2）。
+**基线：** 625 passed, 2 deselected。**完成预期：651 passed, 2 deselected**（新增 26 个测试项：引擎 18 含参数化 + CLI 6 + WebUI 2）。
 
 **工作目录：** worktree `.worktrees/rename-feature`（分支 `rename-feature`）。测试命令：
 
@@ -45,14 +45,17 @@
 
 ```python
 """rename 引擎：计划段校验与引用扫描、应用段落盘同步（rename 设计定案）。"""
+from pathlib import Path
+
 import pytest
 
-from weft.rename import RenameError, apply_rename, plan_rename
+from weft.rename import RenameError, plan_rename   # Task 3 起补 apply_rename
 from weft.scaffold import NewCollisionError, NewNameError
 from weft.models.cards import (
     ClaimCard, DataCard, FactCard, MethodCard, NoteCard, ParamCard,
 )
 from weft.models.narrative import NarrativePart, Node, Use
+from weft.store.writer import card_relpath
 from tests.helpers import build_project
 
 
@@ -71,7 +74,13 @@ def _project(**overrides):
         ],
     )
     base.update(overrides)
-    return build_project(**base)
+    project = build_project(**base)
+    # build_project 填的是假想路径（metadata/<id>.md）；本测试断言真实 rel，按规范重填
+    for table in (project.data_cards, project.facts, project.claims,
+                  project.notes, project.methods, project.params):
+        for card in table.values():
+            project.card_paths[card.id] = Path(card_relpath(card))
+    return project
 
 
 def test_plan_reports_target_refs_and_rels():
@@ -80,11 +89,18 @@ def test_plan_reports_target_refs_and_rels():
     assert plan.old_rel == "metadata/data/data-01.md"
     assert plan.new_rel == "metadata/data/arrhenius-60c.md"
     assert plan.card_refs == {"fact-01": ["data"], "fact-02": ["data"]}
-    assert plan.card_rels == {"fact-01": "metadata/fact-01.md",
-                              "fact-02": "metadata/fact-02.md"}
+    assert plan.card_rels == {"fact-01": "metadata/facts/fact-01.md",
+                              "fact-02": "metadata/facts/fact-02.md"}
+    assert plan.part_refs == {}   # 节点 uses 只直接引用 fact/claim/method/param；data 经 fact 间接可达
+    assert plan.part_rels == {}
+    assert plan.needs_bib_sync is False
+
+
+def test_plan_part_refs_for_fact_rename():
+    plan = plan_rename(_project(), "fact-01", "temp-rate")
+    assert plan.card_refs == {}
     assert plan.part_refs == {"sec-01": 1}
     assert plan.part_rels == {"sec-01": "narrative/01-results/sec-01.md"}
-    assert plan.needs_bib_sync is False
 
 
 def test_plan_aggregates_fields_per_card():
@@ -105,7 +121,7 @@ def test_plan_same_id_raises():
         plan_rename(_project(), "data-01", "data-01")
 
 
-@pytest.mark.parametrize("bad", ["../x", "a/b", "", ".x", "x.", "a b", "a:b\\c"])
+@pytest.mark.parametrize("bad", ["../x", "a/b", "", ".x", "x.", " x", "a:b\\c"])
 def test_plan_unsafe_new_id_raises(bad):
     with pytest.raises(NewNameError):
         plan_rename(_project(), "data-01", bad)
@@ -232,10 +248,10 @@ def _new_rel(card, new_id: str) -> str:
 ```bash
 .venv/Scripts/python.exe -m pytest tests/test_rename.py -q
 ```
-预期： **12 passed**（6 个测试函数；`test_plan_unsafe_new_id_raises` 参数化展开 7 项）。
+预期： **13 passed**（7 个测试函数；`test_plan_unsafe_new_id_raises` 参数化展开 7 项）。
 
-**计数口径（全计划权威）**：新增测试项 = 引擎 12（Task 1）+ 引擎应用 5（Task 3）
-+ CLI 6（Task 4）+ WebUI 2（Task 5）= **25 项**，最终预期 **650 passed, 2 deselected**。
+**计数口径（全计划权威）**：新增测试项 = 引擎计划段 13（Task 1）+ 引擎应用 5（Task 3）
++ CLI 6（Task 4）+ WebUI 2（Task 5）= **26 项**，最终预期 **651 passed, 2 deselected**。
 
 - [ ] **Step 5: 提交**
 
@@ -762,7 +778,7 @@ id 即文件名，全卡种全局唯一；落盘后用 `weft rename <旧id> <新
 ```bash
 .venv/Scripts/python.exe -m pytest tests -q
 ```
-预期： **650 passed, 2 deselected**（625 + 25 项：引擎 13（含 7 项参数化中 6 项额外展开）+ CLI 6 + WebUI 2；以实际输出为准回填本行与文件头部）。若有偏差先查明原因。
+预期： **651 passed, 2 deselected**（625 + 26 项：引擎计划段 13（7 函数，unsafe 参数化展开 7 项）+ 引擎应用 5 + CLI 6 + WebUI 2；以实际输出为准回填本行与文件头部）。若有偏差先查明原因。
 
 - [ ] **Step 5: 提交**
 
