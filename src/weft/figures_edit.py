@@ -57,3 +57,28 @@ def load_for_edit(root: Path) -> dict[str, FigureEntry]:
                 "E-FIG-LOAD",
                 f"图注条目解析失败（{key}）：{exc.errors()[0]['msg']}") from exc
     return entries
+
+
+def ensure_figure_key(key: str) -> None:
+    """键名是图片文件名 stem（figures/{key}.png），安全成分规则同 weft new N9（F4）。"""
+    if (not key or key.startswith(".") or key.endswith(".")
+            or key != key.strip() or _UNSAFE_COMPONENT.search(key)):
+        raise FiguresEditError("E-FIG-NAME", f"键名非法：{key!r}")
+
+
+def next_figure_key(entries: dict[str, FigureEntry], prefix: str) -> str:
+    """{prefix}{n:02d}：同前缀数字键取 max+1（同 weft new part 编号语义，F5）。"""
+    pat = re.compile(rf"^{re.escape(prefix)}(\d+)$")
+    nums = [int(m.group(1)) for k in entries if (m := pat.match(k))]
+    return f"{prefix}{max(nums, default=0) + 1:02d}"
+
+
+def add_entry(entries: dict[str, FigureEntry], key: str, caption: str,
+              subfigs: dict[str, str], prefix: str) -> dict[str, FigureEntry]:
+    """新键追加尾部（键序即 assemble 编号，F5）；非法键名/冲突 fail-closed 零写入。"""
+    if not key:
+        key = next_figure_key(entries, prefix)
+    ensure_figure_key(key)
+    if key in entries:
+        raise FiguresEditError("E-FIG-COLLISION", f"键已存在：{key}")
+    return {**entries, key: FigureEntry(caption=caption, subfigs=subfigs)}
