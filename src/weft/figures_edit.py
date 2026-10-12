@@ -119,3 +119,28 @@ def remove_entry(entries: dict[str, FigureEntry], key: str,
         raise FiguresEditError(
             "E-FIG-IN-USE", f"{'、'.join(hitting)} 引用了 {key}，先解除引用再删除")
     return {k: v for k, v in entries.items() if k != key}
+
+
+def _dump_scalar(value: str) -> str:
+    """简单词原样，含特殊字符走 JSON 双引号（合法 YAML 流标量；同 scaffold 惯例）。"""
+    if _PLAIN_YAML.fullmatch(value):
+        return value
+    return json.dumps(value, ensure_ascii=False)
+
+
+def write_figures_yaml(root: Path, entries: dict[str, FigureEntry]) -> Path:
+    """确定性重写（F2）：键序保持、caption/subfigs 缺省省略、UTF-8 固定 LF。"""
+    lines: list[str] = []
+    for key, entry in entries.items():
+        lines.append(f"{_dump_scalar(key)}:")
+        if entry.caption:
+            lines.append(f"  caption: {_dump_scalar(entry.caption)}")
+        if entry.subfigs:
+            lines.append("  subfigs:")
+            for sub, cap in entry.subfigs.items():
+                lines.append(f"    {_dump_scalar(sub)}: {_dump_scalar(cap)}")
+    text = ("\n".join(lines) + "\n") if lines else ""
+    path = figures_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8", newline="\n")
+    return path

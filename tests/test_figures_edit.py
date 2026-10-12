@@ -10,6 +10,7 @@ from weft.figures_edit import (
     parse_subfigs,
     remove_entry,
     update_entry,
+    write_figures_yaml,
 )
 from weft.models.figures import FigureEntry
 from weft.scaffold import NewNameError, _ensure_component
@@ -196,3 +197,32 @@ def test_remove_entry_missing():
     with pytest.raises(FiguresEditError) as excinfo:
         remove_entry({}, "fig-01", {})
     assert excinfo.value.code == "E-FIG-COLLISION"
+
+
+def test_write_roundtrip_defaults_omitted(tmp_path):
+    entries = {"fig-01": FigureEntry(caption="速率", subfigs={"a": "左"}),
+               "fig-02": FigureEntry()}
+    write_figures_yaml(tmp_path, entries)
+    assert load_for_edit(tmp_path) == entries
+    text = (tmp_path / "metadata" / "figures.yaml").read_text(encoding="utf-8")
+    assert "fig-02:\n" in text and "fig-02:\n  caption" not in text  # 空条目裸键
+
+
+def test_write_deterministic_lf(tmp_path):
+    entries = {"fig-01": FigureEntry(caption="a"), "fig-02": FigureEntry()}
+    p1 = write_figures_yaml(tmp_path, entries)
+    b1 = p1.read_bytes()
+    p2 = write_figures_yaml(tmp_path, entries)
+    assert p2.read_bytes() == b1                     # 字节级确定（黄金可比对）
+    assert b"\r" not in b1 and b1.endswith(b"\n")
+
+
+def test_write_quotes_special_caption(tmp_path):
+    entries = {"fig-01": FigureEntry(caption="速率: 95% CI")}
+    write_figures_yaml(tmp_path, entries)
+    assert load_for_edit(tmp_path)["fig-01"].caption == "速率: 95% CI"
+
+
+def test_load_normalizes_crlf(tmp_path):
+    _write_yaml(tmp_path, "fig-01:\r\n  caption: 速率\r\n")
+    assert load_for_edit(tmp_path)["fig-01"].caption == "速率"
