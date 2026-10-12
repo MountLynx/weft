@@ -21,9 +21,9 @@ class PdfTextError(Exception):
 
 
 def validate_upload_name(filename: str | None) -> None:
-    """非 .pdf（大小写不敏感）/ 空文件名 → E-PDF-SHAPE（staging 之前拒绝，U11）。"""
+    """非 .pdf（大小写不敏感）/ 空文件名 / 裸 .pdf（无 stem）→ E-PDF-SHAPE（staging 之前拒绝，U11）。"""
     name = (filename or "").strip()
-    if not name or not name.lower().endswith(".pdf"):
+    if len(name) <= 4 or not name.lower().endswith(".pdf"):
         raise PdfTextError("E-PDF-SHAPE", f"上传文件必须是 .pdf：{name or '（空）'}")
 
 

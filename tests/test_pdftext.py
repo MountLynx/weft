@@ -31,7 +31,7 @@ def test_validate_upload_name_accepts_pdf_case_insensitive():
     validate_upload_name("Paper.PDF")
 
 
-@pytest.mark.parametrize("name", ["paper.md", "paper", ""])
+@pytest.mark.parametrize("name", ["paper.md", "paper", "", ".pdf"])
 def test_validate_upload_name_rejects_non_pdf(name):
     with pytest.raises(PdfTextError) as ei:
         validate_upload_name(name)
