@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}{{ "新增图注条目" if key is none else "编辑图注 " + key }} · {{ entry.pid }}{% endblock %}
+{% block content %}
+<h2>{{ "新增图注条目" if key is none else "编辑图注 " + key }}</h2>
+{% if errors %}<div class="banner error">
+  {% for k, v in errors.items() %}<div><b>{{ k }}</b>: {{ v }}</div>{% endfor %}
+</div>{% endif %}
+<form method="post" action="{{ action }}">
+  {% if key is none %}
+  <fieldset>
+    <legend>类型（键名留空时决定自动编号前缀）</legend>
+    <label class="check"><input type="radio" name="prefix" value="fig"
+      {% if values.get("prefix", "fig") == "fig" %}checked{% endif %}> fig-（图）</label>
+    <label class="check"><input type="radio" name="prefix" value="tbl"
+      {% if values.get("prefix") == "tbl" %}checked{% endif %}> tbl-（表）</label>
+  </fieldset>
+  <label>键名（留空自动编号；作为 figures/ 图片文件名）
+    <input name="key" value="{{ values.get('key', '') }}" placeholder="如 fig-03">
+  </label>
+  {% endif %}
+  <label>caption<textarea name="caption" rows="2">{{ values.get("caption", "") }}</textarea></label>
+  <label>子图（每行一条 `子图号: 说明`，如 `a: 60°C`）<textarea name="subfigs" rows="4">{{ values.get("subfigs_text", "") }}</textarea></label>
+  <button type="submit">保存</button>
+  <a href="{{ cancel_url }}">取消</a>
+</form>
+{% if key is not none %}
+<form method="post" action="{{ action }}/delete" style="margin-top: 1rem;">
+  <button type="submit">删除此条目</button>
+</form>
+{% endif %}
+{% endblock %}

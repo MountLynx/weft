@@ -47,3 +47,101 @@ def test_broken_yaml_list_viewable(tmp_path):
     assert resp.status_code == 200
     assert "E-FIG-LOAD" in resp.text
     assert "新增图注条目" not in resp.text
+
+
+def _yaml_path(projects):
+    return projects / "demo" / "metadata" / "figures.yaml"
+
+
+def test_figure_new_auto_number(tmp_path):
+    client, projects = make_client(tmp_path)
+    resp = client.get("/p/demo/figures/new")
+    assert resp.status_code == 200 and 'name="prefix"' in resp.text
+    resp = client.post("/p/demo/figures/new",
+                       data={"prefix": "fig", "key": "", "caption": "新图",
+                             "subfigs": "a: 左"}, follow_redirects=False)
+    assert resp.status_code == 303
+    text = _yaml_path(projects).read_text(encoding="utf-8")
+    assert "fig-02:" in text and "新图" in text
+
+
+def test_figure_new_explicit_key(tmp_path):
+    client, projects = make_client(tmp_path)
+    resp = client.post("/p/demo/figures/new",
+                       data={"prefix": "tbl", "key": "tbl-01", "caption": "表一",
+                             "subfigs": ""}, follow_redirects=False)
+    assert resp.status_code == 303
+    assert "tbl-01:" in _yaml_path(projects).read_text(encoding="utf-8")
+
+
+def test_figure_new_collision_rerender(tmp_path):
+    client, _ = make_client(tmp_path)
+    resp = client.post("/p/demo/figures/new",
+                       data={"prefix": "fig", "key": "fig-01", "caption": "x",
+                             "subfigs": ""})
+    assert resp.status_code == 200
+    assert "E-FIG-COLLISION" in resp.text
+
+
+def test_figure_new_invalid_name_rerender(tmp_path):
+    client, _ = make_client(tmp_path)
+    resp = client.post("/p/demo/figures/new",
+                       data={"prefix": "fig", "key": "a/b", "caption": "x",
+                             "subfigs": ""})
+    assert resp.status_code == 200
+    assert "E-FIG-NAME" in resp.text
+
+
+def test_figure_edit_get_prefills(tmp_path):
+    client, _ = make_client(tmp_path)
+    resp = client.get("/p/demo/figures/fig-01")
+    assert resp.status_code == 200
+    assert "速率曲线" in resp.text and "a: 60°C" in resp.text
+
+
+def test_figure_edit_post_updates_keeps_order(tmp_path):
+    client, projects = make_client(tmp_path)
+    write_yaml(_yaml_path(projects),
+               {"fig-01": {"caption": "速率曲线", "subfigs": {"a": "60°C"}},
+                "fig-02": {"caption": "第二张"}})
+    resp = client.post("/p/demo/figures/fig-01",
+                       data={"caption": "改过的题注", "subfigs": "b: 右"},
+                       follow_redirects=False)
+    assert resp.status_code == 303
+    text = _yaml_path(projects).read_text(encoding="utf-8")
+    assert text.index("fig-01:") < text.index("fig-02:")   # 键序保持
+    assert "改过的题注" in text and "b: 右" in text
+
+
+def test_figure_delete_ok(tmp_path):
+    client, projects = make_client(tmp_path)
+    write_yaml(_yaml_path(projects),
+               {"fig-01": {"caption": "速率曲线", "subfigs": {"a": "60°C"}},
+                "fig-02": {"caption": "没人用"}})
+    resp = client.post("/p/demo/figures/fig-02/delete",
+                       follow_redirects=False)
+    assert resp.status_code == 303
+    text = _yaml_path(projects).read_text(encoding="utf-8")
+    assert "fig-02" not in text and "fig-01:" in text
+
+
+def test_figure_delete_blocked_in_use(tmp_path):
+    client, _ = make_client(tmp_path)
+    resp = client.post("/p/demo/figures/fig-01/delete")
+    assert resp.status_code == 200
+    assert "E-FIG-IN-USE" in resp.text and "data-01" in resp.text
+
+
+def test_write_ops_refused_on_broken_yaml(tmp_path):
+    """F3 后半：figures.yaml 坏 → 一切写操作 200 回 E-FIG-LOAD banner（列表可看已在
+    test_broken_yaml_list_viewable 覆盖，这里只测写路径）。"""
+    client, projects = make_client(tmp_path)
+    _yaml_path(projects).write_text("fig-01: [unclosed\n", encoding="utf-8")
+    for url, data in (("/p/demo/figures/new",
+                       {"prefix": "fig", "key": "", "caption": "x",
+                        "subfigs": ""}),
+                      ("/p/demo/figures/fig-01",
+                       {"caption": "x", "subfigs": ""}),
+                      ("/p/demo/figures/fig-01/delete", {})):
+        resp = client.post(url, data=data)
+        assert resp.status_code == 200 and "E-FIG-LOAD" in resp.text, url

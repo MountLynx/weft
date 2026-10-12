@@ -3,7 +3,7 @@
 {% block content %}
 <h2>图表注册表 · {{ entry.pid }}</h2>
 {% if load_error %}<div class="banner error">
-  <div><b>figures.yaml 不可编辑</b>: {{ load_error }}（请手工修复后刷新）</div>
+  <div><b>页面只读</b>: {{ load_error }}</div>
 </div>{% endif %}
 {% if error is defined and error %}<div class="banner error"><div>{{ error }}</div></div>{% endif %}
 {% if rows %}
@@ -24,7 +24,7 @@
   {% endfor %}
   </tbody>
 </table>
-{% else %}
+{% elif not load_error %}
 <p>figures.yaml 为空。</p>
 {% endif %}
 {% if not load_error %}<p><a href="/p/{{ entry.pid }}/figures/new">＋ 新增图注条目</a></p>{% endif %}

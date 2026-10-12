@@ -11,7 +11,12 @@ from fastapi.responses import RedirectResponse
 
 from weft.figures_edit import (
     FiguresEditError,
+    add_entry,
     load_for_edit,
+    parse_subfigs,
+    remove_entry,
+    update_entry,
+    write_figures_yaml,
 )
 from weft.web.common import load_entry_or_404, templates
 
@@ -59,12 +64,112 @@ def figures_page(request: Request, pid: str):
         try:
             load_for_edit(entry.path)
         except FiguresEditError as exc:
-            load_error = f"{exc.code} {exc.message}"
+            # 尾巴随消息走（模板不再固定拼接）：凡 FiguresEditError 消息都带，
+            # 兜底文案不带（与 figures.yaml 无关时不该催用户改 yaml）。
+            load_error = f"{exc.code} {exc.message}（请手工修复后刷新）"
         if load_error is None:
             load_error = "项目加载失败（与 figures.yaml 无关），先看诊断页"
     return templates.TemplateResponse(
         request, "figures.html",
         {"entry": entry, "rows": rows, "load_error": load_error})
+
+
+_PREFIXES = {"fig": "fig-", "tbl": "tbl-"}
+
+
+def _form(request: Request, entry, key: str | None, values: dict,
+          errors: dict):
+    if key is None:
+        action = f"/p/{entry.pid}/figures/new"
+    else:
+        action = f"/p/{entry.pid}/figures/{key}"
+    return templates.TemplateResponse(
+        request, "figure_form.html",
+        {"entry": entry, "key": key, "values": values, "action": action,
+         "cancel_url": f"/p/{entry.pid}/figures", "errors": errors})
+
+
+def _values(caption: str, subfigs_text: str, prefix: str) -> dict:
+    return {"caption": caption, "subfigs_text": subfigs_text, "prefix": prefix}
+
+
+def _list_with_error(request: Request, entry, error: str):
+    return templates.TemplateResponse(
+        request, "figures.html",
+        {"entry": entry, "rows": _rows(entry) if entry.project is not None
+         else [], "load_error": error})
+
+
+@router.get("/p/{pid}/figures/new")
+def figure_new_get(request: Request, pid: str):
+    entry = load_entry_or_404(request, pid)
+    return _form(request, entry, None, _values("", "", "fig"), {})
+
+
+@router.post("/p/{pid}/figures/new")
+async def figure_new_post(request: Request, pid: str):
+    entry = load_entry_or_404(request, pid)
+    form = await request.form()
+    return _submit(request, entry, None, form)
+
+
+@router.get("/p/{pid}/figures/{key}")
+def figure_edit_get(request: Request, pid: str, key: str):
+    entry = load_entry_or_404(request, pid)
+    try:
+        entries = load_for_edit(entry.path)
+    except FiguresEditError as exc:
+        # 与删除同款容错：注册表带病时无表可填，回列表页 banner（F3）
+        return _list_with_error(
+            request, entry, f"{exc.code} {exc.message}（请手工修复后刷新）")
+    fig = entries.get(key)
+    if fig is None:
+        raise HTTPException(status_code=404, detail="图注条目不存在")
+    subfigs_text = "\n".join(f"{s}: {c}" for s, c in fig.subfigs.items())
+    return _form(request, entry, key, _values(fig.caption, subfigs_text, "fig"),
+                 {})
+
+
+@router.post("/p/{pid}/figures/{key}")
+async def figure_edit_post(request: Request, pid: str, key: str):
+    entry = load_entry_or_404(request, pid)
+    form = await request.form()
+    return _submit(request, entry, key, form)
+
+
+@router.post("/p/{pid}/figures/{key}/delete")
+def figure_delete(request: Request, pid: str, key: str):
+    entry = load_entry_or_404(request, pid)
+    references = ({cid: set(card.refs)
+                   for cid, card in entry.project.data_cards.items()}
+                  if entry.project is not None else {})
+    try:
+        entries = remove_entry(load_for_edit(entry.path), key, references)
+        write_figures_yaml(entry.path, entries)
+    except FiguresEditError as exc:
+        return _list_with_error(
+            request, entry, f"{exc.code} {exc.message}（请手工修复后刷新）")
+    return RedirectResponse(f"/p/{pid}/figures", status_code=303)
+
+
+def _submit(request: Request, entry, key: str | None, form):
+    caption = str(form.get("caption", "")).strip()
+    subfigs_text = str(form.get("subfigs", ""))
+    prefix = str(form.get("prefix", "fig"))
+    values = _values(caption, subfigs_text, prefix)
+    try:
+        subfigs = parse_subfigs(subfigs_text)
+        entries = load_for_edit(entry.path)
+        if key is None:
+            entries = add_entry(entries, str(form.get("key", "")).strip(),
+                                caption, subfigs, _PREFIXES.get(prefix, "fig-"))
+        else:
+            entries = update_entry(entries, key, caption, subfigs)
+        write_figures_yaml(entry.path, entries)
+    except FiguresEditError as exc:
+        return _form(request, entry, key, values,
+                     {"figures": f"{exc.code} {exc.message}"})
+    return RedirectResponse(f"/p/{entry.pid}/figures", status_code=303)
 
 
 def register(app: FastAPI) -> None:
