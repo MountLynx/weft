@@ -31,7 +31,7 @@ class FiguresEditError(Exception):
 
 
 def figures_path(root: Path) -> Path:
-    return root / "metadata" / "figures.yaml"
+    return root / FIGURES_REL
 
 
 def load_for_edit(root: Path) -> dict[str, FigureEntry]:
@@ -41,7 +41,7 @@ def load_for_edit(root: Path) -> dict[str, FigureEntry]:
         return {}
     try:
         raw = yaml.safe_load(path.read_text(encoding="utf-8"))
-    except yaml.YAMLError as exc:
+    except (yaml.YAMLError, UnicodeDecodeError, OSError) as exc:
         raise FiguresEditError("E-FIG-LOAD",
                                f"figures.yaml 不是合法 YAML：{exc}") from exc
     if raw is None:

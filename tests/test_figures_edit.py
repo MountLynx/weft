@@ -46,3 +46,12 @@ def test_load_rejects_malformed_yaml(tmp_path):
     with pytest.raises(FiguresEditError) as excinfo:
         load_for_edit(tmp_path)
     assert excinfo.value.code == "E-FIG-LOAD"
+
+
+def test_load_rejects_undecodable_bytes(tmp_path):
+    _write_yaml(tmp_path, "")
+    (tmp_path / "metadata" / "figures.yaml").write_bytes(
+        "fig-01:\n  caption: 速率\n".encode("gbk"))
+    with pytest.raises(FiguresEditError) as excinfo:
+        load_for_edit(tmp_path)
+    assert excinfo.value.code == "E-FIG-LOAD"
