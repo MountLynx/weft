@@ -778,7 +778,7 @@ id 即文件名，全卡种全局唯一；落盘后用 `weft rename <旧id> <新
 ```bash
 .venv/Scripts/python.exe -m pytest tests -q
 ```
-预期： **651 passed, 2 deselected**（625 + 26 项：引擎计划段 13（7 函数，unsafe 参数化展开 7 项）+ 引擎应用 5 + CLI 6 + WebUI 2；以实际输出为准回填本行与文件头部）。若有偏差先查明原因。
+预期： **651 passed, 2 deselected**（625 + 26 项：引擎计划段 13（7 函数，unsafe 参数化展开 7 项）+ 引擎应用 5 + CLI 6 + WebUI 2）。**实际：651 passed, 2 deselected（2026-10-12 全量验证一致，无偏离）。**
 
 - [ ] **Step 5: 提交**
 
