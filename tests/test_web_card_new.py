@@ -11,7 +11,17 @@ def test_new_form_prefills_next_id(tmp_path):
     client, _ = make_client(tmp_path)
     resp = client.get("/p/demo/cards/fact/new")
     assert resp.status_code == 200
-    assert 'value="fact-02"' in resp.text and 'readonly' in resp.text
+    assert 'value="fact-02"' in resp.text and 'readonly' not in resp.text
+
+
+def test_create_custom_semantic_id(tmp_path):
+    client, root = make_client(tmp_path)
+    resp = client.post("/p/demo/cards/fact/new", data={
+        "id": "rate-jumps-above-60c", "data": ["data-01"],
+        "statement": "语义 id 可直接落盘。", "supports": [],
+        "status": "draft", "comment": ""}, follow_redirects=False)
+    assert resp.status_code == 303
+    assert (root / "demo" / "metadata" / "facts" / "rate-jumps-above-60c.md").exists()
 
 
 def test_create_writes_card(tmp_path):

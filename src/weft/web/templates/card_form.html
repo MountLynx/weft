@@ -13,7 +13,7 @@
     {% elif id_widget == "slug" %}
     <input name="id" value="{{ prefilled_id }}" placeholder="slug-id（全局唯一，如 prep-stir-01）">
     {% else %}
-    <input name="id" value="{{ prefilled_id }}" readonly>
+    <input name="id" value="{{ prefilled_id }}" placeholder="预填自动编号，可改为语义 id（全局唯一）">
     {% endif %}
   </label>
   {% endif %}
