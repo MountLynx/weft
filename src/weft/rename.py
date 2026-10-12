@@ -11,7 +11,7 @@ from pathlib import Path
 from weft.labels import find_card
 from weft.scaffold import NewCollisionError, _ensure_component
 from weft.store.project import Project
-from weft.store.writer import card_relpath
+from weft.store.writer import card_relpath, save_card, save_part
 
 
 class RenameError(Exception):
@@ -97,3 +97,40 @@ def plan_rename(project: Project, old_id: str, new_id: str) -> RenamePlan:
                       card_refs=card_refs, card_rels=card_rels,
                       part_refs=part_refs, part_rels=part_rels,
                       needs_bib_sync=(kind == "note" and project.bib_managed))
+
+
+def apply_rename(project: Project, plan: RenamePlan) -> RenameResult:
+    """按 R7 顺序落盘：写新文件 → 删旧文件 → 改写引用卡 → 改写 part → managed bib。"""
+    written: list[Path] = []
+    _kind, card = find_card(project, plan.old_id)
+    new_card = card.model_copy(update={"id": plan.new_id})
+    written.append(save_card(project.root, new_card, old_rel=plan.old_rel))
+
+    for cid, fields in plan.card_refs.items():
+        _ref_kind, ref_card = find_card(project, cid)
+        updates: dict = {}
+        for fname in fields:
+            value = getattr(ref_card, fname)
+            if isinstance(value, str):            # param.method 单值
+                updates[fname] = plan.new_id
+            else:                                 # 列表通道
+                updates[fname] = [plan.new_id if v == plan.old_id else v
+                                  for v in value]
+        written.append(save_card(project.root, ref_card.model_copy(update=updates)))
+
+    for part in project.parts:
+        if part.id not in plan.part_refs:
+            continue
+        new_nodes = [node.model_copy(update={"uses": [
+            u.model_copy(update={"id": plan.new_id}) if u.id == plan.old_id else u
+            for u in node.uses]})
+            if any(u.id == plan.old_id for u in node.uses) else node
+            for node in part.nodes]
+        save_part(project, part.model_copy(update={"nodes": new_nodes}))
+        written.append(project.root / project.part_paths[part.id])
+
+    bib_status = None
+    if plan.kind == "note":
+        from weft.bibgen import sync_managed_bib
+        bib_status = sync_managed_bib(project.root)
+    return RenameResult(written=written, bib_status=bib_status)
