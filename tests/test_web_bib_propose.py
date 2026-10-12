@@ -174,6 +174,21 @@ def test_propose_rejects_empty_pdf(tmp_path, monkeypatch):
     assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
 
 
+def test_propose_staging_write_failure_rerenders(tmp_path, monkeypatch):
+    """staging 落盘失败（磁盘/文件名）呈现 E-PDF-STAGING banner，不 500、零后续状态。"""
+    client, root = make_client(tmp_path)
+    _patch(monkeypatch, ScriptedLLMClient())
+
+    def _boom(self, data):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("pathlib.Path.write_bytes", _boom)
+    resp = client.post("/p/demo/notes/propose", data={"clues": ""},
+                       files=_PDF_FILES)
+    assert resp.status_code == 200 and "E-PDF-STAGING" in resp.text
+    assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
+
+
 def test_propose_convert_failure_keeps_staging(tmp_path, monkeypatch):
     def _boom(p):
         raise PdfTextError("E-PDF-CONVERT", "PDF 无有效文本层（扫描版？）")

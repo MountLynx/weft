@@ -229,8 +229,12 @@ async def bib_propose_post(request: Request, pid: str):
         data = await upload.read()
         if not data:
             return rerender("[E-PDF-SHAPE] 上传文件内容为空。")
-        staging.parent.mkdir(parents=True, exist_ok=True)   # 内容合法才动文件系统（零写入）
-        staging.write_bytes(data)
+        try:
+            staging.parent.mkdir(parents=True, exist_ok=True)   # 内容合法才动文件系统（零写入）
+            staging.write_bytes(data)
+        except OSError as exc:
+            return rerender(
+                f"[E-PDF-STAGING] 上传文件落盘失败（文件名含非法字符或磁盘不可写）：{exc}")
         try:
             full_text = extract_text(staging)   # PdfTextError → PDF 留 staging（U3）
         except PdfTextError as exc:

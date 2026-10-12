@@ -8,7 +8,7 @@
 
 **Tech Stack:** pymupdf4llm（web extra 新增）、FastAPI multipart（python-multipart 已有）、pydantic、pytest。
 
-**测试基线：** 744 passed（afae618 口径）。本计划新增 24 个测试，实测 **768 passed**（2 deselected 为 smoke，下同）。
+**测试基线：** 744 passed（afae618 口径）。本计划新增 25 个测试，实测 **769 passed**（2 deselected 为 smoke，下同）。
 
 ---
 
@@ -801,7 +801,7 @@ git commit -m "fix: demo smith2020 卡 pdf 路径改根相对并入库占位 PDF
 C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pytest tests -q
 ```
 
-Expected: **768 passed**（744 基线 + pdftext 9 + propose_note 2 + 校验 4 + demo 1 + web 8；含修复循环新增）。将实测计数回填至本计划头部"测试基线"行。
+Expected: **769 passed**（744 基线 + pdftext 9 + propose_note 2 + 校验 4 + demo 1 + web 9；含修复循环新增）。将实测计数回填至本计划头部"测试基线"行。
 
 - [ ] **Step 6.4: 设计偏离回填**
 
@@ -825,7 +825,7 @@ C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pip install -e ".
 C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pytest tests -q
 ```
 
-Expected: 合并干净；合并后全量 **768 passed**。注意主检出有无关未提交改动（`examples/paper-demo/metadata/data/data-01.md`），合并不受影响、不要顺手提交它。
+Expected: 合并干净；合并后全量 **769 passed**。注意主检出有无关未提交改动（`examples/paper-demo/metadata/data/data-01.md`），合并不受影响、不要顺手提交它。
 
 ---
 
@@ -839,4 +839,5 @@ Expected: 合并干净；合并后全量 **768 passed**。注意主检出有无�
 | P-D4 | 空内容 E-PDF-SHAPE 前置拒绝补实现（设计流程序 1 有、计划代码块漏） | Task 4 质量审查发现 0 字节 .pdf 会落 staging 后报误导性 E-PDF-CONVERT 并留垃圾件；修复为 read 后判空 rerender，且判空提到 `articles/` mkdir 之前（最严格零写入口径，`77b3f15`） |
 | P-D5 | `validate_upload_name` 拒绝裸 `.pdf` 文件名（无 stem） | Task 1 质量审查发现 `".pdf"` 能穿过校验、下游 staging 会落 `articles/.pdf` 垃圾件（`bfa03ef`） |
 | P-D6 | AGENTS.md 安装命令 `.[dev]` → `.[dev,web]` | 照旧文档安装会缺 web extra → pdftext/web 测试静默 skip；Task 1 质量审查建议 |
-| P-D7 | 测试计数：计划估 765，实测 768 | Task 1 的 +9 中 1 个是 Task 1 修复新增的参数化用例；Task 4 修复增 2 个测试（空内容拒绝 + 截断行使） |
+| P-D7 | 测试计数：计划估 765，实测 769 | Task 1 的 +9 中 1 个是修复新增的参数化用例；Task 4 修复增 3 个测试（空内容拒绝 + 截断行使 + staging 落盘失败） |
+| P-D8 | staging 落盘失败增 E-PDF-STAGING 码进表 | 最终整体审查发现 OSError 裸 500 违背设计"任一步失败即 rerender"原则；按红线 5 新码进表 |
