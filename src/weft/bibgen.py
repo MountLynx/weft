@@ -132,3 +132,20 @@ def draft_key(base: str, used: set[str]) -> str:
         candidate = f"{base}{_excel(n)}"
     used.add(candidate)
     return candidate
+
+
+def sync_managed_bib(project_root) -> str | None:
+    """managed 模式 bib 重渲（P-D1）；非 managed / bib 不唯一 → None，失败 → "bib_error"。
+
+    自 webui 路由上移共用（rename 设计 R8）：web 审阅/编辑与 weft rename 共用同一实现。
+    """
+    from weft.store.loader import load_project
+
+    project, _ = load_project(project_root)
+    if not project.bib_managed or len(project.bib_files) != 1:
+        return None
+    try:
+        sync_bib(project)
+    except (BibValueError, OSError, UnicodeDecodeError):
+        return "bib_error"
+    return "bib_updated"

@@ -16,6 +16,7 @@ from weft.engine.bib_propose import BibProposeError, propose_note
 from weft.engine.clients import make_client
 from weft.engine.draft_rules import DraftError
 from weft.store.writer import create_card, next_card_id, save_card
+from weft.bibgen import sync_managed_bib
 from weft.web.card_forms import (
     FIELD_SPECS,
     KIND_ID_WIDGET,
@@ -36,21 +37,6 @@ router = APIRouter()
 _STATUSES = ("draft", "approved", "rejected")
 # 新建卡的 id 是用户可控的落盘路径组件（模型层 id 无约束且 schema 冻结，只能在此守卫）
 _CARD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
-
-def _sync_managed_bib(project_root) -> str | None:
-    """note 卡写盘后重渲 managed bib；返回重定向标记（None = unmanaged/形状不齐，P-D1）。"""
-    from weft import bibgen
-    from weft.store.loader import load_project
-
-    project, _ = load_project(project_root)
-    if not project.bib_managed or len(project.bib_files) != 1:
-        return None
-    try:
-        bibgen.sync_bib(project)
-    except (bibgen.BibValueError, OSError, UnicodeDecodeError):
-        return "bib_error"
-    return "bib_updated"
-
 
 def _entry_value_error(project, card) -> str | None:
     """预检：假设卡写盘后渲染 bib 是否合法（E-BIB-VALUE 前置，避免毒化项目）。"""
@@ -181,7 +167,7 @@ async def card_new_post(request: Request, pid: str, kind: str):
         return rerender(errors)
     url = f"/p/{pid}/cards/{kind}/{card.id}"
     if kind == "note" and card.status == "approved":
-        flag = _sync_managed_bib(entry.project.root)
+        flag = sync_managed_bib(entry.project.root)
         if flag:
             url += f"?bib={flag}"
     return RedirectResponse(url, status_code=303)
@@ -255,7 +241,7 @@ async def card_review(request: Request, pid: str, kind: str, card_id: str):
               old_rel=entry.project.card_paths[card_id].as_posix())
     url = f"/p/{pid}/cards/{kind}/{card_id}"
     if kind == "note":
-        flag = _sync_managed_bib(entry.project.root)
+        flag = sync_managed_bib(entry.project.root)
         if flag:
             url += f"?bib={flag}"
     return RedirectResponse(url, status_code=303)
@@ -318,7 +304,7 @@ async def card_edit_post(request: Request, pid: str, kind: str, card_id: str):
               old_rel=entry.project.card_paths[card_id].as_posix())
     url = f"/p/{pid}/cards/{kind}/{card_id}"
     if kind == "note":
-        flag = _sync_managed_bib(entry.project.root)
+        flag = sync_managed_bib(entry.project.root)
         if flag:
             url += f"?bib={flag}"
     return RedirectResponse(url, status_code=303)
