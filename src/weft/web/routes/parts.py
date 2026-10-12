@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from weft.engine import make_client
 from weft.engine.part_draft import run_part_draft
+from weft.labels import label_map
 from weft.models.narrative import Node, Use
 from weft.store.loader import load_project
 from weft.store.writer import save_part
@@ -47,7 +48,9 @@ def _panel_ctx(entry, part) -> dict:
     project = entry.project
     return {"entry": entry, "pid": entry.pid, "part": part,
             "nodes": part.nodes, "draft_text": _draft_text(project, part.id),
-            "workflow_vocab": list(WORKFLOW_VOCAB)}
+            "workflow_vocab": list(WORKFLOW_VOCAB),
+            "use_labels": label_map(
+                project, [u.id for n in part.nodes for u in n.uses])}
 
 
 @router.get("/p/{pid}/parts")
@@ -118,7 +121,9 @@ def _node_form_ctx(entry, part, node, values, errors):
     project = entry.project
     return {"pid": entry.pid, "part": part, "node": node,
             "purpose_vocab": sorted(PURPOSE_VOCAB), "role_vocab": sorted(ROLE_VOCAB),
-            "entity_ids": sorted(_known_ids(project)), "values": values,
+            "entity_ids": sorted(_known_ids(project)),
+            "entity_labels": label_map(project, sorted(_known_ids(project))),
+            "values": values,
             "errors": errors}
 
 

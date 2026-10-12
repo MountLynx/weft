@@ -31,6 +31,12 @@
   </div>
   <button type="button" onclick="addUseRow()">＋ 添加 use</button>
   <datalist id="entity-ids">{% for eid in entity_ids %}<option value="{{ eid }}">{% endfor %}</datalist>
+  <div class="label">实体速查（id · 内容摘要）</div>
+  <ul class="entity-ref">
+    {% for eid in entity_ids %}
+    <li><code>{{ eid }}</code>{% if entity_labels.get(eid) %} · {{ entity_labels[eid] }}{% endif %}</li>
+    {% endfor %}
+  </ul>
   <datalist id="role-vocab">{% for r in role_vocab %}<option value="{{ r }}">{% endfor %}</datalist>
   <label>status
     <select name="status">

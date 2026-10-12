@@ -23,7 +23,7 @@
           <td><a href="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}">{{ node.id }}</a></td>
           <td>{{ node.purpose }}</td>
           <td><span class="badge {{ node.status }}">{{ node.status }}</span></td>
-          <td>{% for u in node.uses %}{{ u.id }}({{ u.role }}) {% endfor %}</td>
+          <td>{% for u in node.uses %}{{ u.id }}({{ u.role }}){% if use_labels.get(u.id) %} · {{ use_labels[u.id] }}{% endif %} {% endfor %}</td>
           <td>
             <form method="post" action="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status"
                   hx-post="/p/{{ pid }}/parts/{{ part.id }}/nodes/{{ node.id }}/status"

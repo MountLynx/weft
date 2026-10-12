@@ -22,11 +22,13 @@ from weft.web.card_forms import (
     KIND_MODELS,
     KIND_PREFIX,
     build_choices,
+    build_labels,
     form_to_meta,
     form_to_values,
     validation_errors,
     values_for_template,
 )
+from weft.labels import KEY_FIELD
 from weft.web.common import KIND_ATTRS, KIND_LABELS, load_project_or_404, templates
 
 router = APIRouter()
@@ -34,10 +36,6 @@ router = APIRouter()
 _STATUSES = ("draft", "approved", "rejected")
 # 新建卡的 id 是用户可控的落盘路径组件（模型层 id 无约束且 schema 冻结，只能在此守卫）
 _CARD_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
-# 列表页展示的"关键字段"（有则显示），按卡种
-_KEY_FIELD = {"data": "description", "fact": "statement", "claim": "statement",
-              "note": "summary", "method": "statement", "param": "method"}
-
 
 def _sync_managed_bib(project_root) -> str | None:
     """note 卡写盘后重渲 managed bib；返回重定向标记（None = unmanaged/形状不齐，P-D1）。"""
@@ -97,7 +95,7 @@ def card_list(request: Request, pid: str, kind: str):
     for cid, card in sorted(table.items()):
         rows.append({
             "id": cid, "status": card.status,
-            "key": getattr(card, _KEY_FIELD[kind], "") or "",
+            "key": getattr(card, KEY_FIELD[kind], "") or "",
             "rel": entry.project.card_paths[cid].as_posix()})
     return templates.TemplateResponse(
         request, "cards.html",
@@ -130,6 +128,7 @@ def card_new_get(request: Request, pid: str, kind: str):
          "is_new": True, "id_widget": widget, "prefilled_id": prefilled,
          "id_choices": id_choices, "specs": FIELD_SPECS[kind],
          "values": blank, "choices": build_choices(kind, entry.project),
+         "labels": build_labels(entry.project),
          "errors": {}})
 
 
@@ -153,7 +152,8 @@ async def card_new_post(request: Request, pid: str, kind: str):
              "is_new": True, "id_widget": widget, "prefilled_id": prefilled,
              "id_choices": id_choices, "specs": FIELD_SPECS[kind],
              "values": form_to_values(kind, form),
-             "choices": build_choices(kind, entry.project), "errors": errors})
+             "choices": build_choices(kind, entry.project),
+             "labels": build_labels(entry.project), "errors": errors})
 
     meta, errors = form_to_meta(kind, form, is_new=True, card_id=None)
     card = None
@@ -275,7 +275,8 @@ def card_edit_get(request: Request, pid: str, kind: str, card_id: str):
          "is_new": False, "id_widget": None, "prefilled_id": "", "id_choices": [],
          "specs": FIELD_SPECS[kind],
          "values": values_for_template(kind, card),
-         "choices": build_choices(kind, entry.project), "errors": {}})
+         "choices": build_choices(kind, entry.project),
+         "labels": build_labels(entry.project), "errors": {}})
 
 
 @router.post("/p/{pid}/cards/{kind}/{card_id}/edit")
@@ -295,7 +296,8 @@ async def card_edit_post(request: Request, pid: str, kind: str, card_id: str):
              "cancel_url": f"/p/{pid}/cards/{kind}/{card_id}",
              "is_new": False, "id_widget": None, "prefilled_id": "", "id_choices": [],
              "specs": FIELD_SPECS[kind], "values": form_to_values(kind, form),
-             "choices": build_choices(kind, entry.project), "errors": errors})
+             "choices": build_choices(kind, entry.project),
+             "labels": build_labels(entry.project), "errors": errors})
 
     meta, errors = form_to_meta(kind, form, is_new=False, card_id=card_id)
     card = None
