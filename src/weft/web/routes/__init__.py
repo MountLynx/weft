@@ -10,6 +10,10 @@ def register_all(app: FastAPI) -> None:
     core.register(app)
     cards.register(app)
 
+    from weft.web.routes import figures as figures_routes
+
+    figures_routes.register(app)
+
     from weft.web.routes import parts as parts_routes
 
     parts_routes.register(app)

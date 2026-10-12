@@ -24,7 +24,7 @@ def test_dashboard_subnav_has_all_sections(tmp_path):
     resp = client.get("/p/demo/")
     assert resp.status_code == 200
     assert 'class="subnav"' in resp.text
-    for slug in ("", "parts", "cards", "graph", "inspire", "diagnostics"):
+    for slug in ("", "parts", "cards", "figures", "graph", "inspire", "diagnostics"):
         assert f'href="/p/demo/{slug}"' in resp.text
     assert _active_link(resp.text, "/p/demo/")       # 总览高亮
     assert _plain_link(resp.text, "/p/demo/cards")   # 其余为普通态
@@ -34,6 +34,7 @@ def test_dashboard_subnav_has_all_sections(tmp_path):
 def test_subnav_active_follows_section(tmp_path):
     client, _ = make_client(tmp_path)
     cases = [
+        ("/p/demo/figures", "/p/demo/figures"),
         ("/p/demo/parts", "/p/demo/parts"),
         ("/p/demo/cards/data", "/p/demo/cards"),
         ("/p/demo/graph", "/p/demo/graph"),
