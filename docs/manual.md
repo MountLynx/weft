@@ -162,6 +162,8 @@ my-paper/
 
 YAML 未知键一律报错（`extra="forbid"`）——拼错字段名会被 `E-PARSE` 抓住，而不是被静默忽略。
 
+> **命名约定**：`weft new card` 的 id 显式必填、从不自动编号——新建 data/fact/claim 卡**优先用语义 id**（如 `rate-jumps-above-60c`），让 review/诊断/引用处的编号自带语义；自动编号（data-01 式）仅作缺省回退（WebUI 新建表单会预填，可改）。id 即文件名，全卡种全局唯一；落盘后改名需手工同步所有引用点，故不做 rename 工具。
+
 ### 5.1 data 卡 —— `metadata/data/<id>.md`
 
 一条数据集（一次实验、一组测量）的描述。
@@ -441,7 +443,15 @@ weft validate [project_dir]
 weft review [project_dir]
 ```
 
-按类型列出所有 `status: draft` 的待办：**data / fact / claim / note 四类实体卡**与全部叙事节点（method/param 卡暂不在列，可用 `weft validate` 的孤儿报告辅助检查）。项目加载失败（error 级诊断）退出码 1。
+按类型列出所有 `status: draft` 的待办：**data / fact / claim / note 四类实体卡**与全部叙事节点（method/param 卡暂不在列，可用 `weft validate` 的孤儿报告辅助检查）。每个实体行尾附**语义摘要**（卡片 key 字段 / 节点 logic，截断 40 字符），看编号即知内容，不必逐个开文件。项目加载失败（error 级诊断）退出码 1。
+
+### weft show
+
+```
+weft show <card_id> [project_dir]
+```
+
+按 id 打印卡片速览（六类通用）：头行（id / 卡种 / status / 路径）、全部字段全文（列表逗号连接、映射按 JSON）、被引用关系（哪些 fact/claim/param/节点引用了它）。未知 id 打印 `ERROR 项目中不存在实体：<id>` 并退出 1。适合从 review/诊断里的编号就地查内容。
 
 ### weft graph
 
@@ -451,7 +461,7 @@ weft graph [project_dir]
 
 校验通过后生成三份反向索引产物：
 
-- `generated/graph.json` —— 全量实体反向索引（含 rejected；每实体含 `kind`/`status`/`referenced_by{facts,claims,methods,params,nodes}`）；
+- `generated/graph.json` —— 全量实体反向索引（含 rejected；每实体含 `kind`/`status`/`summary`（key 字段全文）/`referenced_by{facts,claims,methods,params,nodes}`）；
 - `generated/used-metadata.json` —— 被叙事流引用的实体集合；
 - `generated/orphans.md` —— 孤儿实体报告（未被任何叙事节点引用，含间接可达）。
 

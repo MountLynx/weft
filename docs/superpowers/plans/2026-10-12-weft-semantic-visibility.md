@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3 + pydantic（已有）、FastAPI + Jinja2（已有）、pytest + CliRunner/TestClient。
 
-**基线：** 602 passed, 2 deselected。**完成预期：625 passed, 2 deselected**（新增 23 个测试）。
+**基线：** 602 passed, 2 deselected。**完成预期：625 passed, 2 deselected**（新增 23 个测试）。**实际：625 passed, 2 deselected（2026-10-12 全量验证一致，无偏离）。**
 
 **工作目录：** worktree `.worktrees/semantic-visibility`（分支 `semantic-visibility`）。测试命令统一为：
 

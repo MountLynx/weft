@@ -39,7 +39,8 @@
 - `weft init` 项目模板 ✅（2026-09-04）：最小合法骨架（init 后 `weft validate` 0 错 0 提醒；六类卡片目录、figures.yaml/weft.yaml 全注释模板、起步 part）；非空目录拒绝（`E-INIT-COLLISION`，零写入 fail-closed）。骨架文件内注释即格式参考，计划与设计决策见 `docs/superpowers/plans/2026-09-04-weft-init.md`。
 - `weft new` 模板化创建 ✅（2026-10-10）：`weft new part <chapter> <section> [--id]`（part id 全局 sec-NN 自动编号、文件名章节内 part-NN 自动编号）与 `weft new card <kind> <id>`（六类卡片，落盘目录对齐 writer 规范）；碰撞 fail-closed 零写入（`E-NEW-COLLISION`）、路径成分校验（`E-NEW-NAME`）；桩卡"最小合法+注释示例"，fact/param/note 的待填错误由校验器指路。设计见 `docs/superpowers/specs/2026-10-10-weft-new-template-design.md`。
 - WebUI（比赛展示）：`weft serve` 服务器端 Web 应用（FastAPI+htmx，全流程含卡片编辑与生成）✅；项目列表页内嵌表单新建项目（复用 `init_project` 骨架、名称黑名单守卫、中文 pid、冲突零写入，2026-09-08，见 `docs/superpowers/plans/2026-09-08-weft-webui-new-project.md`）
-- 断点续跑/回滚接入 CLI（复用 SpecModule 原生能力）。
+- - 语义可见性 ✅（2026-10-12）：`weft review` 摘要列、graph.json `summary`、orphans 摘要、`weft show <id>` 速览、WebUI 引用控件/uses/实体速查带「id · 摘要」、WebUI 新建卡 id 解锁语义命名。设计见 `docs/superpowers/specs/2026-10-12-weft-semantic-visibility-design.md`。
+断点续跑/回滚接入 CLI（复用 SpecModule 原生能力）。
 - 溯源注释完善与用户文档。
 - bib 自动生成（bibgen）✅（2026-09-29）：`weft bib sync`；managed 模式以已批准文献卡为真源（note 卡 entry 书目字段，spec 2026-09-29-weft-bibgen），WebUI 批准/编辑即同步，AI 提案与 parse 文献模式两条草案入口。
 - 项目注册表（projects registry）✅（2026-09-29）：全局注册表（`$WEFT_HOME/projects.json`）让项目散落磁盘任意位置；`weft projects add/new/list/remove/root` 命令组 + `weft serve` 双模式（无参 = 注册表模式，一个主程序多项目共存且相互隔离；带参 = 扫描模式现状不变）；WebUI 新建表单登记闭环、失联灰显、损坏横幅（E-REG-* fail-closed）；设计定案 `docs/superpowers/specs/2026-09-29-weft-projects-registry-design.md`（决策 R1–R12，测试 547 passed）。
