@@ -3,8 +3,11 @@
 {% block content %}
 <h2>AI 提案文献（note 卡草稿）</h2>
 {% if error %}<div class="banner error">{{ error }}</div>{% endif %}
-<form method="post" action="{{ action }}">
-  <label>线索（DOI / 标题 / 作者 / 年份 / 摘要，任意组合）
+<form method="post" action="{{ action }}" enctype="multipart/form-data">
+  <label>PDF 上传（可选：自动提取线索、归档到 pdfs/、生成 articles/&lt;key&gt;.md）
+    <input type="file" name="pdf_file" accept=".pdf">
+  </label>
+  <label>线索（DOI / 标题 / 作者 / 年份 / 摘要，任意组合；上传 PDF 时可作为补充线索）
     <textarea name="clues" rows="6">{{ clues }}</textarea>
   </label>
   <button type="submit" class="btn-primary">生成提案草稿卡</button>

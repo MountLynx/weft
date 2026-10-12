@@ -5,16 +5,26 @@
 from __future__ import annotations
 
 import re
+import shutil
+from pathlib import Path
 
 import yaml
 from pydantic import ValidationError
 
 from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from starlette.datastructures import UploadFile  # 表单解析产生的是 starlette 基类实例
 
 from weft.engine.bib_propose import BibProposeError, propose_note
 from weft.engine.clients import make_client
 from weft.engine.draft_rules import DraftError
+from weft.pdftext import (
+    CLUES_CHARS,
+    PdfTextError,
+    extract_text,
+    normalize_lf,
+    validate_upload_name,
+)
 from weft.store.writer import create_card, next_card_id, save_card
 from weft.bibgen import sync_managed_bib
 from weft.rename import RenameError, apply_rename, plan_rename
@@ -32,7 +42,13 @@ from weft.web.card_forms import (
     values_for_template,
 )
 from weft.labels import KEY_FIELD
-from weft.web.common import KIND_ATTRS, KIND_LABELS, load_project_or_404, templates
+from weft.web.common import (
+    KIND_ATTRS,
+    KIND_LABELS,
+    load_entry_or_404,
+    load_project_or_404,
+    templates,
+)
 
 router = APIRouter()
 
@@ -189,6 +205,9 @@ async def bib_propose_post(request: Request, pid: str):
     entry = load_project_or_404(request, pid)
     form = await request.form()
     clues = str(form.get("clues") or "")
+    upload = form.get("pdf_file")
+    has_file = isinstance(upload, UploadFile) and bool(upload.filename)
+    project = entry.project
 
     def rerender(error: str):
         return templates.TemplateResponse(
@@ -196,13 +215,53 @@ async def bib_propose_post(request: Request, pid: str):
             {"pid": pid, "action": f"/p/{pid}/notes/propose",
              "cancel_url": f"/p/{pid}/cards/note", "clues": clues, "error": error})
 
+    if not clues.strip() and not has_file:
+        return rerender("请上传 PDF 或填写线索（至少其一）。")
+
+    staging: Path | None = None
+    full_text = ""
+    if has_file:
+        try:
+            validate_upload_name(upload.filename)
+        except PdfTextError as exc:
+            return rerender(str(exc))
+        staging = project.root / "articles" / Path(upload.filename).name
+        staging.parent.mkdir(parents=True, exist_ok=True)
+        staging.write_bytes(await upload.read())
+        try:
+            full_text = extract_text(staging)   # PdfTextError → PDF 留 staging（U3）
+        except PdfTextError as exc:
+            return rerender(str(exc))
+
+    merged_clues = full_text[:CLUES_CHARS]
+    if clues.strip():
+        merged_clues = (f"{merged_clues}\n\n补充线索：{clues.strip()}"
+                        if merged_clues else clues.strip())
+
     try:
-        client = make_client(mock=False, project_root=entry.project.root)
-        key, fields = await propose_note(entry.project, clues, client)
+        client = make_client(mock=False, project_root=project.root)
+        key, fields = await propose_note(
+            project, merged_clues, client,
+            source_pdf=upload.filename if has_file else None)
     except (BibProposeError, DraftError) as exc:
         return rerender(str(exc))
+
+    if has_file:
+        fields["pdf"] = f"pdfs/{key}.pdf"   # key 定了才回填（设计 §引擎规格）
     from weft.engine.card_writer import write_proposed_cards
-    write_proposed_cards(entry.project, [("note", fields)])
+    write_proposed_cards(project, [("note", fields)])
+
+    if has_file:
+        try:
+            dest = project.root / "pdfs" / f"{key}.pdf"
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.unlink(missing_ok=True)    # U2：同名孤儿归档覆盖语义
+            shutil.move(str(staging), str(dest))
+            (project.root / "articles" / f"{key}.md").write_text(
+                normalize_lf(full_text), encoding="utf-8", newline="\n")
+        except OSError:
+            return RedirectResponse(f"/p/{pid}/cards/note/{key}?pdfwarn=1",
+                                    status_code=303)
     return RedirectResponse(f"/p/{pid}/cards/note/{key}", status_code=303)
 
 
@@ -218,13 +277,21 @@ def _render_detail(request, entry, kind, card, *, rename_error: str | None = Non
                     for k, v in card.model_dump().items()
                     if k not in ("id", "status", "comment")},
          "bib_flag": request.query_params.get("bib"),
+         "pdf_warn": request.query_params.get("pdfwarn"),
          "rename_error": rename_error})
 
 
 @router.get("/p/{pid}/cards/{kind}/{card_id}")
 def card_detail(request: Request, pid: str, kind: str, card_id: str):
-    entry, table = _table(request, pid, kind)
-    card = table.get(card_id)
+    # 故意用 load_entry_or_404（figures/诊断页先例：校验错误项目恰恰最需要看卡）：
+    # 提案跳转带 ?pdfwarn=1 时，unmanaged 项目的 draft 卡必触发 E-NOTE-NOT-IN-BIB，
+    # 严格闸门会让落位失败提示永不可见（pdf-ingest 设计 U10）。
+    if kind not in KIND_ATTRS:
+        raise HTTPException(status_code=404, detail="未知卡种")
+    entry = load_entry_or_404(request, pid)
+    if entry.project is None:   # 加载级错误（E-PARSE 等）：无卡表可查，维持 404
+        raise HTTPException(status_code=404, detail="项目不可用")
+    card = getattr(entry.project, KIND_ATTRS[kind]).get(card_id)
     if card is None:
         raise HTTPException(status_code=404, detail="卡片不存在")
     return _render_detail(request, entry, kind, card)
