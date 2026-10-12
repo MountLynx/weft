@@ -1,4 +1,4 @@
-"""typer 入口：weft init / new / validate / graph / review / show / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve。"""
+"""typer 入口：weft init / new / validate / graph / review / show / rename / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve。"""
 from __future__ import annotations
 
 import json
@@ -12,6 +12,8 @@ from weft.diagnostics import Diagnostic, Level
 from weft.graphgen.index import build_index
 from weft.graphgen.writer import write_outputs
 from weft.labels import cap, entity_digest, find_card
+from weft.rename import RenameError, RenamePlan, apply_rename, plan_rename
+from weft.scaffold import NewCollisionError, NewNameError
 from weft.store.loader import load_project
 from weft.store.project import Project
 from weft.validation import validate_project
@@ -768,3 +770,51 @@ def new_card(
     target.write_text(render_card_template(kind.value, card_id), encoding="utf-8", newline="\n")
     typer.echo(f"已创建 {target.relative_to(project.root).as_posix()}")
     typer.echo("下一步：填写字段后 weft validate 检查，approved 进入生成闸门")
+
+
+def _print_plan(plan: RenamePlan) -> None:
+    typer.echo("改写计划：")
+    typer.echo(f"  重命名  {plan.old_rel} → {plan.new_rel}")
+    for cid, fields in plan.card_refs.items():
+        typer.echo(f"  同步    {plan.card_rels[cid]}（{', '.join(fields)}）")
+    for pid, n in plan.part_refs.items():
+        typer.echo(f"  同步    {plan.part_rels[pid]}（uses {n} 处）")
+
+
+@app.command()
+def rename(
+    old_id: str = typer.Argument(..., help="现有卡片 id（六类通用）"),
+    new_id: str = typer.Argument(..., help="新 id（全卡种全局唯一，安全路径成分）"),
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="只打印改写计划，不落盘"),
+) -> None:
+    """改名并同步全部引用位点（文件/frontmatter/data/supports/cites/method/derived_from/节点 uses）。"""
+    project, load_diags = load_project(project_dir)
+    if any(d.is_error for d in load_diags):
+        _print_diagnostics(load_diags)
+        raise typer.Exit(code=1)
+    try:
+        plan = plan_rename(project, old_id, new_id)
+    except RenameError as exc:
+        typer.echo(f"ERROR {exc}")
+        raise typer.Exit(code=1) from exc
+    except NewNameError as exc:
+        _print_diagnostics([Diagnostic(Level.ERROR, "E-NEW-NAME", ".", None, str(exc))])
+        raise typer.Exit(code=1) from exc
+    except NewCollisionError as exc:
+        _print_diagnostics([Diagnostic(
+            Level.ERROR, "E-NEW-COLLISION", exc.rel or ".", None, str(exc))])
+        raise typer.Exit(code=1) from exc
+    _print_plan(plan)
+    if dry_run:
+        typer.echo("(dry-run，未写入)")
+        return
+    result = apply_rename(project, plan)
+    typer.echo(f"✓ {len(result.written)} 个文件已更新")
+    if plan.kind == "note":
+        if result.bib_status == "bib_updated":
+            typer.echo("已同步 managed bib")
+        elif result.bib_status is None:
+            typer.echo("⚠ references.bib 为自管文件（unmanaged），请手工把条目 key 同步为新 id")
+        else:
+            typer.echo("⚠ managed bib 重渲失败（bib_error），请检查 references.bib 与 note entry")
