@@ -6,14 +6,12 @@ from pathlib import Path
 from fastapi import HTTPException, Request
 from fastapi.templating import Jinja2Templates
 
+from weft.labels import KIND_ATTRS
 from weft.web.discovery import ProjectEntry
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
 
-# kind → Project 属性名（models/cards.py 六类卡）
-KIND_ATTRS = {"data": "data_cards", "fact": "facts", "claim": "claims",
-              "note": "notes", "method": "methods", "param": "params"}
 KIND_LABELS = {"data": "data 卡", "fact": "fact 卡", "claim": "claim 卡",
                "note": "note 卡", "method": "method 卡", "param": "param 卡"}
 
