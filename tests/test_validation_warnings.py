@@ -1,6 +1,11 @@
+from pathlib import Path
+
+import pytest
+
 from weft.models.cards import ClaimCard, DataCard, FactCard, MethodCard, NoteCard, ParamCard
 from weft.models.figures import FigureEntry
 from weft.models.narrative import NarrativePart, Node, Use
+from weft.store.loader import load_project
 from weft.validation import validate_project
 from tests.helpers import build_project
 
@@ -273,10 +278,6 @@ def test_note_pdf_rejected_skipped(tmp_path):
 
 def test_demo_project_no_pdf_missing():
     """U12：demo 的 smith2020 卡 pdf 路径根相对且文件在库，校验零该提醒。"""
-    from pathlib import Path
-
-    from weft.store.loader import load_project
-
     root = Path(__file__).resolve().parents[1] / "examples" / "paper-demo"
     if not (root / "weft.yaml").exists():
         pytest.skip("demo 项目缺失")

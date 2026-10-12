@@ -696,15 +696,19 @@ git commit -m "feat: 文献提案表单支持 PDF 上传——staging→转换�
 
 - [ ] **Step 5.1: 写失败测试**
 
-`tests/test_validation_warnings.py` 末尾追加：
+`tests/test_validation_warnings.py` 末尾追加测试；模块顶部 import 区补 `import pytest`、`from pathlib import Path`、`from weft.store.loader import load_project`（修正：原片段漏 `import pytest`，demo 缺失时 skip 守卫会 NameError）：
 
 ```python
+# —— 模块顶部 import 区追加 ——
+import pytest
+from pathlib import Path
+
+from weft.store.loader import load_project
+
+
+# —— 文件末尾追加 ——
 def test_demo_project_no_pdf_missing():
     """U12：demo 的 smith2020 卡 pdf 路径根相对且文件在库，校验零该提醒。"""
-    from pathlib import Path
-
-    from weft.store.loader import load_project
-
     root = Path(__file__).resolve().parents[1] / "examples" / "paper-demo"
     if not (root / "weft.yaml").exists():
         pytest.skip("demo 项目缺失")
