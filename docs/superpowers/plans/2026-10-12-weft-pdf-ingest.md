@@ -8,7 +8,7 @@
 
 **Tech Stack:** pymupdf4llm（web extra 新增）、FastAPI multipart（python-multipart 已有）、pydantic、pytest。
 
-**测试基线：** 744 passed（afae618 口径）。本计划新增 21 个测试，预期 **765 passed**；执行完回填实测计数。
+**测试基线：** 744 passed（afae618 口径）。本计划新增 24 个测试，实测 **768 passed**（2 deselected 为 smoke，下同）。
 
 ---
 
@@ -801,7 +801,7 @@ git commit -m "fix: demo smith2020 卡 pdf 路径改根相对并入库占位 PDF
 C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pytest tests -q
 ```
 
-Expected: **765 passed**（744 + 21；如有 skip 属 pymupdf4llm 缺装或 demo 缺失路径，须排查而非默认接受）。将实测计数回填至本计划头部"测试基线"行。
+Expected: **768 passed**（744 基线 + pdftext 9 + propose_note 2 + 校验 4 + demo 1 + web 8；含修复循环新增）。将实测计数回填至本计划头部"测试基线"行。
 
 - [ ] **Step 6.4: 设计偏离回填**
 
@@ -825,7 +825,7 @@ C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pip install -e ".
 C:/Users/xingy/Desktop/开发/weft/.venv/Scripts/python.exe -m pytest tests -q
 ```
 
-Expected: 合并干净；合并后全量 **765 passed**。注意主检出有无关未提交改动（`examples/paper-demo/metadata/data/data-01.md`），合并不受影响、不要顺手提交它。
+Expected: 合并干净；合并后全量 **768 passed**。注意主检出有无关未提交改动（`examples/paper-demo/metadata/data/data-01.md`），合并不受影响、不要顺手提交它。
 
 ---
 
@@ -833,4 +833,10 @@ Expected: 合并干净；合并后全量 **765 passed**。注意主检出有无�
 
 | # | 偏离 | 理由 |
 |---|---|---|
-| （暂无） | | |
+| P-D1 | `UploadFile` 从 `starlette.datastructures` 导入（计划写 fastapi） | fastapi 的 UploadFile 是 starlette 基类的子类，表单解析只造基类实例，`isinstance(upload, fastapi.UploadFile)` 恒 False → `has_file` 恒 False，上传会被静默忽略（实测定案） |
+| P-D2 | `card_detail` GET 改容错加载 `load_entry_or_404`（POST 侧保持严格） | unmanaged 项目（正式配置）提案产生 draft note 卡即触发 E-NOTE-NOT-IN-BIB → 项目 unavailable → 严格闸门 404 → U10 的 `?pdfwarn` banner 永不可达；in-repo 先例 `figures.py:55`、`core.py:178`（"坏项目恰恰最需要这个页面"）；加载级错误（E-PARSE）仍 404；managed 项目 draft 豁免该错误、不受影响 |
+| P-D3 | 任务执行顺序：Task 5（demo 修正）提前到 Task 4 之前 | Task 3 新规则正确暴露 demo 坏数据（smith2020 卡 `../pdfs/` 自 de068bf 就错，计划"基线不应有"判断有误）→ 全量暂红 1 条；提前修复恢复绿，避免后续任务带红跑 |
+| P-D4 | 空内容 E-PDF-SHAPE 前置拒绝补实现（设计流程序 1 有、计划代码块漏） | Task 4 质量审查发现 0 字节 .pdf 会落 staging 后报误导性 E-PDF-CONVERT 并留垃圾件；修复为 read 后判空 rerender，且判空提到 `articles/` mkdir 之前（最严格零写入口径，`77b3f15`） |
+| P-D5 | `validate_upload_name` 拒绝裸 `.pdf` 文件名（无 stem） | Task 1 质量审查发现 `".pdf"` 能穿过校验、下游 staging 会落 `articles/.pdf` 垃圾件（`bfa03ef`） |
+| P-D6 | AGENTS.md 安装命令 `.[dev]` → `.[dev,web]` | 照旧文档安装会缺 web extra → pdftext/web 测试静默 skip；Task 1 质量审查建议 |
+| P-D7 | 测试计数：计划估 765，实测 768 | Task 1 的 +9 中 1 个是 Task 1 修复新增的参数化用例；Task 4 修复增 2 个测试（空内容拒绝 + 截断行使） |
