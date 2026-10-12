@@ -58,3 +58,22 @@ def test_claim_type_edit_moves_file(tmp_path):
     assert resp.status_code == 303
     assert (root / "demo" / "metadata" / "claims" / "cited" / "claim-01.md").exists()
     assert not (root / "demo" / "metadata" / "claims" / "uncited" / "claim-01.md").exists()
+
+
+def test_rename_card_via_ui(tmp_path):
+    client, root = make_client(tmp_path)
+    resp = client.post("/p/demo/cards/fact/fact-01/rename",
+                       data={"new_id": "temp-rate"}, follow_redirects=False)
+    assert resp.status_code == 303
+    assert resp.headers["location"] == "/p/demo/cards/fact/temp-rate"
+    assert (root / "demo" / "metadata" / "facts" / "temp-rate.md").exists()
+    assert not (root / "demo" / "metadata" / "facts" / "fact-01.md").exists()
+
+
+def test_rename_collision_renders_error(tmp_path):
+    client, root = make_client(tmp_path)
+    resp = client.post("/p/demo/cards/fact/fact-01/rename",
+                       data={"new_id": "claim-01"})
+    assert resp.status_code == 200
+    assert "E-NEW-COLLISION" in resp.text
+    assert (root / "demo" / "metadata" / "facts" / "fact-01.md").exists()

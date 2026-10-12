@@ -17,6 +17,8 @@ from weft.engine.clients import make_client
 from weft.engine.draft_rules import DraftError
 from weft.store.writer import create_card, next_card_id, save_card
 from weft.bibgen import sync_managed_bib
+from weft.rename import RenameError, apply_rename, plan_rename
+from weft.scaffold import NewCollisionError, NewNameError
 from weft.web.card_forms import (
     FIELD_SPECS,
     KIND_ID_WIDGET,
@@ -204,12 +206,9 @@ async def bib_propose_post(request: Request, pid: str):
     return RedirectResponse(f"/p/{pid}/cards/note/{key}", status_code=303)
 
 
-@router.get("/p/{pid}/cards/{kind}/{card_id}")
-def card_detail(request: Request, pid: str, kind: str, card_id: str):
-    entry, table = _table(request, pid, kind)
-    card = table.get(card_id)
-    if card is None:
-        raise HTTPException(status_code=404, detail="卡片不存在")
+def _render_detail(request, entry, kind, card, *, rename_error: str | None = None):
+    """详情页渲染（GET 与 rename 错误回显共用，rename 设计 R9）。"""
+    card_id = card.id
     return templates.TemplateResponse(
         request, "card_detail.html",
         {"entry": entry, "kind": kind, "card": card,
@@ -218,7 +217,40 @@ def card_detail(request: Request, pid: str, kind: str, card_id: str):
                         if k == "entry" and v else ("" if v is None else v))
                     for k, v in card.model_dump().items()
                     if k not in ("id", "status", "comment")},
-         "bib_flag": request.query_params.get("bib"),})
+         "bib_flag": request.query_params.get("bib"),
+         "rename_error": rename_error})
+
+
+@router.get("/p/{pid}/cards/{kind}/{card_id}")
+def card_detail(request: Request, pid: str, kind: str, card_id: str):
+    entry, table = _table(request, pid, kind)
+    card = table.get(card_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="卡片不存在")
+    return _render_detail(request, entry, kind, card)
+
+
+@router.post("/p/{pid}/cards/{kind}/{card_id}/rename")
+async def card_rename(request: Request, pid: str, kind: str, card_id: str):
+    """卡片改名（rename 设计 R9）：与 CLI 共用 plan/apply 引擎，错误回显详情页。"""
+    entry, table = _table(request, pid, kind)
+    card = table.get(card_id)
+    if card is None:
+        raise HTTPException(status_code=404, detail="卡片不存在")
+    form = await request.form()
+    new_id = str(form.get("new_id") or "").strip()
+    try:
+        plan = plan_rename(entry.project, card_id, new_id)
+    except RenameError as exc:
+        return _render_detail(request, entry, kind, card, rename_error=str(exc))
+    except NewNameError as exc:
+        return _render_detail(request, entry, kind, card,
+                              rename_error=f"[E-NEW-NAME] {exc}")
+    except NewCollisionError as exc:
+        return _render_detail(request, entry, kind, card,
+                              rename_error=f"[E-NEW-COLLISION] {exc}")
+    apply_rename(entry.project, plan)
+    return RedirectResponse(f"/p/{pid}/cards/{kind}/{new_id}", status_code=303)
 
 
 @router.post("/p/{pid}/cards/{kind}/{card_id}/status")
