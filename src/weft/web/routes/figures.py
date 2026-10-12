@@ -101,13 +101,13 @@ def _list_readonly(request: Request, entry, error: str):
          else [], "load_error": error})
 
 
-def _list_with_error(request: Request, entry, exc: FiguresEditError):
-    """操作被拒（COLLISION/IN-USE 等，注册表本身健康）：banner 报错但页面可交互。"""
+def _list_with_error(request: Request, entry, error: str):
+    """操作被拒（COLLISION/IN-USE/项目带病等，注册表本身健康）：banner 报错但页面可交互。"""
     return templates.TemplateResponse(
         request, "figures.html",
         {"entry": entry,
          "rows": _rows(entry) if entry.project is not None else [],
-         "load_error": None, "error": f"{exc.code} {exc.message}"})
+         "load_error": None, "error": error})
 
 
 @router.get("/p/{pid}/figures/new")
@@ -133,7 +133,7 @@ def figure_edit_get(request: Request, pid: str, key: str):
             # 注册表带病时无表可填，回列表页只读 banner（F3）
             return _list_readonly(
                 request, entry, f"{exc.code} {exc.message}（请手工修复后刷新）")
-        return _list_with_error(request, entry, exc)
+        return _list_with_error(request, entry, f"{exc.code} {exc.message}")
     fig = entries.get(key)
     if fig is None:
         raise HTTPException(status_code=404, detail="图注条目不存在")
@@ -152,17 +152,26 @@ async def figure_edit_post(request: Request, pid: str, key: str):
 @router.post("/p/{pid}/figures/{key}/delete")
 def figure_delete(request: Request, pid: str, key: str):
     entry = load_entry_or_404(request, pid)
-    references = ({cid: set(card.refs)
-                   for cid, card in entry.project.data_cards.items()}
-                  if entry.project is not None else {})
     try:
-        entries = remove_entry(load_for_edit(entry.path), key, references)
-        write_figures_yaml(entry.path, entries)
+        entries = load_for_edit(entry.path)
     except FiguresEditError as exc:
         if exc.code == "E-FIG-LOAD":
             return _list_readonly(
                 request, entry, f"{exc.code} {exc.message}（请手工修复后刷新）")
-        return _list_with_error(request, entry, exc)
+        return _list_with_error(request, entry, f"{exc.code} {exc.message}")
+    if entry.project is None:
+        # 引用检查需要 project 的 data 卡视图；项目带病时宁可拒绝（F6 从严），
+        # 指向诊断页让用户先修项目——figures.yaml 本身没坏（否则上面已只读），
+        # 故走交互 banner。
+        return _list_with_error(
+            request, entry, "项目加载失败，删除需要完整引用检查，先看诊断页")
+    references = {cid: set(card.refs)
+                  for cid, card in entry.project.data_cards.items()}
+    try:
+        entries = remove_entry(entries, key, references)
+        write_figures_yaml(entry.path, entries)
+    except FiguresEditError as exc:
+        return _list_with_error(request, entry, f"{exc.code} {exc.message}")
     return RedirectResponse(f"/p/{pid}/figures", status_code=303)
 
 
@@ -171,6 +180,10 @@ def _submit(request: Request, entry, key: str | None, form):
     subfigs_text = str(form.get("subfigs", ""))
     prefix = str(form.get("prefix", "fig"))
     values = _values(caption, subfigs_text, prefix)
+    if key is None:
+        # 回显保真：键是身份（F8），冲突/键名错误重显时不能丢用户键名，
+        # 否则没注意就重交 → 静默落自动编号。
+        values["key"] = str(form.get("key", "")).strip()
     try:
         subfigs = parse_subfigs(subfigs_text)
         entries = load_for_edit(entry.path)

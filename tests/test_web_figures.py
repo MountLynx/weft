@@ -81,6 +81,7 @@ def test_figure_new_collision_rerender(tmp_path):
                              "subfigs": ""})
     assert resp.status_code == 200
     assert "E-FIG-COLLISION" in resp.text
+    assert 'value="fig-01"' in resp.text   # 键名保真（F8：键是身份）
 
 
 def test_figure_new_invalid_name_rerender(tmp_path):
@@ -131,6 +132,19 @@ def test_figure_delete_blocked_in_use(tmp_path):
     assert resp.status_code == 200
     assert "E-FIG-IN-USE" in resp.text and "data-01" in resp.text
     assert 'href="/p/demo/figures/fig-01"' in resp.text   # 编辑链接仍在（页面可交互）
+    assert "页面只读" not in resp.text
+
+
+def test_figure_delete_refused_on_degraded_project(tmp_path):
+    """F6 从严：figures.yaml 健康、项目带病（project=None）→ 删除拒绝（引用检查
+    需要完整 data 卡视图），页面保持可交互（非只读）。"""
+    client, projects = make_client(tmp_path)
+    (projects / "demo" / "metadata" / "data" / "data-01.md").write_text(
+        "not: [valid", encoding="utf-8")
+    resp = client.post("/p/demo/figures/fig-01/delete")
+    assert resp.status_code == 200
+    assert "删除需要完整引用检查" in resp.text
+    assert "fig-01:" in _yaml_path(projects).read_text(encoding="utf-8")
     assert "页面只读" not in resp.text
 
 
