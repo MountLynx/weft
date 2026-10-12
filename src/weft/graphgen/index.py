@@ -6,6 +6,7 @@ derived_from（method/param → bib key）与 claim.cites 一样进 note 的反�
 """
 from __future__ import annotations
 
+from weft.labels import KEY_FIELD
 from weft.store.project import Project
 
 _PLURAL = {"data": "data", "fact": "facts", "claim": "claims",
@@ -41,6 +42,7 @@ def build_index(project: Project) -> dict:
                         ("method", project.methods), ("param", project.params)):
         for cid, card in cards.items():
             entities[cid] = {"kind": kind, "status": card.status,
+                             "summary": getattr(card, KEY_FIELD[kind], "") or "",
                              "referenced_by": {k: [] for k in _REVERSE_KEYS}}
 
     for fid, fact in project.facts.items():

@@ -1,6 +1,7 @@
-"""typer 入口：weft init / new / validate / graph / review / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve。"""
+"""typer 入口：weft init / new / validate / graph / review / show / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve。"""
 from __future__ import annotations
 
+import json
 import sys
 from enum import Enum
 from pathlib import Path
@@ -8,7 +9,9 @@ from pathlib import Path
 import typer
 
 from weft.diagnostics import Diagnostic, Level
+from weft.graphgen.index import build_index
 from weft.graphgen.writer import write_outputs
+from weft.labels import cap, entity_digest, find_card
 from weft.store.loader import load_project
 from weft.store.project import Project
 from weft.validation import validate_project
@@ -86,6 +89,10 @@ def _init_collision_diagnostic(exc) -> Diagnostic:
         f"目标目录非空（{preview}）；为避免覆盖，未写入任何文件")
 
 
+def _digest_suffix(digest: str) -> str:
+    return f"  ｜ {digest}" if digest else ""
+
+
 def _print_review(project: Project) -> None:
     typer.echo("待审阅实体（status: draft）：")
     groups = (("data", project.data_cards), ("fact", project.facts),
@@ -96,7 +103,8 @@ def _print_review(project: Project) -> None:
             if card.status == "draft":
                 entity_found = True
                 rel = project.card_paths[cid].as_posix()
-                typer.echo(f"  {label}  {cid}  {rel}")
+                typer.echo(f"  {label}  {cid}  {rel}"
+                           f"{_digest_suffix(entity_digest(project, cid))}")
     if not entity_found:
         typer.echo("  （无）")
     typer.echo("待审阅叙事节点：")
@@ -106,7 +114,8 @@ def _print_review(project: Project) -> None:
             if node.status == "draft":
                 node_found = True
                 rel = project.part_paths[part.id].as_posix()
-                typer.echo(f"  {part.id}/{node.id}  {rel}")
+                typer.echo(f"  {part.id}/{node.id}  {rel}"
+                           f"{_digest_suffix(cap(node.logic or '', 40))}")
     if not node_found:
         typer.echo("  （无）")
 
@@ -168,6 +177,48 @@ def review(project_dir: Path = typer.Argument(Path("."), help="weft 项目根目
         _print_diagnostics(load_diags)
         raise typer.Exit(code=1)
     _print_review(project)
+
+
+def _format_field(name: str, value) -> str:
+    if value is None:
+        value = "（无）"
+    elif isinstance(value, list):
+        value = ", ".join(str(v) for v in value) or "（无）"
+    elif isinstance(value, dict):
+        value = json.dumps(value, ensure_ascii=False) or "（无）"
+    return f"{name}: {value}"
+
+
+@app.command()
+def show(
+    card_id: str = typer.Argument(..., help="卡片 id（六类通用，全局命名空间）"),
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+) -> None:
+    """按 id 打印卡片速览：key 字段全文 + 引用关系 + 被引用（编号→语义→关系）。"""
+    project, load_diags = load_project(project_dir)
+    if any(d.is_error for d in load_diags):
+        _print_diagnostics(load_diags)
+        raise typer.Exit(code=1)
+    found = find_card(project, card_id)
+    if found is None:
+        # 无码 ERROR 行：与 weft graph 的 OSError 先例一致，不新增诊断码（D7）
+        typer.echo(f"ERROR 项目中不存在实体：{card_id}")
+        raise typer.Exit(code=1)
+    kind, card = found
+    rel = project.card_paths[card_id].as_posix()
+    typer.echo(f"# {card_id}（{kind} 卡，{card.status}）— {rel}")
+    for name, value in card.model_dump().items():
+        if name in ("id", "status") or (name == "comment" and not value):
+            continue
+        typer.echo(_format_field(name, value))
+    refs = build_index(project)["entities"][card_id]["referenced_by"]
+    back = [(group, ids) for group, ids in refs.items() if ids]
+    if not back:
+        typer.echo("被引用: （无）")
+        return
+    typer.echo("被引用:")
+    for group, ids in back:
+        typer.echo(f"  {group}: {', '.join(ids)}")
 
 
 @app.command()

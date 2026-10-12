@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import yaml
+from weft.labels import cap, label_map
 from weft.models.cards import (
     ClaimCard,
     DataCard,
@@ -63,6 +64,18 @@ def build_choices(kind: str, project: Project) -> dict[str, list[str]]:
             "bib_keys": sorted(project.bib_keys),
             "method_ids": sorted(project.methods),
             "claim_type": ["uncited", "cited"]}
+
+
+def build_labels(project: Project) -> dict[str, dict[str, str]]:
+    """引用控件的标签映射：choices_key → {id: 摘要}（展示附加，提交值不变，设计 D9）。"""
+    return {
+        "figure_refs": {k: cap(v.caption, 40) for k, v in project.figures.items()},
+        "data_ids": label_map(project, sorted(project.data_cards)),
+        "claim_ids": label_map(project, sorted(project.claims)),
+        "bib_keys": label_map(project, sorted(project.bib_keys)),
+        "method_ids": label_map(project, sorted(project.methods)),
+        "claim_type": {},
+    }
 
 
 def form_to_meta(kind: str, form, *, is_new: bool, card_id: str | None

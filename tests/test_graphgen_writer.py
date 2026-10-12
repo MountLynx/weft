@@ -46,3 +46,13 @@ def test_orphans_md_lists_paths(tmp_path):
     assert "data-01（data）" not in text
     raw = (tmp_path / "generated" / "orphans.md").read_bytes()
     assert b"\r" not in raw and raw.endswith(b"\n")
+
+
+def test_orphans_md_appends_digest(tmp_path):
+    project = _project(root=tmp_path, data=[
+        DataCard(id="data-01", status="approved"),
+        DataCard(id="data-02", status="draft", description="备选测量"),
+    ])
+    write_outputs(project, tmp_path / "generated")
+    text = (tmp_path / "generated" / "orphans.md").read_text(encoding="utf-8")
+    assert "data-02（data）— metadata/data-02.md：备选测量" in text

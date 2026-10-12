@@ -76,3 +76,11 @@ def test_node_review_preserves_comment_when_absent(tmp_path):
     node = next(n for p in project.parts for n in p.nodes if n.id == "para-01-01")
     assert node.status == "rejected"
     assert node.comment == "备注一"
+
+
+def test_part_panel_uses_show_digest(tmp_path):
+    client, _ = make_client(tmp_path)
+    resp = client.get("/p/demo/parts/sec-01")
+    assert resp.status_code == 200
+    # fact-01（statement 温度提高速率。）被 para-01-01 使用
+    assert "fact-01(evidence) · 温度提高速率。" in resp.text

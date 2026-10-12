@@ -13,7 +13,7 @@
     {% elif id_widget == "slug" %}
     <input name="id" value="{{ prefilled_id }}" placeholder="slug-id（全局唯一，如 prep-stir-01）">
     {% else %}
-    <input name="id" value="{{ prefilled_id }}" readonly>
+    <input name="id" value="{{ prefilled_id }}" placeholder="预填自动编号，可改为语义 id（全局唯一）">
     {% endif %}
   </label>
   {% endif %}
@@ -28,14 +28,15 @@
   {% elif spec.widget == "select" %}
   <select name="{{ spec.name }}">
     {% for c in choices[spec.choices] %}
-    <option value="{{ c }}" {% if values.get(spec.name) == c %}selected{% endif %}>{{ c }}</option>
+    <option value="{{ c }}" {% if values.get(spec.name) == c %}selected{% endif %}>{{ c }}{% if labels[spec.choices].get(c, '') %} · {{ labels[spec.choices][c] }}{% endif %}</option>
     {% endfor %}
   </select>
   {% elif spec.widget == "multiselect" %}
   <div class="multi">
     {% for c in choices[spec.choices] %}
+    {% set lbl = labels[spec.choices].get(c, '') %}
     <label class="check"><input type="checkbox" name="{{ spec.name }}" value="{{ c }}"
-      {% if c in values.get(spec.name, []) %}checked{% endif %}> {{ c }}</label>
+      {% if c in values.get(spec.name, []) %}checked{% endif %}> {{ c }}{% if lbl %} · {{ lbl }}{% endif %}</label>
     {% endfor %}
   </div>
   {% endif %}

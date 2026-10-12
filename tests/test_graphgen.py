@@ -88,6 +88,22 @@ def test_index_tolerates_dangling_refs():
             assert not any(str(i).startswith("ghost") for i in ids)
 
 
+def test_index_entities_carry_summary():
+    project = _project(
+        data=[DataCard(id="data-01", status="approved", description="测量值")],
+        facts=[FactCard(id="fact-01", data=["data-01"], statement="温度提高速率。",
+                        status="approved")],
+    )
+    entities = build_index(project)["entities"]
+    assert entities["data-01"]["summary"] == "测量值"
+    assert entities["fact-01"]["summary"] == "温度提高速率。"
+
+
+def test_index_summary_empty_when_key_field_missing():
+    project = _project()   # DataCard 无 description → summary 为 ""
+    assert build_index(project)["entities"]["data-01"]["summary"] == ""
+
+
 def test_direct_claim_seed_reachable():
     # 种子规则：node.uses 直接引用的 claim 也算可达（无需 fact 支撑）
     project = _project(

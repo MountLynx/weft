@@ -39,3 +39,11 @@ def test_node_edit_dangling_use_blocked(tmp_path):
     project, _ = load_project(root / "demo")
     node = next(n for p in project.parts for n in p.nodes if n.id == "para-01-01")
     assert [u.id for u in node.uses] == ["fact-01"]
+
+
+def test_node_edit_shows_entity_quicklist(tmp_path):
+    client, _ = make_client(tmp_path)
+    resp = client.get("/p/demo/parts/sec-01/nodes/para-01-01")
+    assert resp.status_code == 200
+    assert "实体速查" in resp.text
+    assert "<code>fact-01</code> · 温度提高速率。" in resp.text
