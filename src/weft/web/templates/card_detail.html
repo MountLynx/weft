@@ -19,6 +19,12 @@
   <button type="submit" name="status" value="draft">↩ 退回 draft</button>
   <label>comment<input name="comment" value="{{ card.comment }}"></label>
 </form>
+<h3>改名</h3>
+{% if rename_error %}<div class="banner error">{{ rename_error }}</div>{% endif %}
+<form method="post" action="/p/{{ entry.pid }}/cards/{{ kind }}/{{ card.id }}/rename">
+  <label>新 id（全卡种全局唯一，语义命名优先）<input name="new_id" placeholder="{{ kind }}-语义短语"></label>
+  <button type="submit">改名并同步引用</button>
+</form>
 <p><a href="/p/{{ entry.pid }}/cards/{{ kind }}/{{ card.id }}/edit">✏️ 编辑</a> ·
    <a href="/p/{{ entry.pid }}/cards/{{ kind }}">返回列表</a></p>
 {% endblock %}
