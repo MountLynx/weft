@@ -128,3 +128,37 @@ def test_review_lists_draft_nodes(tmp_path):
     assert "para-02-02" not in result.output
     # approved 的 sec-01/para-01-01 也不出现
     assert "para-01-01" not in result.output
+
+
+def test_review_appends_card_digest(tmp_path):
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "metadata" / "facts", "fact-02",
+               {"id": "fact-02", "data": ["data-01"],
+                "statement": "压力不影响产率。", "status": "draft"})
+    result = runner.invoke(app, ["review", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "fact-02  metadata/facts/fact-02.md  ｜ 压力不影响产率。" in result.output
+
+
+def test_review_appends_node_logic_digest(tmp_path):
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "narrative" / "02-discussion", "part-01",
+               {"id": "sec-02", "section": "Discussion",
+                "nodes": [{"id": "para-02-01", "purpose": "interpret", "uses": [],
+                           "logic": "把主结果与文献对照，指出一致性与差异",
+                           "status": "draft"}]})
+    result = runner.invoke(app, ["review", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    line = next(l for l in result.output.splitlines() if "sec-02/para-02-01" in l)
+    assert "｜ 把主结果与文献对照" in line
+
+
+def test_review_omits_empty_digest(tmp_path):
+    # data-02 无 description → 不追加摘要段（行保持 path 结尾）
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "metadata" / "data", "data-02",
+               {"id": "data-02", "refs": [], "status": "draft"})
+    result = runner.invoke(app, ["review", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "data-02  metadata/data/data-02.md\n" in result.output
+    assert "｜" not in result.output

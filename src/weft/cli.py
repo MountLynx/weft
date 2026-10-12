@@ -1,6 +1,7 @@
-"""typer 入口：weft init / new / validate / graph / review / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve。"""
+"""typer 入口：weft init / new / validate / graph / review / show / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve。"""
 from __future__ import annotations
 
+import json
 import sys
 from enum import Enum
 from pathlib import Path
@@ -9,6 +10,7 @@ import typer
 
 from weft.diagnostics import Diagnostic, Level
 from weft.graphgen.writer import write_outputs
+from weft.labels import cap, entity_digest, find_card
 from weft.store.loader import load_project
 from weft.store.project import Project
 from weft.validation import validate_project
@@ -86,6 +88,10 @@ def _init_collision_diagnostic(exc) -> Diagnostic:
         f"目标目录非空（{preview}）；为避免覆盖，未写入任何文件")
 
 
+def _digest_suffix(digest: str) -> str:
+    return f"  ｜ {digest}" if digest else ""
+
+
 def _print_review(project: Project) -> None:
     typer.echo("待审阅实体（status: draft）：")
     groups = (("data", project.data_cards), ("fact", project.facts),
@@ -96,7 +102,8 @@ def _print_review(project: Project) -> None:
             if card.status == "draft":
                 entity_found = True
                 rel = project.card_paths[cid].as_posix()
-                typer.echo(f"  {label}  {cid}  {rel}")
+                typer.echo(f"  {label}  {cid}  {rel}"
+                           f"{_digest_suffix(entity_digest(project, cid))}")
     if not entity_found:
         typer.echo("  （无）")
     typer.echo("待审阅叙事节点：")
@@ -106,7 +113,8 @@ def _print_review(project: Project) -> None:
             if node.status == "draft":
                 node_found = True
                 rel = project.part_paths[part.id].as_posix()
-                typer.echo(f"  {part.id}/{node.id}  {rel}")
+                typer.echo(f"  {part.id}/{node.id}  {rel}"
+                           f"{_digest_suffix(cap(node.logic or '', 40))}")
     if not node_found:
         typer.echo("  （无）")
 
