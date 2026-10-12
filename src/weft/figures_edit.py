@@ -82,3 +82,40 @@ def add_entry(entries: dict[str, FigureEntry], key: str, caption: str,
     if key in entries:
         raise FiguresEditError("E-FIG-COLLISION", f"键已存在：{key}")
     return {**entries, key: FigureEntry(caption=caption, subfigs=subfigs)}
+
+
+def parse_subfigs(text: str) -> dict[str, str]:
+    """textarea 逐行 `子图号: 说明`，首个冒号切分、空行跳过（F7）；非法 → E-FIG-VALUE。"""
+    subfigs: dict[str, str] = {}
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        sub, sep, caption = line.partition(":")
+        sub = sub.strip()
+        if not sep or not sub or re.search(r"\s", sub):
+            raise FiguresEditError("E-FIG-VALUE", f"子图行格式非法：{line!r}")
+        subfigs[sub] = caption.strip()
+    return subfigs
+
+
+def update_entry(entries: dict[str, FigureEntry], key: str, caption: str,
+                 subfigs: dict[str, str]) -> dict[str, FigureEntry]:
+    """键不可变（F8），只替换 caption/subfigs；键序保持。"""
+    if key not in entries:
+        raise FiguresEditError("E-FIG-COLLISION", f"键不存在：{key}")
+    return {k: (FigureEntry(caption=caption, subfigs=subfigs)
+                if k == key else v)
+            for k, v in entries.items()}
+
+
+def remove_entry(entries: dict[str, FigureEntry], key: str,
+                 references: dict[str, set[str]]) -> dict[str, FigureEntry]:
+    """被任何 data 卡（含 rejected，F6）refs 命中 `{key} ∪ {key+sub}` 即阻断。"""
+    if key not in entries:
+        raise FiguresEditError("E-FIG-COLLISION", f"键不存在：{key}")
+    valid = {key, *(f"{key}{sub}" for sub in entries[key].subfigs)}
+    hitting = sorted(cid for cid, refs in references.items() if refs & valid)
+    if hitting:
+        raise FiguresEditError(
+            "E-FIG-IN-USE", f"{'、'.join(hitting)} 引用了 {key}，先解除引用再删除")
+    return {k: v for k, v in entries.items() if k != key}

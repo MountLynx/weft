@@ -7,6 +7,9 @@ from weft.figures_edit import (
     ensure_figure_key,
     load_for_edit,
     next_figure_key,
+    parse_subfigs,
+    remove_entry,
+    update_entry,
 )
 from weft.models.figures import FigureEntry
 from weft.scaffold import NewNameError, _ensure_component
@@ -132,3 +135,64 @@ def test_add_entry_appends_tail():
     entries = {"fig-03": FigureEntry(), "fig-01": FigureEntry()}
     out = add_entry(entries, "fig-09", "x", {}, "fig-")
     assert list(out) == ["fig-03", "fig-01", "fig-09"]
+
+
+def test_parse_subfigs_basic():
+    assert parse_subfigs("a: 60°C\nb: 温度: 95% CI\n\n") == \
+        {"a": "60°C", "b": "温度: 95% CI"}      # 首个冒号切分，空行跳过
+
+
+@pytest.mark.parametrize("text", ["没有冒号", ": 说明", "a b: 说明", "   : x"])
+def test_parse_subfigs_invalid(text):
+    with pytest.raises(FiguresEditError) as excinfo:
+        parse_subfigs(text)
+    assert excinfo.value.code == "E-FIG-VALUE"
+
+
+def test_update_entry_keeps_order():
+    entries = {"fig-01": FigureEntry(caption="旧"), "fig-02": FigureEntry()}
+    out = update_entry(entries, "fig-01", "新", {"b": "右"})
+    assert list(out) == ["fig-01", "fig-02"]
+    assert out["fig-01"].caption == "新"
+    assert out["fig-01"].subfigs == {"b": "右"}
+
+
+def test_update_entry_missing():
+    with pytest.raises(FiguresEditError) as excinfo:
+        update_entry({}, "fig-01", "x", {})
+    assert excinfo.value.code == "E-FIG-COLLISION"
+
+
+def test_remove_entry_ok():
+    entries = {"fig-01": FigureEntry(), "fig-02": FigureEntry()}
+    out = remove_entry(entries, "fig-01", {"data-01": {"fig-02"}})
+    assert list(out) == ["fig-02"]
+
+
+def test_remove_entry_blocked_direct():
+    entries = {"fig-01": FigureEntry()}
+    with pytest.raises(FiguresEditError) as excinfo:
+        remove_entry(entries, "fig-01", {"data-01": {"fig-01"}})
+    assert excinfo.value.code == "E-FIG-IN-USE"
+    assert "data-01" in excinfo.value.message
+
+
+def test_remove_entry_blocked_via_subfig():
+    entries = {"fig-01": FigureEntry(subfigs={"a": "左"})}
+    with pytest.raises(FiguresEditError) as excinfo:
+        remove_entry(entries, "fig-01", {"data-01": {"fig-01a"}})
+    assert excinfo.value.code == "E-FIG-IN-USE"
+
+
+def test_remove_entry_blocked_rejected_card():
+    """F6：rejected 卡也算引用——可能被重新批准，删除从严。"""
+    entries = {"fig-01": FigureEntry()}
+    with pytest.raises(FiguresEditError) as excinfo:
+        remove_entry(entries, "fig-01", {"data-09": {"fig-01"}})
+    assert excinfo.value.code == "E-FIG-IN-USE"
+
+
+def test_remove_entry_missing():
+    with pytest.raises(FiguresEditError) as excinfo:
+        remove_entry({}, "fig-01", {})
+    assert excinfo.value.code == "E-FIG-COLLISION"
