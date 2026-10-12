@@ -93,3 +93,20 @@ def test_propose_note_non_dict_fields_with_extras():
     _, fields = asyncio.run(propose_note(_project_with("key2020"), "x",
                                          _NullFieldsClient()))
     assert fields["entry"]["fields"] == {"editor": "X"}
+
+
+def test_propose_note_source_pdf_comment():
+    project = _project_with("key2020")
+    _, fields = asyncio.run(
+        propose_note(project, "Smith 2020", ScriptedLLMClient(),
+                     source_pdf="smith_paper.pdf"))
+    assert "来源 PDF：smith_paper.pdf" in fields["comment"]
+
+
+def test_propose_note_without_pdf_unchanged():
+    """U6 回归保障：无 PDF 调用时行为与现状一致（comment 无 PDF 痕迹、无 pdf 键）。"""
+    project = _project_with("key2020")
+    _, fields = asyncio.run(
+        propose_note(project, "Smith 2020", ScriptedLLMClient()))
+    assert "来源 PDF" not in fields["comment"]
+    assert "pdf" not in fields

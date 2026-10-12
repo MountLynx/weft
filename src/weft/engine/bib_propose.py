@@ -48,7 +48,8 @@ def _sink_extras(raw):
     return raw
 
 
-async def propose_note(project, clues: str, client) -> tuple[str, dict]:
+async def propose_note(project, clues: str, client,
+                       source_pdf: str | None = None) -> tuple[str, dict]:
     """返回（拟分配 key, note 卡 frontmatter 字段 dict）；不落盘。"""
     prompt = _PROMPT_TEMPLATE.format(clues=clues.strip() or "（无）")
     try:
@@ -63,11 +64,14 @@ async def propose_note(project, clues: str, client) -> tuple[str, dict]:
     except (json.JSONDecodeError, ValueError) as exc:   # ValueError 涵盖 ValidationError
         raise BibProposeError(f"条目提案输出非法（须为 entry JSON）：{exc}") from exc
     key = bibgen.draft_key(bibgen.key_base_from_entry(entry), all_card_ids(project))
+    comment = "来源：AI 条目提案（线索：" + (clues.strip()[:40] or "无") + "…）"
+    if source_pdf:
+        comment += f"；来源 PDF：{source_pdf}"
     fields = {
         "id": key,
         "status": "draft",
         "summary": "",
         "entry": entry.model_dump(),
-        "comment": "来源：AI 条目提案（线索：" + (clues.strip()[:40] or "无") + "…）",
+        "comment": comment,
     }
     return key, fields
