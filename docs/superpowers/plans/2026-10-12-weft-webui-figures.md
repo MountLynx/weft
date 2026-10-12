@@ -13,7 +13,7 @@
 **执行约定：**
 - 功能开发用 git worktree（`.worktrees/`，见 superpowers:using-git-worktrees），完成后合回 main。
 - 全量测试命令：`.venv/Scripts/python.exe -m pytest tests -q`；当前基线 **651 passed, 2 deselected**。
-- 本计划新增测试 **39 个**（引擎 27 + WebUI 12），预期全量 **690 passed, 2 deselected**；执行完回填实际数字到"验收与计数"一节。
+- 计划估算 39 个（实施期因审查修复新增至 44 个测试函数，见「验收与计数」与「执行期设计偏离回填」）。
 
 ## 文件结构
 
@@ -1032,13 +1032,29 @@ git commit -m "docs: WebUI 图表管理落地——AGENTS 红线 5 码表 E-FIG-
 
 （提交信息中的数字以 Step 3 实际输出为准。）
 
-## 验收与计数
+## 验收与计数（执行后实测回填 2026-10-12）
 
-- 引擎测试 `tests/test_figures_edit.py`：**27 个**
-- WebUI 测试 `tests/test_web_figures.py`：**12 个**
+- 引擎测试 `tests/test_figures_edit.py`：**31 个**测试函数（pytest 参数化实例 79）
+- WebUI 测试 `tests/test_web_figures.py`：**14 个**测试函数
 - `tests/test_web_subnav.py`：断言更新，无新增
-- 全量预期：651 + 39 = **670 passed, 2 deselected**
-- 实际执行结果：（执行后回填）
+- 全量实测：**744 passed, 2 deselected**（基线 651 → +93，无回归）
+- 执行分支：`webui-figures`（worktree `.worktrees/webui-figures`），实现提交链 `b534668…49ed06c`
+
+## 执行期设计偏离回填（2026-10-12 实施期定案，含双轮审查产出）
+
+| # | 偏离 | 缘由 |
+|---|---|---|
+| E1 | `load_for_edit` 读取异常扩为 `(yaml.YAMLError, UnicodeDecodeError, OSError)`；`figures_path` 改用 `FIGURES_REL` | 质量审查：GBK 编码/IO 异常逃逸 fail-closed 边界（对齐 store/loader `_read_yaml` 既有约定）；消常量重复 |
+| E2 | `write_figures_yaml` 的 subfigs 按**嵌套块**输出（`  subfigs:` + 4 空格子键） | 计划片段的扁平写法与 `FigureEntry` 模型（嵌套映射）及计划自带 roundtrip 测试矛盾，TDD 红灯后修正；落盘格式与 loader 夹具逐字节一致 |
+| E3 | `_dump_scalar` 对 plain 命中的词追加 `isinstance(yaml.safe_load(value), str)` 复检，可重定型词（"123"/"true"/"on" 等）一律 JSON 引用 | 质量审查 Critical：数字子图号等自然输入裸写后回读 YAML 重定型 → pydantic 拒绝 → 整注册表 E-FIG-LOAD 锁死且无 UI 恢复路径 |
+| E4 | `_rows` 文件缺失按**键文件族**判定（`{key} ∪ {key+sub}` 的 png/pdf 全缺失才标记） | 计划片段只查 `{key}.png|pdf` 与计划自带测试夹具矛盾（fig-01a.png 存在而 fig-01.png 不存在）；对齐校验器 W-FIGURE-FILE-MISSING 语义 |
+| E5 | `figures_page` 改用 `load_entry_or_404` + `project is None` 容错；`base.html` subnav parts 项加 None 守卫 | spec 审查：figures.yaml 坏 → loader E-PARSE → discovery 置 project=None → `load_project_or_404` 整页 404，F3"页面仍可看"成死代码；figures.html 成为全站唯一可渲染 project=None 的页面 |
+| E6 | 操作被拒（COLLISION/NAME/VALUE/IN-USE）与注册表带病（LOAD）banner 分流：前者交互 `error` banner（页面保持可编辑），后者只读 `load_error`；"（请手工修复后刷新）"尾巴只属于 E-FIG-LOAD | 单 banner 设计会把 IN-USE 阻断误渲染成整页只读，与"页面实际可写"自相矛盾 |
+| E7 | 写路由一律 `load_entry_or_404` + `entry.path`（不要求 project 可用）；GET 编辑预填取 `load_for_edit`（磁盘真源） | E5 推论：坏 yaml 下写操作必须能到达引擎拿到 E-FIG-LOAD，而不是 404 |
+| E8 | `figure_delete` 对 degraded 项目（figures.yaml 健康但 project=None）fail-closed 拒绝；守卫置于 `load_for_edit` **之后** | 质量审查 Important：此时 references 只能取空集，引用检查静默退化，与 F6 从严矛盾；守卫后置使最具体病因（坏 yaml → E-FIG-LOAD 只读）优先归因 |
+| E9 | 新增 POST 失败回显保真用户键名（`values["key"]`） | 质量审查 Important：键名框清空 + 用户直接重提 → 静默落自动编号，违背 F8 键是身份 |
+| E10 | 坏 yaml 场景拆为两个测试：列表可看（Task 5）与三写路径拒绝（Task 6） | 职责单一；E5 落地后列表可看属于列表路由自身行为 |
+| 留守 | `scaffold._yaml_scalar` 存在 E3 同款 YAML 重定型隐患（暴露面仅 CLI 章节名，低危） | 登记为后续独立任务，本次不顺带改（超出计划范围） |
 
 ## 自查记录（计划完成时已核）
 
