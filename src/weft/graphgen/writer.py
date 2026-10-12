@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from weft.graphgen.index import build_index, orphan_ids, used_ids
+from weft.labels import entity_digest
 from weft.store.project import Project
 
 
@@ -45,5 +46,7 @@ def _orphans_md(project: Project, orphans: dict[str, list[str]]) -> str:
     for group, ids in orphans.items():
         for eid in ids:
             path = project.card_paths.get(eid, Path("?")).as_posix()
-            lines.append(f"- {eid}（{titles[group]}）— {path}")
+            digest = entity_digest(project, eid)
+            lines.append(f"- {eid}（{titles[group]}）— {path}"
+                         + (f"：{digest}" if digest else ""))
     return "\n".join(lines) + "\n"

@@ -16,7 +16,8 @@
         ],
         "params": []
       },
-      "status": "approved"
+      "status": "approved",
+      "summary": "温度升高显著提高反应速率，但不影响最终产率。"
     },
     "claim-02": {
       "kind": "claim",
@@ -32,7 +33,8 @@
         ],
         "params": []
       },
-      "status": "approved"
+      "status": "approved",
+      "summary": "该温度效应与 Smith 等提出的热激活催化机制一致。"
     },
     "claim-03": {
       "kind": "claim",
@@ -45,7 +47,8 @@
         ],
         "params": []
       },
-      "status": "draft"
+      "status": "draft",
+      "summary": "与 Doe 等报道的 Pt 基催化体系相比，本体系的表观活化能更低。"
     },
     "data-01": {
       "kind": "data",
@@ -61,7 +64,8 @@
         ],
         "params": []
       },
-      "status": "approved"
+      "status": "approved",
+      "summary": "60 °C 下三次重复反应的速率-时间测量值（每 5 分钟取样）"
     },
     "data-02": {
       "kind": "data",
@@ -77,7 +81,8 @@
         ],
         "params": []
       },
-      "status": "approved"
+      "status": "approved",
+      "summary": "25 °C 下三次重复反应的速率-时间测量值（每 5 分钟取样）"
     },
     "data-03": {
       "kind": "data",
@@ -92,7 +97,8 @@
         ],
         "params": []
       },
-      "status": "approved"
+      "status": "approved",
+      "summary": "各温度条件的初始速率均值、标准差与最终产率汇总"
     },
     "doe2021": {
       "kind": "note",
@@ -105,7 +111,8 @@
         "nodes": [],
         "params": []
       },
-      "status": "approved"
+      "status": "approved",
+      "summary": "Doe 等报道了 Pt 基催化体系在 25–80 °C 区间的速率数据，表观活化能 52 kJ/mol，可作为本工作的对照体系。"
     },
     "fact-01": {
       "kind": "fact",
@@ -119,7 +126,8 @@
         ],
         "params": []
       },
-      "status": "approved"
+      "status": "approved",
+      "summary": "60 °C 时的初始反应速率比 25 °C 高 42%（p < 0.01，n = 3）。"
     },
     "fact-02": {
       "kind": "fact",
@@ -132,7 +140,8 @@
         ],
         "params": []
       },
-      "status": "approved"
+      "status": "approved",
+      "summary": "60 °C 与 25 °C 的最终产率均超过 90%，温度对产率无显著影响。"
     },
     "smith2020": {
       "kind": "note",
@@ -145,7 +154,8 @@
         "nodes": [],
         "params": []
       },
-      "status": "approved"
+      "status": "approved",
+      "summary": "Smith 等提出热激活催化机制，核心证据是 Arrhenius 图在 45 °C 以上出现拐点，对应催化活性位点的结构转变。"
     }
   },
   "version": 2
