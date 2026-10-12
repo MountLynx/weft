@@ -216,6 +216,18 @@ def _check_notes_summary(project: Project) -> list[Diagnostic]:
     return out
 
 
+def _check_notes_pdf(project: Project) -> list[Diagnostic]:
+    out: list[Diagnostic] = []
+    for nid, note in project.notes.items():
+        if note.status == "rejected" or not note.pdf:
+            continue
+        if not (project.root / note.pdf).exists():
+            out.append(Diagnostic(Level.WARNING, "W-NOTE-PDF-MISSING",
+                                  _card_rel(project, nid), "pdf",
+                                  f"note 卡 pdf 字段指向的文件不存在：{note.pdf}"))
+    return out
+
+
 def _check_note_cards_exist(project: Project) -> list[Diagnostic]:
     out: list[Diagnostic] = []
     for clid, claim in project.claims.items():
@@ -293,6 +305,7 @@ def validate_project(project: Project) -> list[Diagnostic]:
     diagnostics += _check_figures_files(project)
     diagnostics += _check_orphans(project)
     diagnostics += _check_notes_summary(project)
+    diagnostics += _check_notes_pdf(project)
     diagnostics += _check_note_cards_exist(project)
     diagnostics += _check_vocab(project)
     diagnostics += _check_workflow(project)

@@ -1,6 +1,11 @@
+from pathlib import Path
+
+import pytest
+
 from weft.models.cards import ClaimCard, DataCard, FactCard, MethodCard, NoteCard, ParamCard
 from weft.models.figures import FigureEntry
 from weft.models.narrative import NarrativePart, Node, Use
+from weft.store.loader import load_project
 from weft.validation import validate_project
 from tests.helpers import build_project
 
@@ -236,3 +241,45 @@ def test_method_orphan_warns_and_param_reach_saves_method():
                  uses=[Use(id="p1", role="evidence")], status="approved")])])
     orphans = [d for d in validate_project(project) if d.code == "W-ORPHAN"]
     assert [d.path for d in orphans] == ["metadata/orphan-m.md"]
+
+
+def test_note_pdf_missing_warns(tmp_path):
+    notes = [NoteCard(id="k2020", summary="s", status="approved",
+                      pdf="pdfs/k2020.pdf")]
+    project = build_project(root=tmp_path, notes=notes)
+    diagnostics = validate_project(project)
+    assert "W-NOTE-PDF-MISSING" in _codes(diagnostics)
+    d = next(d for d in diagnostics if d.code == "W-NOTE-PDF-MISSING")
+    assert d.field == "pdf"
+
+
+def test_note_pdf_parent_form_resolved_from_root(tmp_path):
+    """U7：路径按项目根解析，../ 形态照常 Path 语义判存在。"""
+    notes = [NoteCard(id="k2020", summary="s", status="approved",
+                      pdf="pdfs/../pdfs/k2020.pdf")]
+    (tmp_path / "pdfs").mkdir()
+    (tmp_path / "pdfs" / "k2020.pdf").write_bytes(b"%PDF-1.4\n")
+    project = build_project(root=tmp_path, notes=notes)
+    assert "W-NOTE-PDF-MISSING" not in _codes(validate_project(project))
+
+
+def test_note_pdf_empty_skipped(tmp_path):
+    notes = [NoteCard(id="k2020", summary="s", status="approved")]
+    project = build_project(root=tmp_path, notes=notes)
+    assert "W-NOTE-PDF-MISSING" not in _codes(validate_project(project))
+
+
+def test_note_pdf_rejected_skipped(tmp_path):
+    """设计决策 2：rejected 卡零 W 痕迹。"""
+    notes = [NoteCard(id="k2020", status="rejected", pdf="pdfs/ghost.pdf")]
+    project = build_project(root=tmp_path, notes=notes)
+    assert "W-NOTE-PDF-MISSING" not in _codes(validate_project(project))
+
+
+def test_demo_project_no_pdf_missing():
+    """U12：demo 的 smith2020 卡 pdf 路径根相对且文件在库，校验零该提醒。"""
+    root = Path(__file__).resolve().parents[1] / "examples" / "paper-demo"
+    if not (root / "weft.yaml").exists():
+        pytest.skip("demo 项目缺失")
+    project, _ = load_project(root)
+    assert "W-NOTE-PDF-MISSING" not in _codes(validate_project(project))

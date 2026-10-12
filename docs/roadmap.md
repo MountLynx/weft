@@ -42,6 +42,7 @@
 - 语义可见性 ✅（2026-10-12）：`weft review` 摘要列、graph.json `summary`、orphans 摘要、`weft show <id>` 速览、WebUI 引用控件/uses/实体速查带「id · 摘要」、WebUI 新建卡 id 解锁语义命名。设计见 `docs/superpowers/specs/2026-10-12-weft-semantic-visibility-design.md`。
 - 改名对齐 `weft rename` ✅（2026-10-12）：一条命令完成卡片改名——冲突审查 fail-closed（复用 E-NEW-NAME/E-NEW-COLLISION）+ 全部引用位点同步（文件/frontmatter/data/supports/cites/param.method/derived_from/节点 uses）+ managed bib 自动重渲；`--dry-run` 计划打印；WebUI 详情页表单共用引擎。设计见 `docs/superpowers/specs/2026-10-12-weft-rename-design.md`。
 - WebUI 图表管理 ✅（2026-10-12）：figures.yaml 图表页（键序列表 + 引用卡链接 + 文件缺失/未被引用标记）与图注条目新增/编辑/删除（fig-/tbl- 自动编号、删除被引用键 `E-FIG-IN-USE` 阻断、解析失败 `E-FIG-LOAD` 转只读、degraded 项目删除 fail-closed）；`figures_edit` 纯函数引擎（确定性 LF 重写、YAML 重定型防护）。设计见 `docs/superpowers/specs/2026-10-12-weft-webui-figures-design.md`。
+- 文献 PDF 上传收录 ✅（2026-10-12）：文献提案表单支持 PDF 上传——pymupdf4llm 确定性转文本作线索拟 entry 草案卡，原件归档 `pdfs/<key>.pdf` 自动填卡 `pdf` 字段，转换全文落 `articles/<key>.md` 供 `weft parse --key` 富化 summary；`W-NOTE-PDF-MISSING` 校验提醒。设计见 `docs/superpowers/specs/2026-10-12-weft-pdf-ingest-design.md`。
 - 断点续跑/回滚接入 CLI（复用 SpecModule 原生能力）。
 - 溯源注释完善与用户文档。
 - bib 自动生成（bibgen）✅（2026-09-29）：`weft bib sync`；managed 模式以已批准文献卡为真源（note 卡 entry 书目字段，spec 2026-09-29-weft-bibgen），WebUI 批准/编辑即同步，AI 提案与 parse 文献模式两条草案入口。

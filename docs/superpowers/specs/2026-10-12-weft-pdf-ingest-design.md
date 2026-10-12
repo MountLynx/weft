@@ -8,7 +8,7 @@
 
 ## 范围
 
-- **做**：`bib_propose.html` 表单增 PDF 文件输入；文本转换模块 `src/weft/pdftext.py`（pymupdf4llm 懒加载，web extra 增依赖）；propose 路由改造（staging → 转换 → 提案 → 落位）；校验新提醒 `W-NOTE-PDF-MISSING`；诊断码 E-PDF-SHAPE / E-PDF-CONVERT；AGENTS.md 红线 5 码表增补；demo 项目补 `pdfs/smith2020.pdf` 并修正该卡 pdf 路径为根相对。
+- **做**：`bib_propose.html` 表单增 PDF 文件输入；文本转换模块 `src/weft/pdftext.py`（pymupdf4llm 懒加载，web extra 增依赖）；propose 路由改造（staging → 转换 → 提案 → 落位）；校验新提醒 `W-NOTE-PDF-MISSING`；诊断码 E-PDF-SHAPE / E-PDF-STAGING / E-PDF-CONVERT；AGENTS.md 红线 5 码表增补；demo 项目补 `pdfs/smith2020.pdf` 并修正该卡 pdf 路径为根相对。
 - **不做**（YAGNI）：扫描版 PDF / OCR（无文本层 → E-PDF-CONVERT 指路）；WebUI parse 触发器（runs 机制可复用，独立任务；summary 富化仍走 CLI `weft parse --key`）；`E-ARTICLE-KEY` 闸门放开（parse 设计定案 D4"不自动拟条目"维持，bib 先行、parse 后行）；PDF 在线预览/下载；批量上传与大小限额；note 卡 schema 改动（`pdf` 字段已存在，红线 2 不触）；pyzotero 同步（扩展场景 3 不变）。
 
 ## 方案取舍
@@ -50,6 +50,7 @@
 | 码 | 级别 | 含义 | path |
 |---|---|---|---|
 | `E-PDF-SHAPE` | 错误（阻断） | 上传非 .pdf / 空文件（staging 之前拒绝） | `articles` |
+| `E-PDF-STAGING` | 错误（阻断） | staging 落盘失败（文件名非法/磁盘满/目录只读） | `articles/<原始文件名>` |
 | `E-PDF-CONVERT` | 错误（阻断） | PDF 转换失败 / 无有效文本层（扫描版）/ 文本过短（<200 字符） | `articles/<staging 文件名>` |
 | `W-NOTE-PDF-MISSING` | 提醒（不阻断） | note 卡 pdf 字段指向的文件不存在（项目根相对解析） | 卡相对路径，field=`pdf` |
 
