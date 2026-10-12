@@ -203,7 +203,9 @@ def test_write_roundtrip_defaults_omitted(tmp_path):
     entries = {"fig-01": FigureEntry(caption="速率", subfigs={"a": "左"}),
                "fig-02": FigureEntry()}
     write_figures_yaml(tmp_path, entries)
-    assert load_for_edit(tmp_path) == entries
+    loaded = load_for_edit(tmp_path)
+    assert loaded == entries
+    assert list(loaded) == list(entries)             # 键序即 assemble 编号（F5）
     text = (tmp_path / "metadata" / "figures.yaml").read_text(encoding="utf-8")
     assert "fig-02:\n" in text and "fig-02:\n  caption" not in text  # 空条目裸键
 
@@ -223,6 +225,31 @@ def test_write_quotes_special_caption(tmp_path):
     assert load_for_edit(tmp_path)["fig-01"].caption == "速率: 95% CI"
 
 
+@pytest.mark.parametrize("caption", ["123", "true", "on", "null", "007"])
+def test_write_quotes_rescalarizable_caption(tmp_path, caption):
+    """裸写会被 YAML 重定型为 int/bool/None → E-FIG-LOAD 锁死注册表，必须加引号。"""
+    entries = {"fig-01": FigureEntry(caption=caption)}
+    write_figures_yaml(tmp_path, entries)
+    text = (tmp_path / "metadata" / "figures.yaml").read_text(encoding="utf-8")
+    assert load_for_edit(tmp_path)["fig-01"].caption == caption
+    assert f'"{caption}"' in text  # 落盘带引号
+
+
+def test_write_quotes_numeric_subfig_key(tmp_path):
+    """parse_subfigs 放行数字子图号（最自然的输入），落盘同样不得重定型。"""
+    entries = {"fig-01": FigureEntry(subfigs={"1": "60°C"})}
+    write_figures_yaml(tmp_path, entries)
+    assert load_for_edit(tmp_path)["fig-01"].subfigs == {"1": "60°C"}
+
+
+def test_write_empty_entries_roundtrip(tmp_path):
+    p = write_figures_yaml(tmp_path, {})
+    assert p.read_bytes() == b""
+    assert load_for_edit(tmp_path) == {}
+
+
 def test_load_normalizes_crlf(tmp_path):
-    _write_yaml(tmp_path, "fig-01:\r\n  caption: 速率\r\n")
+    _write_yaml(tmp_path, "")
+    (tmp_path / "metadata" / "figures.yaml").write_bytes(
+        "fig-01:\r\n  caption: 速率\r\n".encode("utf-8"))
     assert load_for_edit(tmp_path)["fig-01"].caption == "速率"

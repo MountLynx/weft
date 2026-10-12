@@ -124,7 +124,11 @@ def remove_entry(entries: dict[str, FigureEntry], key: str,
 def _dump_scalar(value: str) -> str:
     """简单词原样，含特殊字符走 JSON 双引号（合法 YAML 流标量；同 scaffold 惯例）。"""
     if _PLAIN_YAML.fullmatch(value):
-        return value
+        try:
+            if isinstance(yaml.safe_load(value), str):
+                return value
+        except yaml.YAMLError:
+            pass
     return json.dumps(value, ensure_ascii=False)
 
 
