@@ -269,3 +269,16 @@ def test_note_pdf_rejected_skipped(tmp_path):
     notes = [NoteCard(id="k2020", status="rejected", pdf="pdfs/ghost.pdf")]
     project = build_project(root=tmp_path, notes=notes)
     assert "W-NOTE-PDF-MISSING" not in _codes(validate_project(project))
+
+
+def test_demo_project_no_pdf_missing():
+    """U12：demo 的 smith2020 卡 pdf 路径根相对且文件在库，校验零该提醒。"""
+    from pathlib import Path
+
+    from weft.store.loader import load_project
+
+    root = Path(__file__).resolve().parents[1] / "examples" / "paper-demo"
+    if not (root / "weft.yaml").exists():
+        pytest.skip("demo 项目缺失")
+    project, _ = load_project(root)
+    assert "W-NOTE-PDF-MISSING" not in _codes(validate_project(project))
