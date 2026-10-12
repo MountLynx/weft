@@ -36,3 +36,14 @@ def test_figures_page_markers(tmp_path):
 def test_figures_unknown_project_404(tmp_path):
     client, _ = make_client(tmp_path)
     assert client.get("/p/nope/figures").status_code == 404
+
+
+def test_broken_yaml_list_viewable(tmp_path):
+    """F3：figures.yaml 坏 → 页面仍 200，banner 指认 E-FIG-LOAD，转只读。"""
+    client, projects = make_client(tmp_path)
+    (projects / "demo" / "metadata" / "figures.yaml").write_text(
+        "fig-01: [unclosed\n", encoding="utf-8")
+    resp = client.get("/p/demo/figures")
+    assert resp.status_code == 200
+    assert "E-FIG-LOAD" in resp.text
+    assert "新增图注条目" not in resp.text

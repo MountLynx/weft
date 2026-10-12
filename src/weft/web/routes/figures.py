@@ -13,7 +13,7 @@ from weft.figures_edit import (
     FiguresEditError,
     load_for_edit,
 )
-from weft.web.common import load_project_or_404, templates
+from weft.web.common import load_entry_or_404, templates
 
 router = APIRouter()
 
@@ -47,15 +47,24 @@ def _rows(entry) -> list[dict]:
 
 @router.get("/p/{pid}/figures")
 def figures_page(request: Request, pid: str):
-    entry = load_project_or_404(request, pid)
-    load_error = None
-    try:
-        load_for_edit(entry.project.root)
-    except FiguresEditError as exc:
-        load_error = f"{exc.code} {exc.message}"
+    # 故意不用 load_project_or_404：figures.yaml 坏掉的项目恰恰最需要这个页面
+    # 指路修复（同诊断页先例；F3 页面转只读）。project 为 None 时行数据不可得，
+    # banner 指认坏因（figures.yaml 的解析错误经引擎探针转 E-FIG-LOAD 文案）。
+    entry = load_entry_or_404(request, pid)
+    rows: list[dict] = []
+    load_error: str | None = None
+    if entry.project is not None:
+        rows = _rows(entry)
+    else:
+        try:
+            load_for_edit(entry.path)
+        except FiguresEditError as exc:
+            load_error = f"{exc.code} {exc.message}"
+        if load_error is None:
+            load_error = "项目加载失败（与 figures.yaml 无关），先看诊断页"
     return templates.TemplateResponse(
         request, "figures.html",
-        {"entry": entry, "rows": _rows(entry), "load_error": load_error})
+        {"entry": entry, "rows": rows, "load_error": load_error})
 
 
 def register(app: FastAPI) -> None:
