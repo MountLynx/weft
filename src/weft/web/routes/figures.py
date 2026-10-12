@@ -64,8 +64,8 @@ def figures_page(request: Request, pid: str):
         try:
             load_for_edit(entry.path)
         except FiguresEditError as exc:
-            # 尾巴随消息走（模板不再固定拼接）：凡 FiguresEditError 消息都带，
-            # 兜底文案不带（与 figures.yaml 无关时不该催用户改 yaml）。
+            # 尾巴只属于 E-FIG-LOAD（注册表带病需手修 yaml）；兜底文案不带
+            # （与 figures.yaml 无关时不该催用户改 yaml）。
             load_error = f"{exc.code} {exc.message}（请手工修复后刷新）"
         if load_error is None:
             load_error = "项目加载失败（与 figures.yaml 无关），先看诊断页"
@@ -93,11 +93,21 @@ def _values(caption: str, subfigs_text: str, prefix: str) -> dict:
     return {"caption": caption, "subfigs_text": subfigs_text, "prefix": prefix}
 
 
-def _list_with_error(request: Request, entry, error: str):
+def _list_readonly(request: Request, entry, error: str):
+    """注册表带病（E-FIG-LOAD）场景：列表转只读，隐藏全部编辑/新增入口。"""
     return templates.TemplateResponse(
         request, "figures.html",
         {"entry": entry, "rows": _rows(entry) if entry.project is not None
          else [], "load_error": error})
+
+
+def _list_with_error(request: Request, entry, exc: FiguresEditError):
+    """操作被拒（COLLISION/IN-USE 等，注册表本身健康）：banner 报错但页面可交互。"""
+    return templates.TemplateResponse(
+        request, "figures.html",
+        {"entry": entry,
+         "rows": _rows(entry) if entry.project is not None else [],
+         "load_error": None, "error": f"{exc.code} {exc.message}"})
 
 
 @router.get("/p/{pid}/figures/new")
@@ -119,9 +129,11 @@ def figure_edit_get(request: Request, pid: str, key: str):
     try:
         entries = load_for_edit(entry.path)
     except FiguresEditError as exc:
-        # 与删除同款容错：注册表带病时无表可填，回列表页 banner（F3）
-        return _list_with_error(
-            request, entry, f"{exc.code} {exc.message}（请手工修复后刷新）")
+        if exc.code == "E-FIG-LOAD":
+            # 注册表带病时无表可填，回列表页只读 banner（F3）
+            return _list_readonly(
+                request, entry, f"{exc.code} {exc.message}（请手工修复后刷新）")
+        return _list_with_error(request, entry, exc)
     fig = entries.get(key)
     if fig is None:
         raise HTTPException(status_code=404, detail="图注条目不存在")
@@ -147,8 +159,10 @@ def figure_delete(request: Request, pid: str, key: str):
         entries = remove_entry(load_for_edit(entry.path), key, references)
         write_figures_yaml(entry.path, entries)
     except FiguresEditError as exc:
-        return _list_with_error(
-            request, entry, f"{exc.code} {exc.message}（请手工修复后刷新）")
+        if exc.code == "E-FIG-LOAD":
+            return _list_readonly(
+                request, entry, f"{exc.code} {exc.message}（请手工修复后刷新）")
+        return _list_with_error(request, entry, exc)
     return RedirectResponse(f"/p/{pid}/figures", status_code=303)
 
 
@@ -167,8 +181,11 @@ def _submit(request: Request, entry, key: str | None, form):
             entries = update_entry(entries, key, caption, subfigs)
         write_figures_yaml(entry.path, entries)
     except FiguresEditError as exc:
-        return _form(request, entry, key, values,
-                     {"figures": f"{exc.code} {exc.message}"})
+        # 尾巴只属于 E-FIG-LOAD；COLLISION/NAME/VALUE 是表单可改的错误
+        message = f"{exc.code} {exc.message}"
+        if exc.code == "E-FIG-LOAD":
+            message += "（请手工修复后刷新）"
+        return _form(request, entry, key, values, {"figures": message})
     return RedirectResponse(f"/p/{entry.pid}/figures", status_code=303)
 
 

@@ -130,6 +130,8 @@ def test_figure_delete_blocked_in_use(tmp_path):
     resp = client.post("/p/demo/figures/fig-01/delete")
     assert resp.status_code == 200
     assert "E-FIG-IN-USE" in resp.text and "data-01" in resp.text
+    assert 'href="/p/demo/figures/fig-01"' in resp.text   # 编辑链接仍在（页面可交互）
+    assert "页面只读" not in resp.text
 
 
 def test_write_ops_refused_on_broken_yaml(tmp_path):
