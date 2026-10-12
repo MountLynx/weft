@@ -226,8 +226,11 @@ async def bib_propose_post(request: Request, pid: str):
         except PdfTextError as exc:
             return rerender(str(exc))
         staging = project.root / "articles" / Path(upload.filename).name
-        staging.parent.mkdir(parents=True, exist_ok=True)
-        staging.write_bytes(await upload.read())
+        data = await upload.read()
+        if not data:
+            return rerender("[E-PDF-SHAPE] 上传文件内容为空。")
+        staging.parent.mkdir(parents=True, exist_ok=True)   # 内容合法才动文件系统（零写入）
+        staging.write_bytes(data)
         try:
             full_text = extract_text(staging)   # PdfTextError → PDF 留 staging（U3）
         except PdfTextError as exc:

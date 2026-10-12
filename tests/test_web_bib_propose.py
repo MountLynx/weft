@@ -129,6 +129,21 @@ def test_propose_pdf_and_manual_clues_merged(tmp_path, monkeypatch):
     assert "补充线索：额外线索 DOI 10.1/x" in scripted.prompts[0]
 
 
+def test_propose_clues_truncated_to_clues_chars(tmp_path, monkeypatch):
+    """U9：转换文本超 CLUES_CHARS 时截断后才进线索。"""
+    from weft.pdftext import CLUES_CHARS
+
+    scripted = ScriptedLLMClient()
+    client, _ = make_client(tmp_path)
+    _patch(monkeypatch, scripted)
+    monkeypatch.setattr("weft.web.routes.cards.extract_text",
+                        lambda p: "Z" * (CLUES_CHARS + 500))
+    client.post("/p/demo/notes/propose", data={"clues": ""},
+                files=_PDF_FILES)
+    assert "Z" * CLUES_CHARS in scripted.prompts[0]
+    assert "Z" * (CLUES_CHARS + 1) not in scripted.prompts[0]
+
+
 def test_propose_requires_clues_or_file(tmp_path, monkeypatch):
     client, root = make_client(tmp_path)
     _patch(monkeypatch, ScriptedLLMClient())
@@ -143,6 +158,17 @@ def test_propose_rejects_non_pdf(tmp_path, monkeypatch):
     _patch(monkeypatch, ScriptedLLMClient())
     resp = client.post("/p/demo/notes/propose", data={"clues": ""},
                        files={"pdf_file": ("x.md", b"data", "text/markdown")})
+    assert resp.status_code == 200 and "E-PDF-SHAPE" in resp.text
+    assert not (root / "demo" / "articles").exists()
+    assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
+
+
+def test_propose_rejects_empty_pdf(tmp_path, monkeypatch):
+    """设计流程序 1：空内容在 staging 之前拒绝（E-PDF-SHAPE），零写入。"""
+    client, root = make_client(tmp_path)
+    _patch(monkeypatch, ScriptedLLMClient())
+    resp = client.post("/p/demo/notes/propose", data={"clues": ""},
+                       files={"pdf_file": ("empty.pdf", b"", "application/pdf")})
     assert resp.status_code == 200 and "E-PDF-SHAPE" in resp.text
     assert not (root / "demo" / "articles").exists()
     assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
