@@ -8,7 +8,7 @@
 
 **Tech Stack:** pydantic、FastAPI + Jinja2、typer、pytest（现仓依赖，零新增）。
 
-**测试基线：** 773 passed（b2c5a84 口径）。本计划新增 28 个测试（引擎 14 + WebUI 9 + CLI 5），预期 **801 passed**（2 deselected 为 smoke，下同）。
+**测试基线：** 773 passed（b2c5a84 口径）。本计划新增 32 个测试（引擎 18 + WebUI 9 + CLI 5；引擎侧比预估多 4：P-M1 口径修正拆出的缺失 bib 文件用例等），实测 **805 passed**（2 deselected 为 smoke，下同）。
 
 ## 文件结构
 

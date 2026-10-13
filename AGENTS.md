@@ -17,12 +17,13 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 - `docs/superpowers/specs/2026-09-29-weft-projects-registry-design.md` — 项目注册表设计定案（全局注册表 `$WEFT_HOME/projects.json`、`weft projects` 命令组、`weft serve` 双模式、多项目隔离、E-REG-* 诊断码；决策 R1–R12）
 - `docs/superpowers/specs/2026-10-10-weft-new-template-design.md` — weft new 模板化创建设计定案（`weft new part/card`、自动编号、E-NEW-* 诊断码；决策 N1–N10）
 - `docs/superpowers/specs/2026-09-09-weft-webui-style-design.md` — WebUI 样式令牌化主题架构定案（webui.css 令牌 + themes/*.css 纯令牌覆盖、导航切换/localStorage/防闪脚本；主题文件只许含令牌声明，有守卫测试）
+- `docs/superpowers/specs/2026-10-13-weft-bib-mode-fix-design.md` — bib 模式切换与一键修复设计定案（unmanaged↔managed 切换预检/逐行改 weft.yaml 保注释、E-NOTE-NOT-IN-BIB 一键修复、`weft bib mode/fix`；E-BIB-MODE 操作码；决策 M1–M8）
 
 ## 常用命令（Windows + Git Bash）
 
 ```bash
 .venv/Scripts/python.exe -m pip install -e ".[dev,web]"     # 安装（含 pytest 与 WebUI 依赖）
-.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（773 passed, 2 deselected）
+.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（805 passed, 2 deselected）
 .venv/Scripts/python.exe -m pytest tests/test_xxx.py -v # 聚焦测试
 .venv/Scripts/weft.exe --help                           # CLI：init / new / validate / graph / review / show / rename / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve
 WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实 LLM 冒烟（默认排除，双保险门）
@@ -37,8 +38,8 @@ WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实
 1. **分层**：`src/weft/engine/` 是全项目唯一允许 import `module_harness` / `llm`（PyPI 包 `specmodule[openai]>=0.2.0,<0.3`，版本锁定）的 src 层。违规会被 `tests/test_engine_layering.py` 抓住。tests/ 豁免（可 import llm.client 造假响应）。
 2. **数据结构 v1 冻结**：卡片 schema（`src/weft/models/`，pydantic `extra="forbid"`）不改；schema 变更走设计文档 §3 迁移流程。
 3. **加载永不中断**：store 加载对单卡解析/编码/IO 失败一律转 `E-PARSE` 诊断后继续（宁可一次看全所有问题）。
-4. **路径白名单**：AI 产物唯一落盘点是 `engine/drafts.py::write_draft` 的 `drafts/<part_id>.md` 与 `engine/card_writer.py` 的 `metadata/` 草稿卡 + `inspirations/proposals/` 提案（均固定 LF，写入前归一化 CRLF）。bib 渲染器 `src/weft/bibgen.py` 写 managed 项目的 bibliography 目标文件（默认 `assets/references.bib`；确定性产物，非 AI 直接落盘）；全局注册表 `$WEFT_HOME/projects.json` 由 `src/weft/registry.py` 原子写（确定性工具状态，非 AI 直接落盘）；draft 管线的 SpecModule 以零残留模式运行（`persist/status_file/keep_records/stream_log` 全 False）；inspire/parse 管线例外——开启 persist 断点续跑，运行快照只落 `generated/inspirations/.runs/` 与 `generated/articles/.runs/`（weft 受管目录），其余任何位置不得出现 `.specmodule/` 残留。
-5. **诊断码是稳定标识**：`E-*`（错误，阻断）/`W-*`（提醒，不阻断），总表见 M1/M2/v1.1 计划文档及 `2026-09-04-weft-init.md`（E-INIT-COLLISION）、`2026-09-04-weft-inspire.md`（E-INSPIRE-SHAPE / E-INSPIRE-FAILED）、`2026-09-28-weft-parse.md`（E-ARTICLE-SHAPE / E-ARTICLE-FAILED / E-ARTICLE-KEY / W-ARTICLE-LONG）、`2026-09-29-weft-bibgen-design.md`（E-BIB-SHAPE / E-BIB-VALUE / W-BIB-STALE / W-BIB-ETYPE）、`2026-09-29-weft-projects-registry-design.md`（E-REG-MALFORMED / E-REG-DUP / E-REG-PATH-DUP / E-REG-NOT-PROJECT / E-REG-UNKNOWN / E-REG-NAME）、`2026-10-10-weft-new-template-design.md`（E-NEW-NAME / E-NEW-COLLISION）、`2026-10-12-weft-webui-figures-design.md`（E-FIG-LOAD / E-FIG-NAME / E-FIG-COLLISION / E-FIG-IN-USE / E-FIG-VALUE）、`2026-10-12-weft-pdf-ingest-design.md`（E-PDF-SHAPE / E-PDF-STAGING / E-PDF-CONVERT / W-NOTE-PDF-MISSING）；新增码必须进表。生成时诊断 path=`drafts/<part>.md`、field=`<节点id>.<字段>`。
+4. **路径白名单**：AI 产物唯一落盘点是 `engine/drafts.py::write_draft` 的 `drafts/<part_id>.md` 与 `engine/card_writer.py` 的 `metadata/` 草稿卡 + `inspirations/proposals/` 提案（均固定 LF，写入前归一化 CRLF）。bib 渲染器 `src/weft/bibgen.py` 写 managed 项目的 bibliography 目标文件（默认 `assets/references.bib`；确定性产物，非 AI 直接落盘），并受管写 `weft.yaml` 的 `bib.managed`（模式切换，逐行改保注释）与 unmanaged bib 目标文件（一键修复追加式写入）；全局注册表 `$WEFT_HOME/projects.json` 由 `src/weft/registry.py` 原子写（确定性工具状态，非 AI 直接落盘）；draft 管线的 SpecModule 以零残留模式运行（`persist/status_file/keep_records/stream_log` 全 False）；inspire/parse 管线例外——开启 persist 断点续跑，运行快照只落 `generated/inspirations/.runs/` 与 `generated/articles/.runs/`（weft 受管目录），其余任何位置不得出现 `.specmodule/` 残留。
+5. **诊断码是稳定标识**：`E-*`（错误，阻断）/`W-*`（提醒，不阻断），总表见 M1/M2/v1.1 计划文档及 `2026-09-04-weft-init.md`（E-INIT-COLLISION）、`2026-09-04-weft-inspire.md`（E-INSPIRE-SHAPE / E-INSPIRE-FAILED）、`2026-09-28-weft-parse.md`（E-ARTICLE-SHAPE / E-ARTICLE-FAILED / E-ARTICLE-KEY / W-ARTICLE-LONG）、`2026-09-29-weft-bibgen-design.md`（E-BIB-SHAPE / E-BIB-VALUE / W-BIB-STALE / W-BIB-ETYPE）、`2026-09-29-weft-projects-registry-design.md`（E-REG-MALFORMED / E-REG-DUP / E-REG-PATH-DUP / E-REG-NOT-PROJECT / E-REG-UNKNOWN / E-REG-NAME）、`2026-10-10-weft-new-template-design.md`（E-NEW-NAME / E-NEW-COLLISION）、`2026-10-12-weft-webui-figures-design.md`（E-FIG-LOAD / E-FIG-NAME / E-FIG-COLLISION / E-FIG-IN-USE / E-FIG-VALUE）、`2026-10-12-weft-pdf-ingest-design.md`（E-PDF-SHAPE / E-PDF-STAGING / E-PDF-CONVERT / W-NOTE-PDF-MISSING）、`2026-10-13-weft-bib-mode-fix-design.md`（E-BIB-MODE）；新增码必须进表。生成时诊断 path=`drafts/<part>.md`、field=`<节点id>.<字段>`。
 6. **生成闸门**：`weft draft` 先跑 `validate_project`，有任何 error 即拒绝生成；生成时硬规则（引文必须在 bib——正文 `[@key]` 与结构化 cites 双通道、uses 越界）在 run 内抛 `DraftRuleError` → 退出码 1 且不写 drafts。
 
 ## SpecModule 嵌入要点（实测语义，勿凭直觉改）
