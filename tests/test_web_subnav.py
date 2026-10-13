@@ -1,75 +1,52 @@
-"""项目子导航（subnav）：全站持久版块导航、活动态、无 part 收缩、快捷入口退役。"""
-import re
+"""项目工作台导航数据（旧 subnav 的 API 化）：payload 携带各版块入口所需计数。
+
+前端侧边栏（总览/叙事/卡片/图表/图谱/灵感/诊断）的显示/收缩完全由
+dashboard payload 的 kind_counts/n_parts 驱动，服务端不再渲染导航 HTML。
+"""
 import shutil
-
-import pytest
-
-pytest.importorskip("fastapi")
 
 from tests.webutil import make_client
 
 
-def _active_link(html: str, href: str) -> bool:
-    return re.search(
-        rf'<a class="subnav-link active"[^>]*href="{re.escape(href)}"', html) is not None
-
-
-def _plain_link(html: str, href: str) -> bool:
-    return re.search(
-        rf'<a class="subnav-link"[^>]*href="{re.escape(href)}"', html) is not None
-
-
-def test_dashboard_subnav_has_all_sections(tmp_path):
+def test_dashboard_payload_carries_navigation_counts(tmp_path):
     client, _ = make_client(tmp_path)
-    resp = client.get("/p/demo/")
-    assert resp.status_code == 200
-    assert 'class="subnav"' in resp.text
-    for slug in ("", "parts", "cards", "figures", "graph", "inspire", "diagnostics"):
-        assert f'href="/p/demo/{slug}"' in resp.text
-    assert _active_link(resp.text, "/p/demo/")       # 总览高亮
-    assert _plain_link(resp.text, "/p/demo/cards")   # 其余为普通态
-    assert "快捷入口" not in resp.text               # 裸链接段落被子导航取代
+    payload = client.get("/api/projects/demo").json()
+    assert set(payload["kind_counts"]) == {"data", "fact", "claim", "note",
+                                           "method", "param"}
+    assert payload["n_parts"] == 1                 # 叙事入口可见
+    assert payload["kind_counts"]["data"] == 1     # 卡片 kind 分组入口可见
+    # 待审队列条目带前端路由所需坐标
+    client.post("/api/projects/demo/cards/fact/fact-01/status",
+                json={"status": "draft", "comment": ""})
+    queue = client.get("/api/projects/demo").json()["review_queue"]
+    item = next(q for q in queue if q["id"] == "fact-01")
+    assert item["type"] == "card" and item["card_kind"] == "fact" and item["rel"]
 
 
-def test_subnav_active_follows_section(tmp_path):
-    client, _ = make_client(tmp_path)
-    cases = [
-        ("/p/demo/figures", "/p/demo/figures"),
-        ("/p/demo/parts", "/p/demo/parts"),
-        ("/p/demo/cards/data", "/p/demo/cards"),
-        ("/p/demo/graph", "/p/demo/graph"),
-        ("/p/demo/inspire", "/p/demo/inspire"),
-        ("/p/demo/diagnostics", "/p/demo/diagnostics"),
-    ]
-    for url, active_href in cases:
-        resp = client.get(url)
-        assert resp.status_code == 200, url
-        assert _active_link(resp.text, active_href), url
-        assert 'aria-current="page"' in resp.text, url
-
-
-def test_index_has_no_subnav(tmp_path):
-    client, _ = make_client(tmp_path)
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert 'class="subnav"' not in resp.text
-
-
-def test_narrative_link_hidden_without_parts(tmp_path):
+def test_narrative_absent_yields_parts_404(tmp_path):
+    """无叙事 part：parts 列表 404（前端据此隐藏"叙事"入口）。"""
     client, projects = make_client(tmp_path)
     shutil.rmtree(projects / "demo" / "narrative")
-    resp = client.get("/p/demo/")
-    assert resp.status_code == 200
-    assert 'class="subnav"' in resp.text
-    assert 'href="/p/demo/parts"' not in resp.text
-    assert client.get("/p/demo/parts").status_code == 404
+    payload = client.get("/api/projects/demo").json()
+    assert payload["n_parts"] == 0
+    assert client.get("/api/projects/demo/parts").status_code == 404
 
 
-def test_cards_kind_tabs_live_in_content_not_topnav(tmp_path):
-    client, _ = make_client(tmp_path)
-    resp = client.get("/p/demo/cards/data")
-    assert resp.status_code == 200
-    topnav = re.search(r'<nav class="topnav">.*?</nav>', resp.text, re.S).group(0)
-    assert "/p/demo/cards/" not in topnav            # 深色全局栏回归纯全局内容
-    assert '<a class="tab active"' in resp.text      # 当前卡种 tab 高亮
-    assert 'href="/p/demo/cards/data"' in resp.text  # 卡种链接在内容区
+def test_kind_counts_reflect_card_creation(tmp_path):
+    client, root = make_client(tmp_path)
+    from tests.helpers import write_card
+    write_card(root / "demo" / "metadata" / "methods", "qpcr",
+               {"id": "qpcr", "statement": "qPCR 三步法。", "protocol": "p",
+                "status": "approved"})
+    counts = client.get("/api/projects/demo").json()["kind_counts"]
+    assert counts["method"] == 1
+
+
+def test_review_queue_node_entries_carry_part_id(tmp_path):
+    client, root = make_client(tmp_path)
+    client.post("/api/projects/demo/parts/sec-01/nodes/para-01-01/status",
+                json={"status": "draft"})
+    queue = client.get("/api/projects/demo").json()["review_queue"]
+    item = next(q for q in queue if q["id"] == "para-01-01")
+    assert item["type"] == "node" and item["part_id"] == "sec-01"
+    assert item["label"] == "叙事节点"

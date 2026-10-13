@@ -1,9 +1,8 @@
-"""项目新建（POST /projects/new）：表单展示、创建落盘、冲突 fail-closed、名称守卫。"""
-from urllib.parse import quote
+"""项目新建（POST /api/projects）：创建落盘、冲突 fail-closed、名称守卫。
 
+表单渲染属前端职责（SPA），服务端契约 = JSON 请求/响应 + 零写入失败语义。
+"""
 import pytest
-
-pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient
 
@@ -11,70 +10,46 @@ from tests.webutil import make_client
 from weft.web import create_app
 
 
-def test_index_shows_new_project_form(tmp_path):
-    client, _ = make_client(tmp_path)
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert 'action="/projects/new"' in resp.text
-    assert 'name="name"' in resp.text
-    assert "新建项目" in resp.text
-
-
-def test_form_visible_on_empty_root(tmp_path):
-    projects = tmp_path / "projects"
-    projects.mkdir()
-    client = TestClient(create_app(projects))
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert 'action="/projects/new"' in resp.text
-
-
 def test_create_project_success(tmp_path):
     client, projects = make_client(tmp_path)
-    resp = client.post("/projects/new", data={"name": "paper-new"},
-                       follow_redirects=False)
-    assert resp.status_code == 303
-    assert resp.headers["location"] == "/p/paper-new/"
+    resp = client.post("/api/projects", json={"name": "paper-new"})
+    assert resp.status_code == 200 and resp.json()["ok"] is True
+    assert resp.json()["pid"] == "paper-new"
     # 骨架落盘（init_project 载体）
     assert (projects / "paper-new" / "weft.yaml").exists()
     assert (projects / "paper-new" / "metadata").is_dir()
     # 列表出现且零诊断
-    listing = client.get("/")
-    assert "paper-new" in listing.text
-    assert "E: 0 · W: 0" in listing.text
+    listing = client.get("/api/projects").json()
+    entry = next(e for e in listing["entries"] if e["pid"] == "paper-new")
+    assert entry["n_errors"] == 0 and entry["n_warnings"] == 0
     # 新项目仪表盘可打开
-    assert client.get("/p/paper-new/").status_code == 200
+    assert client.get("/api/projects/paper-new").status_code == 200
 
 
 def test_create_project_strips_whitespace(tmp_path):
     client, projects = make_client(tmp_path)
-    resp = client.post("/projects/new", data={"name": "  spaced  "},
-                       follow_redirects=False)
-    assert resp.status_code == 303
-    assert resp.headers["location"] == "/p/spaced/"
+    resp = client.post("/api/projects", json={"name": "  spaced  "})
+    assert resp.status_code == 200 and resp.json()["pid"] == "spaced"
     assert (projects / "spaced" / "metadata").is_dir()
 
 
 def test_create_project_chinese_name(tmp_path):
     client, projects = make_client(tmp_path)
-    resp = client.post("/projects/new", data={"name": "我的论文"},
-                       follow_redirects=False)
-    assert resp.status_code == 303
-    assert resp.headers["location"] == f"/p/{quote('我的论文', safe='')}/"
+    resp = client.post("/api/projects", json={"name": "我的论文"})
+    assert resp.status_code == 200
     assert (projects / "我的论文" / "metadata").is_dir()
-    # percent-encoded 直达新项目仪表盘
-    assert client.get(f"/p/{quote('我的论文')}/").status_code == 200
-    assert "我的论文" in client.get("/").text
+    # pid 直达新项目仪表盘
+    assert client.get("/api/projects/我的论文").status_code == 200
+    listing = client.get("/api/projects").json()
+    assert any(e["pid"] == "我的论文" for e in listing["entries"])
 
 
 def test_create_project_collision_fail_closed(tmp_path):
     client, projects = make_client(tmp_path)
     before = sorted(str(p.relative_to(projects)) for p in projects.rglob("*"))
-    resp = client.post("/projects/new", data={"name": "demo"},
-                       follow_redirects=False)
-    assert resp.status_code == 200
-    assert "新建失败" in resp.text
-    assert "未写入任何文件" in resp.text
+    resp = client.post("/api/projects", json={"name": "demo"})
+    assert resp.status_code == 422
+    assert "未写入任何文件" in resp.json()["detail"]
     after = sorted(str(p.relative_to(projects)) for p in projects.rglob("*"))
     assert before == after
 
@@ -82,9 +57,8 @@ def test_create_project_collision_fail_closed(tmp_path):
 def test_create_project_into_existing_empty_dir(tmp_path):
     client, projects = make_client(tmp_path)
     (projects / "blank").mkdir()
-    resp = client.post("/projects/new", data={"name": "blank"},
-                       follow_redirects=False)
-    assert resp.status_code == 303
+    resp = client.post("/api/projects", json={"name": "blank"})
+    assert resp.status_code == 200
     assert (projects / "blank" / "weft.yaml").exists()
 
 
@@ -101,8 +75,24 @@ def test_create_project_into_existing_empty_dir(tmp_path):
 def test_create_project_rejects_invalid_names(tmp_path, bad):
     client, projects = make_client(tmp_path)
     before = {p.name for p in projects.iterdir()}
-    resp = client.post("/projects/new", data={"name": bad},
-                       follow_redirects=False)
-    assert resp.status_code == 200
-    assert "新建失败" in resp.text
+    resp = client.post("/api/projects", json={"name": bad})
+    assert resp.status_code == 422
     assert {p.name for p in projects.iterdir()} == before
+
+
+def test_create_project_location_ignored_in_scan_mode(tmp_path):
+    """扫描模式新建只认 projects_root：location 字段无意义但不致错。"""
+    client, projects = make_client(tmp_path)
+    resp = client.post("/api/projects",
+                       json={"name": "scan-only", "location": str(tmp_path / "no")})
+    assert resp.status_code == 200
+    assert (projects / "scan-only" / "metadata").is_dir()
+
+
+def test_empty_root_lists_zero_entries(tmp_path):
+    projects = tmp_path / "projects"
+    projects.mkdir()
+    client = TestClient(create_app(projects))
+    payload = client.get("/api/projects").json()
+    assert payload["entries"] == [] and payload["registry_mode"] is False
+    assert payload["projects_root"] == str(projects.resolve())

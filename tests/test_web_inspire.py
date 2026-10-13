@@ -1,10 +1,5 @@
-"""灵感页：表单触发（mock）、SSE 完成、提案应用路由、提案对比页。"""
+"""灵感管线：触发（mock）、SSE 完成、提案应用、提案对比 payload。"""
 import json
-import re
-
-import pytest
-
-pytest.importorskip("fastapi")
 
 import frontmatter as fm
 
@@ -19,20 +14,23 @@ def _write_proposal(root, card_id: str, **meta):
     return path
 
 
-def test_inspire_page_renders(tmp_path):
-    client, _ = make_client(tmp_path)
-    resp = client.get("/p/demo/inspire")
-    assert resp.status_code == 200 and "灵感" in resp.text
+def test_inspire_list_proposals(tmp_path):
+    client, root = make_client(tmp_path)
+    _write_proposal(root, "claim-01", id="claim-01", claim_type="uncited",
+                    statement="提案。", status="draft")
+    payload = client.get("/api/projects/demo/inspire").json()
+    assert [p["id"] for p in payload["proposals"]] == ["claim-01"]
 
 
 def test_inspire_run_finishes_with_mock(tmp_path):
     client, root = make_client(tmp_path)
-    resp = client.post("/p/demo/inspire/run", data={
-        "text": "搅拌 speed up dissolving，也许温度才是主因？", "mock": "1"})
-    match = re.search(r'data-run-id="([0-9a-f]+)"', resp.text)
-    assert match, resp.text
+    resp = client.post("/api/projects/demo/inspire/run", json={
+        "text": "搅拌 speed up dissolving，也许温度才是主因？", "mock": True})
+    assert resp.status_code == 200
+    run_id = resp.json()["run_id"]
     events = []
-    with client.stream("GET", f"/p/demo/runs/{match.group(1)}/events") as r:
+    with client.stream("GET",
+                       f"/api/projects/demo/runs/{run_id}/events") as r:
         for line in r.iter_lines():
             if line.startswith("data: "):
                 events.append(json.loads(line[len("data: "):]))
@@ -40,91 +38,87 @@ def test_inspire_run_finishes_with_mock(tmp_path):
     assert (root / "demo" / "inspirations").is_dir()   # 收件箱 + 报告已落盘
 
 
-def test_apply_proposal_route(tmp_path):
+def test_inspire_run_empty_text_422(tmp_path):
+    client, _ = make_client(tmp_path)
+    resp = client.post("/api/projects/demo/inspire/run",
+                       json={"text": "   ", "mock": True})
+    assert resp.status_code == 422
+    assert "灵感文本为空" in resp.json()["detail"]
+
+
+def test_apply_proposal(tmp_path):
     client, root = make_client(tmp_path)
     proposals = root / "demo" / "inspirations" / "proposals"
     proposals.mkdir(parents=True)
     proposals.joinpath("claim-01.md").write_text(fm.dumps(fm.Post("", **{
         "id": "claim-01", "claim_type": "uncited",
         "statement": "网页应用的提案。", "status": "draft"})), encoding="utf-8")
-    resp = client.post("/p/demo/inspire/proposals/claim-01/apply",
-                       follow_redirects=False)
-    assert resp.status_code == 303
+    resp = client.post("/api/projects/demo/inspire/proposals/claim-01/apply")
+    assert resp.status_code == 200 and resp.json()["ok"] is True
     assert "网页应用的提案" in (root / "demo" / "metadata" / "claims" / "uncited"
                                 / "claim-01.md").read_text(encoding="utf-8")
     assert not proposals.joinpath("claim-01.md").exists()
 
 
-def test_proposal_compare_page(tmp_path):
+def test_proposal_compare_payload(tmp_path):
     client, root = make_client(tmp_path)
     _write_proposal(root, "fact-01", id="fact-01", data=["data-01"],
                     statement="温度显著提高反应速率。", supports=["claim-01"],
                     status="draft", comment="取代 fact-01（灵感补充）")
-    resp = client.get("/p/demo/inspire/proposals/fact-01")
-    assert resp.status_code == 200
-    assert "温度显著提高反应速率。" in resp.text      # 提案侧
-    assert "温度提高速率。" in resp.text              # 当前卡侧
-    assert "diff-add" in resp.text and "diff-del" in resp.text
-    assert 'class="changed"' in resp.text             # statement/comment 差异高亮
-    assert "data-01" in resp.text                     # 列表字段进对照表
-    assert "/p/demo/inspire/proposals/fact-01/apply" in resp.text
+    payload = client.get("/api/projects/demo/inspire/proposals/fact-01").json()
+    assert payload["applicable"] is True and payload["warn"] is None
+    assert payload["old_rel"] == "metadata/facts/fact-01.md"
+    changed = {r["key"] for r in payload["rows"] if r["changed"]}
+    assert "statement" in changed and "comment" in changed
+    assert any(r["new"] == "温度显著提高反应速率。" for r in payload["rows"])
+    assert any(r["old"] == "温度提高速率。" for r in payload["rows"])
+    assert any(r["cls"] == "add" for r in payload["diff_rows"])
 
 
-def test_proposal_compare_page_missing_proposal(tmp_path):
+def test_proposal_compare_missing_proposal_404(tmp_path):
     client, _ = make_client(tmp_path)
-    resp = client.get("/p/demo/inspire/proposals/fact-01")
-    assert resp.status_code == 404
+    assert client.get(
+        "/api/projects/demo/inspire/proposals/fact-01").status_code == 404
 
 
-def test_proposal_compare_page_missing_target(tmp_path):
+def test_proposal_compare_missing_target(tmp_path):
     client, root = make_client(tmp_path)
     _write_proposal(root, "claim-99", id="claim-99", claim_type="uncited",
                     statement="无主提案。", status="draft")
-    resp = client.get("/p/demo/inspire/proposals/claim-99")
-    assert resp.status_code == 200
-    assert "不存在" in resp.text
-    assert "/apply" not in resp.text                  # 目标缺失不渲染应用按钮
+    payload = client.get("/api/projects/demo/inspire/proposals/claim-99").json()
+    assert payload["applicable"] is False          # 目标缺失 fail-closed 隐藏应用
+    assert "不存在" in payload["warn"]
+    assert payload["raw_new"] and payload["rows"] is None
 
 
-def test_proposal_compare_page_unparseable(tmp_path):
+def test_proposal_compare_unparseable(tmp_path):
     client, root = make_client(tmp_path)
     _write_proposal(root, "claim-01", id="claim-01", claim_type="weird",
                     statement="坏提案。", status="draft")
-    resp = client.get("/p/demo/inspire/proposals/claim-01")
-    assert resp.status_code == 200
-    assert "解析失败" in resp.text
-    assert "diff-del" in resp.text                    # 当前卡 vs 提案原文 raw diff
-    assert "/apply" not in resp.text
+    payload = client.get("/api/projects/demo/inspire/proposals/claim-01").json()
+    assert payload["applicable"] is False
+    assert "解析失败" in payload["warn"]
+    assert payload["diff_rows"]                    # 当前卡 vs 提案原文 raw diff
+    assert payload["raw_new"]                      # 解析失败回显原文兜底（旧语义）
 
 
-def test_proposal_compare_page_id_mismatch(tmp_path):
+def test_proposal_compare_id_mismatch(tmp_path):
     client, root = make_client(tmp_path)
     _write_proposal(root, "claim-01", id="claim-02", claim_type="uncited",
                     statement="错位提案。", status="draft")
-    resp = client.get("/p/demo/inspire/proposals/claim-01")
-    assert resp.status_code == 200
-    assert "不一致" in resp.text
-    assert "/apply" not in resp.text
+    payload = client.get("/api/projects/demo/inspire/proposals/claim-01").json()
+    assert payload["applicable"] is False
+    assert "不一致" in payload["warn"]
 
 
-def test_proposal_compare_page_clean_diff_hidden(tmp_path):
+def test_proposal_compare_clean_diff_hidden(tmp_path):
     client, root = make_client(tmp_path)
-    src = (root / "demo" / "metadata" / "claims" / "uncited"
-           / "claim-01.md")
+    src = (root / "demo" / "metadata" / "claims" / "uncited" / "claim-01.md")
     proposals = root / "demo" / "inspirations" / "proposals"
     proposals.mkdir(parents=True)
     proposals.joinpath("claim-01.md").write_text(
         src.read_text(encoding="utf-8"), encoding="utf-8")
-    resp = client.get("/p/demo/inspire/proposals/claim-01")
-    assert resp.status_code == 200
-    assert "diff-add" not in resp.text                # 无逐行差异段
-    assert 'class="changed"' not in resp.text         # 无字段差异高亮
-    assert "/p/demo/inspire/proposals/claim-01/apply" in resp.text
-
-
-def test_inspire_page_links_compare(tmp_path):
-    client, root = make_client(tmp_path)
-    _write_proposal(root, "claim-01", id="claim-01", claim_type="uncited",
-                    statement="提案。", status="draft")
-    resp = client.get("/p/demo/inspire")
-    assert 'href="/p/demo/inspire/proposals/claim-01"' in resp.text
+    payload = client.get("/api/projects/demo/inspire/proposals/claim-01").json()
+    assert payload["applicable"] is True
+    assert payload["diff_rows"] is None            # 无逐行差异段
+    assert all(not r["changed"] for r in payload["rows"])   # 无字段差异

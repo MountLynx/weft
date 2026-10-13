@@ -1,8 +1,4 @@
-"""项目扫描：识别、忽略非项目、损坏项目不阻断。"""
-import pytest
-
-pytest.importorskip("fastapi")
-
+"""项目扫描：识别、忽略非项目、损坏项目不阻断（纯 discovery 层，语义不变）。"""
 from pathlib import Path
 
 from tests.helpers import make_minimal_project, write_card

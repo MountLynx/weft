@@ -1,16 +1,11 @@
-"""WebUI 共享 helpers：模板、卡种映射、项目解析（webui 设计 §3/§4.1）。"""
+"""WebUI 共享 helpers：卡种映射、项目解析、诊断序列化（webui-react 设计 §3）。"""
 from __future__ import annotations
 
-from pathlib import Path
-
 from fastapi import HTTPException, Request
-from fastapi.templating import Jinja2Templates
 
+from weft.diagnostics import Diagnostic
 from weft.labels import KIND_ATTRS
 from weft.web.discovery import ProjectEntry
-
-_TEMPLATE_DIR = Path(__file__).parent / "templates"
-templates = Jinja2Templates(directory=str(_TEMPLATE_DIR))
 
 KIND_LABELS = {"data": "data 卡", "fact": "fact 卡", "claim": "claim 卡",
                "note": "note 卡", "method": "method 卡", "param": "param 卡"}
@@ -52,3 +47,20 @@ def load_reviewable_or_404(request: Request, pid: str) -> ProjectEntry:
     if entry.project is None:
         raise HTTPException(status_code=404, detail="项目不可用")
     return entry
+
+
+def diag_to_json(d: Diagnostic) -> dict:
+    """诊断 → JSON（E-*/W-* 码原样透传，稳定标识红线）。"""
+    return {"level": d.level.value, "code": d.code, "path": d.path,
+            "field": d.field, "message": d.message, "is_error": d.is_error}
+
+
+def diags_to_json(diags) -> list[dict]:
+    return [diag_to_json(d) for d in diags]
+
+
+def entry_to_json(entry: ProjectEntry) -> dict:
+    return {"pid": entry.pid, "path": str(entry.path),
+            "available": entry.available, "missing": entry.missing,
+            "n_cards": entry.n_cards, "n_errors": entry.n_errors,
+            "n_warnings": entry.n_warnings}

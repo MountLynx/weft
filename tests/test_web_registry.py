@@ -1,13 +1,8 @@
-"""注册表模式 WebUI（projects registry 设计 §5）：列表、失联灰显、新建登记闭环、损坏横幅。
+"""注册表模式 API（projects registry 设计 §5）：列表、失联条目、新建登记闭环、表损坏。
 
-扫描模式回归由既有 test_web_* 全套守护，本文件只覆盖注册表模式增量。
+扫描模式回归由其余 test_web_* 守护，本文件只覆盖注册表模式增量。
 """
 from pathlib import Path
-from urllib.parse import quote
-
-import pytest
-
-pytest.importorskip("fastapi")
 
 from fastapi.testclient import TestClient
 
@@ -22,7 +17,7 @@ def make_projects_root(tmp_path: Path) -> Path:
     return projects
 
 
-def setup_weft_home(tmp_path: Path, monkeypatch) -> None:
+def setup_weft_home(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("WEFT_HOME", str(tmp_path / "weft-home"))
 
 
@@ -51,23 +46,19 @@ def test_registry_mode_lists_registered_project(tmp_path, monkeypatch):
     register_from_env("demo", make_minimal_project(projects / "demo"))
     client = TestClient(create_app(use_registry=True))
 
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert "demo" in resp.text
-    assert "可用" in resp.text
-    assert "注册表：" in resp.text
-    assert 'href="/p/demo/"' in resp.text
-    assert client.get("/p/demo/").status_code == 200
+    payload = client.get("/api/projects").json()
+    assert payload["registry_mode"] is True and payload["registry_path"]
+    entry = next(e for e in payload["entries"] if e["pid"] == "demo")
+    assert entry["available"] is True and entry["n_errors"] == 0
+    assert client.get("/api/projects/demo").status_code == 200
 
 
 def test_registry_mode_empty_state(tmp_path, monkeypatch):
     setup_weft_home(tmp_path, monkeypatch)
     make_projects_root(tmp_path)
     client = TestClient(create_app(use_registry=True))
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert "注册表为空" in resp.text
-    assert 'action="/projects/new"' in resp.text
+    payload = client.get("/api/projects").json()
+    assert payload["entries"] == [] and payload["registry_mode"] is True
 
 
 def test_registry_mode_missing_entry_greyed(tmp_path, monkeypatch):
@@ -76,22 +67,22 @@ def test_registry_mode_missing_entry_greyed(tmp_path, monkeypatch):
     register_from_env("ghost", tmp_path / "no" / "such" / "dir")
     client = TestClient(create_app(use_registry=True))
 
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert "位置失联" in resp.text
-    assert 'href="/p/ghost/"' not in resp.text
-    # 直达 URL 也 404（missing 不是可用项目）
-    assert client.get("/p/ghost/").status_code == 404
+    payload = client.get("/api/projects").json()
+    entry = next(e for e in payload["entries"] if e["pid"] == "ghost")
+    assert entry["missing"] is True and entry["available"] is False
+    # 直达也 404（missing 不是可用项目）
+    assert client.get("/api/projects/ghost").status_code == 404
 
 
 def test_cli_registration_visible_without_restart(tmp_path, monkeypatch):
     setup_weft_home(tmp_path, monkeypatch)
     projects = make_projects_root(tmp_path)
     client = TestClient(create_app(use_registry=True))
-    assert "late-add" not in client.get("/").text
+    assert client.get("/api/projects").json()["entries"] == []
     # serve 启动后 CLI 登记（R7：每请求实时读注册表）
     register_from_env("late-add", make_minimal_project(projects / "late-add"))
-    assert "late-add" in client.get("/").text
+    pids = [e["pid"] for e in client.get("/api/projects").json()["entries"]]
+    assert pids == ["late-add"]
 
 
 # ---------- 新建项目（创建 + 登记闭环） ----------
@@ -102,13 +93,11 @@ def test_new_project_creates_and_registers(tmp_path, monkeypatch):
     set_default_root(projects)
     client = TestClient(create_app(use_registry=True))
 
-    resp = client.post("/projects/new", data={"name": "fresh"},
-                       follow_redirects=False)
-    assert resp.status_code == 303
-    assert resp.headers["location"] == "/p/fresh/"
+    resp = client.post("/api/projects", json={"name": "fresh"})
+    assert resp.status_code == 200 and resp.json()["pid"] == "fresh"
     assert (projects / "fresh" / "metadata").is_dir()
     assert registry_entry_names() == ["fresh"]
-    assert client.get("/p/fresh/").status_code == 200
+    assert client.get("/api/projects/fresh").status_code == 200
 
 
 def test_new_project_explicit_location(tmp_path, monkeypatch):
@@ -117,10 +106,9 @@ def test_new_project_explicit_location(tmp_path, monkeypatch):
     elsewhere = tmp_path / "elsewhere-root"
     client = TestClient(create_app(use_registry=True))
 
-    resp = client.post("/projects/new",
-                       data={"name": "over-there", "location": str(elsewhere)},
-                       follow_redirects=False)
-    assert resp.status_code == 303
+    resp = client.post("/api/projects",
+                       json={"name": "over-there", "location": str(elsewhere)})
+    assert resp.status_code == 200
     assert (elsewhere / "over-there" / "weft.yaml").is_file()
     assert registry_entry_names() == ["over-there"]
 
@@ -132,10 +120,9 @@ def test_new_project_default_root_unset_errors(tmp_path, monkeypatch):
     monkeypatch.setattr(Path, "home", lambda: fake_home)
     client = TestClient(create_app(use_registry=True))
 
-    resp = client.post("/projects/new", data={"name": "x"})
-    assert resp.status_code == 200
-    assert "新建失败" in resp.text
-    assert "weft projects root" in resp.text
+    resp = client.post("/api/projects", json={"name": "x"})
+    assert resp.status_code == 422
+    assert "weft projects root" in resp.json()["detail"]
     # 不允许悄悄落进 ~/weft-projects
     assert not (fake_home / "weft-projects").exists()
     assert registry_entry_names() == []
@@ -148,9 +135,8 @@ def test_new_project_duplicate_name_fail_closed(tmp_path, monkeypatch):
     client = TestClient(create_app(use_registry=True))
 
     before = sorted(str(p.relative_to(projects)) for p in projects.rglob("*"))
-    resp = client.post("/projects/new", data={"name": "demo"})
-    assert resp.status_code == 200
-    assert "新建失败" in resp.text
+    resp = client.post("/api/projects", json={"name": "demo"})
+    assert resp.status_code == 422
     after = sorted(str(p.relative_to(projects)) for p in projects.rglob("*"))
     assert before == after
     assert registry_entry_names() == ["demo"]
@@ -166,10 +152,9 @@ def test_new_project_collision_zero_write(tmp_path, monkeypatch):
     client = TestClient(create_app(use_registry=True))
 
     before = sorted(str(p.relative_to(busy)) for p in busy.rglob("*"))
-    resp = client.post("/projects/new", data={"name": "busy"})
-    assert resp.status_code == 200
-    assert "新建失败" in resp.text
-    assert "未写入任何文件" in resp.text
+    resp = client.post("/api/projects", json={"name": "busy"})
+    assert resp.status_code == 422
+    assert "未写入任何文件" in resp.json()["detail"]
     after = sorted(str(p.relative_to(busy)) for p in busy.rglob("*"))
     assert before == after
     assert registry_entry_names() == []
@@ -177,43 +162,40 @@ def test_new_project_collision_zero_write(tmp_path, monkeypatch):
 
 # ---------- 注册表损坏 ----------
 
-def test_malformed_registry_error_banner(tmp_path, monkeypatch):
+def test_malformed_registry_error_surface(tmp_path, monkeypatch):
     setup_weft_home(tmp_path, monkeypatch)
     home = tmp_path / "weft-home"
     home.mkdir(parents=True)
     (home / "projects.json").write_text("not json {", encoding="utf-8")
     client = TestClient(create_app(use_registry=True))
 
-    resp = client.get("/")
-    assert resp.status_code == 200
-    assert "E-REG-MALFORMED" in resp.text
+    payload = client.get("/api/projects").json()
+    assert "E-REG-MALFORMED" in payload["reg_error"]
 
 
 # ---------- 审查修复补充 ----------
 
 def test_new_project_rejects_invalid_name(tmp_path, monkeypatch):
-    """表单非法名（E-REG-NAME 场景）：错误文案 + 零写入（审查 Minor 5a）。"""
+    """表单非法名（E-REG-NAME 场景）：错误 + 零写入（审查 Minor 5a）。"""
     setup_weft_home(tmp_path, monkeypatch)
     projects = make_projects_root(tmp_path)
     set_default_root(projects)
     client = TestClient(create_app(use_registry=True))
-    resp = client.post("/projects/new", data={"name": "a/b"})
-    assert resp.status_code == 200
-    assert "新建失败" in resp.text
+    resp = client.post("/api/projects", json={"name": "a/b"})
+    assert resp.status_code == 422
     assert registry_entry_names() == []
     assert not (projects / "a").exists()
 
 
 def test_scan_mode_does_not_touch_registry(tmp_path, monkeypatch):
-    """扫描模式（含其新建表单）不读写注册表（审查 Minor 5b 回归守护）。"""
+    """扫描模式（含新建）不读写注册表（审查 Minor 5b 回归守护）。"""
     setup_weft_home(tmp_path, monkeypatch)
     projects = make_projects_root(tmp_path)
     make_minimal_project(projects / "demo")
     client = TestClient(create_app(projects))
-    assert client.get("/").status_code == 200
-    resp = client.post("/projects/new", data={"name": "scan-made"},
-                       follow_redirects=False)
-    assert resp.status_code == 303
+    assert client.get("/api/projects").status_code == 200
+    resp = client.post("/api/projects", json={"name": "scan-made"})
+    assert resp.status_code == 200
     assert load_registry().projects == []
 
 

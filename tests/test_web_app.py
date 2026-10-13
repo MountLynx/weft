@@ -1,4 +1,4 @@
-"""WebUI 骨架与 serve 子命令。"""
+"""WebUI 骨架（SPA 宿主 + API 挂载）与 serve 子命令。"""
 import pytest
 
 pytest.importorskip("fastapi")
@@ -16,6 +16,22 @@ from weft.web import create_app
 def test_create_app_health(tmp_path: Path):
     client = TestClient(create_app(tmp_path))
     assert client.get("/healthz").json() == {"ok": True}
+
+
+def test_shell_served_and_api_unknown_404(tmp_path: Path):
+    """GET / 返回 SPA shell（text/html）；/api 与 /static 未知路径保持 JSON 404。"""
+    client = TestClient(create_app(tmp_path))
+    resp = client.get("/")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/html")
+    assert "weft-theme" in resp.text                    # 防闪脚本随 shell 走
+    assert client.get("/p/demo/dashboard").status_code == 200   # 前端路由路径交 shell
+    r404 = client.get("/api/nope")
+    assert r404.status_code == 404
+    assert r404.headers["content-type"].startswith("application/json")
+    # docs/openapi 均禁用：/docs、/openapi.json 无 FastAPI 文档内容（落 SPA 宿主）
+    assert "swagger" not in client.get("/docs").text.lower()
+    assert '"openapi"' not in client.get("/openapi.json").text
 
 
 def test_serve_invokes_uvicorn(tmp_path: Path, monkeypatch):

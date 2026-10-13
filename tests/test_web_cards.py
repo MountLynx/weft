@@ -1,8 +1,4 @@
-"""卡片列表、详情与审阅（status/comment 写回）。"""
-import pytest
-
-pytest.importorskip("fastapi")
-
+"""卡片列表、详情与审阅（status/comment 写回）——JSON API 版。"""
 from weft.store.loader import load_project
 from tests.helpers import make_managed_project, write_card
 from tests.webutil import make_client
@@ -10,30 +6,34 @@ from tests.webutil import make_client
 
 def test_cards_overview_and_list(tmp_path):
     client, _ = make_client(tmp_path)
-    assert client.get("/p/demo/cards").status_code == 200
-    resp = client.get("/p/demo/cards/fact")
-    assert resp.status_code == 200 and "fact-01" in resp.text
+    counts = client.get("/api/projects/demo/cards").json()["counts"]
+    assert counts["fact"] == 1 and counts["note"] == 1
+    payload = client.get("/api/projects/demo/cards/fact").json()
+    assert payload["label"] == "fact 卡"
+    assert [r["id"] for r in payload["rows"]] == ["fact-01"]
+    assert payload["rows"][0]["key"] == "温度提高速率。"   # key = KEY_FIELD 摘要
 
 
-def test_card_detail_renders(tmp_path):
+def test_card_detail_payload(tmp_path):
     client, _ = make_client(tmp_path)
-    resp = client.get("/p/demo/cards/fact/fact-01")
-    assert resp.status_code == 200
-    assert "fact-01" in resp.text and "温度提高速率" in resp.text
+    payload = client.get("/api/projects/demo/cards/fact/fact-01").json()
+    assert payload["id"] == "fact-01" and payload["status"] == "approved"
+    assert "温度提高速率" in payload["fields"]["statement"]
+    assert payload["rel"] == "metadata/facts/fact-01.md"
+    assert payload["fixable"] is False
 
 
-def test_unknown_kind_404(tmp_path):
+def test_unknown_kind_and_card_404(tmp_path):
     client, _ = make_client(tmp_path)
-    assert client.get("/p/demo/cards/bogus").status_code == 404
-    assert client.get("/p/demo/cards/fact/fact-99").status_code == 404
+    assert client.get("/api/projects/demo/cards/bogus").status_code == 404
+    assert client.get("/api/projects/demo/cards/fact/fact-99").status_code == 404
 
 
 def test_review_updates_file(tmp_path):
     client, root = make_client(tmp_path)
-    resp = client.post("/p/demo/cards/fact/fact-01/status",
-                       data={"status": "rejected", "comment": "表述有误"},
-                       follow_redirects=False)
-    assert resp.status_code == 303
+    resp = client.post("/api/projects/demo/cards/fact/fact-01/status",
+                       json={"status": "rejected", "comment": "表述有误"})
+    assert resp.status_code == 200 and resp.json()["ok"] is True
     project, diags = load_project(root / "demo")
     assert not any(d.is_error for d in diags)
     assert project.facts["fact-01"].status == "rejected"
@@ -42,8 +42,8 @@ def test_review_updates_file(tmp_path):
 
 def test_review_invalid_status_400(tmp_path):
     client, root = make_client(tmp_path)
-    resp = client.post("/p/demo/cards/fact/fact-01/status",
-                       data={"status": "bogus", "comment": ""})
+    resp = client.post("/api/projects/demo/cards/fact/fact-01/status",
+                       json={"status": "bogus", "comment": ""})
     assert resp.status_code == 400
     project, _ = load_project(root / "demo")
     assert project.facts["fact-01"].status == "approved"
@@ -55,12 +55,11 @@ def test_review_surface_survives_validation_errors(tmp_path):
     client, root = make_client(tmp_path)
     write_card(root / "demo" / "metadata" / "notes", "li2021",
                {"id": "li2021", "summary": "", "status": "draft"})
-    assert client.get("/p/demo/cards").status_code == 200
-    assert client.get("/p/demo/cards/note").status_code == 200
-    resp = client.post("/p/demo/cards/note/li2021/status",
-                       data={"status": "approved", "comment": ""},
-                       follow_redirects=False)
-    assert resp.status_code == 303
+    assert client.get("/api/projects/demo/cards").status_code == 200
+    assert client.get("/api/projects/demo/cards/note").status_code == 200
+    resp = client.post("/api/projects/demo/cards/note/li2021/status",
+                       json={"status": "approved", "comment": ""})
+    assert resp.status_code == 200
     project, _ = load_project(root / "demo")
     assert project.notes["li2021"].status == "approved"
 
@@ -73,14 +72,11 @@ def test_rename_to_bib_key_clears_validation_error(tmp_path):
     bib.write_text(bib.read_text(encoding="utf-8")
                    + "@article{altkey2021,\n  title = {T},\n  year = {2021},\n}\n",
                    encoding="utf-8")
-    resp = client.post("/p/demo/cards/note/li2021/rename",
-                       data={"new_id": "altkey2021"}, follow_redirects=False)
-    assert resp.status_code == 303
-    resp = client.get("/p/demo/")
-    assert resp.status_code == 200
-    # base.html 主题脚本注释含"不可用"字样，须断言徽章标记本身
-    assert 'badge rejected">不可用' not in resp.text
-    assert "altkey2021" in resp.text
+    resp = client.post("/api/projects/demo/cards/note/li2021/rename",
+                       json={"new_id": "altkey2021"})
+    assert resp.status_code == 200 and resp.json()["id"] == "altkey2021"
+    payload = client.get("/api/projects/demo").json()
+    assert payload["available"] is True            # 改名后校验错误消除
 
 
 ENTRY_YAML = "type: article\ntitle: T\nauthor:\n- A, B\nyear: 2020\njournal: J\nvolume: '1'\n"
@@ -92,57 +88,50 @@ def _managed_web_client(tmp_path):
     return client, root
 
 
-def test_note_edit_form_shows_entry_yaml(tmp_path):
+def test_note_edit_payload_shows_entry_yaml(tmp_path):
     client, _ = _managed_web_client(tmp_path)
-    resp = client.get("/p/demo/cards/note/key2020/edit")
-    assert resp.status_code == 200 and 'name="entry"' in resp.text
-    assert "type: article" in resp.text          # 既有 entry 以 YAML 文本回显
+    payload = client.get("/api/projects/demo/cards/note/key2020/edit").json()
+    assert payload["is_new"] is False
+    assert "type: article" in payload["values"]["entry"]   # 既有 entry 以 YAML 文本回显
 
 
 def test_note_edit_saves_entry(tmp_path):
     client, root = _managed_web_client(tmp_path)
-    resp = client.post("/p/demo/cards/note/key2020/edit", data={
+    resp = client.patch("/api/projects/demo/cards/note/key2020", json={
         "summary": "s", "pdf": "", "entry": ENTRY_YAML,
-        "status": "approved", "comment": ""}, follow_redirects=False)
-    assert resp.status_code == 303
+        "status": "approved", "comment": ""})
+    assert resp.status_code == 200
     project, _ = load_project(root / "demo")
     assert project.notes["key2020"].entry.title == "T"
 
 
 def test_approve_note_managed_syncs_bib(tmp_path):
     client, root = _managed_web_client(tmp_path)
-    resp = client.post("/p/demo/cards/note/key2020/status",
-                       data={"status": "approved", "comment": ""},
-                       follow_redirects=False)
-    assert resp.status_code == 303 and "bib=bib_updated" in resp.headers["location"]
+    resp = client.post("/api/projects/demo/cards/note/key2020/status",
+                       json={"status": "approved", "comment": ""})
+    body = resp.json()
+    assert resp.status_code == 200 and body["bib"] == "bib_updated"
     content = (root / "demo" / "references.bib").read_text(encoding="utf-8")
     assert content.startswith("%") and "@article{key2020" in content
 
 
 def test_approve_note_unmanaged_no_bib_flag(tmp_path):
     client, root = make_client(tmp_path)
-    resp = client.post("/p/demo/cards/note/key2020/status",
-                       data={"status": "approved", "comment": ""},
-                       follow_redirects=False)
-    assert resp.status_code == 303 and "bib=" not in resp.headers["location"]
+    resp = client.post("/api/projects/demo/cards/note/key2020/status",
+                       json={"status": "approved", "comment": ""})
+    assert resp.status_code == 200 and resp.json()["bib"] is None
 
 
-def test_approve_note_managed_bib_error_flag(tmp_path):
-    """E-BIB-VALUE 前置为落盘前拒绝后：坏值批准被 400 挡下，盘上零毒化。
-
-    （原「批准后 bib_error 旗标」契约已废除——旗标降级为纯防御路径，正常流不可达。）
-    """
+def test_approve_note_managed_bib_error_rejected_422(tmp_path):
+    """E-BIB-VALUE 前置为落盘前拒绝：坏值批准被 422 挡下，盘上零毒化。"""
     client, root = _managed_web_client(tmp_path)
     before = (root / "demo" / "references.bib").read_text(encoding="utf-8")
-    # 花括号不平衡的 entry 若直接以 approved 落盘，validate_project 会判 E-BIB-VALUE
-    # 使项目「不可用」（请求级 404），故以 draft 落盘、经批准动作触发预检拒绝
     write_card(root / "demo" / "metadata" / "notes", "key2020",
                {"id": "key2020", "summary": "s", "status": "draft",
                 "entry": {"type": "article", "title": "{T", "year": 2020}})
-    resp = client.post("/p/demo/cards/note/key2020/status",
-                       data={"status": "approved", "comment": ""},
-                       follow_redirects=False)
-    assert resp.status_code == 400 and "E-BIB-VALUE" in resp.text
+    resp = client.post("/api/projects/demo/cards/note/key2020/status",
+                       json={"status": "approved", "comment": ""})
+    assert resp.status_code == 422 and "E-BIB-VALUE" in resp.json()["detail"]
     project, _ = load_project(root / "demo")
     assert project.notes["key2020"].status == "draft"     # 未落盘
     assert (root / "demo" / "references.bib").read_text(encoding="utf-8") == before
@@ -151,64 +140,71 @@ def test_approve_note_managed_bib_error_flag(tmp_path):
 def test_edit_entry_value_error_field_error(tmp_path):
     client, root = _managed_web_client(tmp_path)
     before = (root / "demo" / "references.bib").read_text(encoding="utf-8")
-    resp = client.post("/p/demo/cards/note/key2020/edit", data={
-        "summary": "s", "pdf": "", "entry": "title: 'Smith {O''Brien'\nyear: 2020\ntype: article\n",
+    resp = client.patch("/api/projects/demo/cards/note/key2020", json={
+        "summary": "s", "pdf": "",
+        "entry": "title: 'Smith {O''Brien'\nyear: 2020\ntype: article\n",
         "status": "approved", "comment": ""})
-    assert resp.status_code == 200 and "E-BIB-VALUE" in resp.text
+    assert resp.status_code == 422
+    assert "E-BIB-VALUE" in resp.json()["errors"]["entry"]
     card_path = root / "demo" / "metadata" / "notes" / "key2020.md"
     assert "O'Brien" not in card_path.read_text(encoding="utf-8")      # 未落盘
     assert (root / "demo" / "references.bib").read_text(encoding="utf-8") == before
 
 
-def test_review_bad_entry_blocked_400(tmp_path):
+def test_review_bad_entry_blocked_422(tmp_path):
     client, root = _managed_web_client(tmp_path)
     write_card(root / "demo" / "metadata" / "notes", "bad2020",
                {"id": "bad2020", "summary": "s", "status": "draft",
                 "entry": {"type": "article", "title": "{T", "year": 2020}})
-    resp = client.post("/p/demo/cards/note/bad2020/status",
-                       data={"status": "approved", "comment": ""})
-    assert resp.status_code == 400 and "E-BIB-VALUE" in resp.text
+    resp = client.post("/api/projects/demo/cards/note/bad2020/status",
+                       json={"status": "approved", "comment": ""})
+    assert resp.status_code == 422 and "E-BIB-VALUE" in resp.json()["detail"]
     project, _ = load_project(root / "demo")
     assert project.notes["bad2020"].status == "draft"                 # 批准被阻止
 
 
 def test_new_note_approved_syncs_bib(tmp_path):
     client, root = _managed_web_client(tmp_path)
-    # 夹具自带 note key2020（approved+entry）；create_card 遇重名会 409 rerender，
+    # 夹具自带 note key2020（approved+entry）；重名会 422，
     # 故删掉预置卡以走「新建即批准」路径（断言与原意不变）
     (root / "demo" / "metadata" / "notes" / "key2020.md").unlink()
-    resp = client.post("/p/demo/cards/note/new", data={
+    resp = client.post("/api/projects/demo/cards/note", json={
         "id": "key2020", "summary": "s", "pdf": "",
         "entry": "type: article\ntitle: T\nyear: 2020\n",
-        "status": "approved", "comment": ""}, follow_redirects=False)
-    assert resp.status_code == 303 and "bib=bib_updated" in resp.headers["location"]
+        "status": "approved", "comment": ""})
+    assert resp.status_code == 200 and resp.json()["bib"] == "bib_updated"
     content = (root / "demo" / "references.bib").read_text(encoding="utf-8")
     assert "@article{key2020" in content and "title = {T}" in content
 
 
 def test_new_note_draft_no_bib_flag(tmp_path):
     client, root = _managed_web_client(tmp_path)
-    resp = client.post("/p/demo/cards/note/new", data={
+    resp = client.post("/api/projects/demo/cards/note", json={
         "id": "new2021", "summary": "s", "pdf": "",
         "entry": "type: article\ntitle: N\nyear: 2021\n",
-        "status": "draft", "comment": ""}, follow_redirects=False)
-    assert resp.status_code == 303 and "bib=" not in resp.headers["location"]
+        "status": "draft", "comment": ""})
+    assert resp.status_code == 200 and resp.json()["bib"] is None
 
 
 def test_reject_note_removes_from_bib(tmp_path):
     client, root = _managed_web_client(tmp_path)
-    resp = client.post("/p/demo/cards/note/key2020/status",
-                       data={"status": "rejected", "comment": ""},
-                       follow_redirects=False)
-    assert "bib=bib_updated" in resp.headers["location"]
+    resp = client.post("/api/projects/demo/cards/note/key2020/status",
+                       json={"status": "rejected", "comment": ""})
+    assert resp.json()["bib"] == "bib_updated"
     content = (root / "demo" / "references.bib").read_text(encoding="utf-8")
     assert "@article{key2020" not in content
 
 
-def test_detail_banner_success_renders(tmp_path):
-    client, _ = _managed_web_client(tmp_path)
-    resp = client.get("/p/demo/cards/note/key2020?bib=bib_updated")
-    assert resp.status_code == 200 and "已同步" in resp.text
+def test_detail_payload_marks_fixable(tmp_path):
+    client, root = make_client(tmp_path)
+    # fixable 前置：非 rejected + entry 非空 + id 不在 bib（bibgen.fixable_notes §3.5）
+    write_card(root / "demo" / "metadata" / "notes", "li2021",
+               {"id": "li2021", "summary": "s", "status": "draft",
+                "entry": {"type": "article", "title": "T", "year": 2021}})
+    assert client.get(
+        "/api/projects/demo/cards/note/li2021").json()["fixable"] is True
+    assert client.get(
+        "/api/projects/demo/cards/note/key2020").json()["fixable"] is False
 
 
 def test_unmanaged_entry_error_not_prechecked(tmp_path):
@@ -217,10 +213,10 @@ def test_unmanaged_entry_error_not_prechecked(tmp_path):
     write_card(root / "demo" / "metadata" / "notes", "key2020",
                {"id": "key2020", "summary": "旧", "status": "approved",
                 "entry": {"type": "article", "title": "{T", "year": 2020}})
-    resp = client.post("/p/demo/cards/note/key2020/edit", data={
+    resp = client.patch("/api/projects/demo/cards/note/key2020", json={
         "summary": "新概括", "pdf": "",
         "entry": "title: 'Smith {O''Brien'\nyear: 2020\ntype: article\n",
-        "status": "approved", "comment": ""}, follow_redirects=False)
-    assert resp.status_code == 303
+        "status": "approved", "comment": ""})
+    assert resp.status_code == 200
     project, _ = load_project(root / "demo")
     assert project.notes["key2020"].summary == "新概括"    # 无关编辑照常落盘

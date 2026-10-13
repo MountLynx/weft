@@ -1,12 +1,7 @@
-"""生成触发、SSE 事件序列、闸门拒绝、per-project 锁。"""
+"""生成触发、SSE 事件序列、闸门拒绝、per-project 锁——JSON API 版。"""
 import json
-import re
 
-import pytest
-
-pytest.importorskip("fastapi")
-
-from tests.helpers import make_minimal_project, write_card
+from tests.helpers import write_card
 from tests.webutil import make_client
 from weft.web.runs import RunManager
 
@@ -23,12 +18,13 @@ def test_run_manager_lock():
 
 def test_generate_sse_event_sequence(tmp_path):
     client, root = make_client(tmp_path)
-    resp = client.post("/p/demo/parts/sec-01/generate", data={"mock": "1"})
+    resp = client.post("/api/projects/demo/parts/sec-01/generate",
+                       json={"mock": True})
     assert resp.status_code == 200
-    match = re.search(r'data-run-id="([0-9a-f]+)"', resp.text)
-    assert match, resp.text
+    run_id = resp.json()["run_id"]
     events = []
-    with client.stream("GET", f"/p/demo/runs/{match.group(1)}/events") as r:
+    with client.stream("GET",
+                       f"/api/projects/demo/runs/{run_id}/events") as r:
         for line in r.iter_lines():
             if line.startswith("data: "):
                 events.append(json.loads(line[len("data: "):]))
@@ -40,14 +36,17 @@ def test_generate_sse_event_sequence(tmp_path):
     assert (root / "demo" / "drafts" / "sec-01.md").exists()
 
 
-def test_generate_gate_rejects_with_errors(tmp_path):
+def test_generate_gate_rejects_with_diagnostics(tmp_path):
     client, root = make_client(tmp_path)
     write_card(root / "demo" / "metadata" / "data", "oops",
                {"id": "data-01", "status": "draft"})   # 文件名≠id → 校验错误
-    resp = client.post("/p/demo/parts/sec-01/generate", data={"mock": "1"})
-    assert resp.status_code == 200
-    assert "校验存在错误" in resp.text
-    assert 'data-run-id' not in resp.text
+    resp = client.post("/api/projects/demo/parts/sec-01/generate",
+                       json={"mock": True})
+    assert resp.status_code == 422
+    body = resp.json()
+    assert "校验存在错误" in body["detail"]
+    assert body["diagnostics"] and all(d["is_error"] for d in body["diagnostics"])
+    assert "run_id" not in body
 
 
 def test_generate_second_run_409(tmp_path):
@@ -57,8 +56,9 @@ def test_generate_second_run_409(tmp_path):
     run = mgr.try_start("demo")
     assert run is not None
     try:
-        resp = client.post("/p/demo/parts/sec-01/generate", data={"mock": "1"})
+        resp = client.post("/api/projects/demo/parts/sec-01/generate",
+                           json={"mock": True})
         assert resp.status_code == 409
-        assert "已有生成任务在运行" in resp.text
+        assert "已有生成任务在运行" in resp.json()["detail"]
     finally:
         mgr.finish("demo", run)

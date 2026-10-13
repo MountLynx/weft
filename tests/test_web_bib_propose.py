@@ -1,7 +1,5 @@
-"""WebUI 文献提案路由（bibgen 设计 §8 路径 1）。"""
+"""WebUI 文献提案 API（bibgen 设计 §8 路径 1）——multipart 语义不变。"""
 import pytest
-
-pytest.importorskip("fastapi")
 
 from weft.engine.clients import ScriptedLLMClient
 from weft.pdftext import PdfTextError
@@ -10,27 +8,19 @@ from tests.webutil import make_client
 
 
 def _patch(monkeypatch, client_obj):
-    monkeypatch.setattr("weft.web.routes.cards.make_client",
+    monkeypatch.setattr("weft.web.api.cards.make_client",
                         lambda mock, project_root=None: client_obj)
-
-
-def test_propose_page_renders(tmp_path):
-    client, _ = make_client(tmp_path)
-    resp = client.get("/p/demo/notes/propose")
-    assert resp.status_code == 200
-    assert 'name="clues"' in resp.text and "draft" in resp.text
-    assert 'type="file"' in resp.text
-    assert 'enctype="multipart/form-data"' in resp.text
 
 
 def test_propose_creates_draft_note(tmp_path, monkeypatch):
     client, root = make_client(tmp_path)
     scripted = ScriptedLLMClient()
     _patch(monkeypatch, scripted)
-    resp = client.post("/p/demo/notes/propose", data={"clues": "Smith 2020 催化"},
-                       follow_redirects=False)
-    assert resp.status_code == 303
-    assert resp.headers["location"].endswith("/cards/note/smith2020")
+    resp = client.post("/api/projects/demo/notes/propose",
+                       data={"clues": "Smith 2020 催化"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["ok"] is True and body["id"] == "smith2020" and body["pdfwarn"] is False
     assert "Smith 2020 催化" in scripted.prompts[0]     # 线索进了 prompt
     project, _ = load_project(root / "demo")
     card = project.notes["smith2020"]
@@ -46,12 +36,11 @@ def test_propose_conflict_suffix(tmp_path, monkeypatch):
     (root / "demo" / "metadata" / "notes" / "smith2020.md").write_text(
         "---\nid: smith2020\nsummary: 占位\nstatus: approved\n---\n", encoding="utf-8")
     _patch(monkeypatch, ScriptedLLMClient())
-    resp = client.post("/p/demo/notes/propose", data={"clues": "Smith 2020"},
-                       follow_redirects=False)
-    assert resp.headers["location"].endswith("/cards/note/smith2020a")
+    resp = client.post("/api/projects/demo/notes/propose", data={"clues": "Smith 2020"})
+    assert resp.json()["id"] == "smith2020a"
 
 
-def test_propose_invalid_json_rerenders(tmp_path, monkeypatch):
+def test_propose_invalid_json_422(tmp_path, monkeypatch):
     class _Bad:
         async def complete(self, **kwargs):
             from llm.client import LLMResponse
@@ -59,12 +48,12 @@ def test_propose_invalid_json_rerenders(tmp_path, monkeypatch):
 
     client, root = make_client(tmp_path)
     _patch(monkeypatch, _Bad())
-    resp = client.post("/p/demo/notes/propose", data={"clues": "x"})
-    assert resp.status_code == 200 and "条目提案输出非法" in resp.text
+    resp = client.post("/api/projects/demo/notes/propose", data={"clues": "x"})
+    assert resp.status_code == 422 and "条目提案输出非法" in resp.json()["detail"]
     assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
 
 
-def test_propose_invalid_schema_rerenders(tmp_path, monkeypatch):
+def test_propose_invalid_schema_422(tmp_path, monkeypatch):
     class _NoYear:
         async def complete(self, **kwargs):
             from llm.client import LLMResponse
@@ -73,21 +62,21 @@ def test_propose_invalid_schema_rerenders(tmp_path, monkeypatch):
 
     client, root = make_client(tmp_path)
     _patch(monkeypatch, _NoYear())
-    resp = client.post("/p/demo/notes/propose", data={"clues": "x"})
-    assert resp.status_code == 200 and "条目提案输出非法" in resp.text
+    resp = client.post("/api/projects/demo/notes/propose", data={"clues": "x"})
+    assert resp.status_code == 422 and "条目提案输出非法" in resp.json()["detail"]
 
 
-def test_propose_make_client_failure_rerenders(tmp_path, monkeypatch):
-    """LLM 配置缺失：make_client 的 DraftError 呈现为页面错误而非 500（T9 质量审查）。"""
+def test_propose_make_client_failure_422(tmp_path, monkeypatch):
+    """LLM 配置缺失：make_client 的 DraftError 呈现为 422 而非 500（T9 质量审查）。"""
     from weft.engine.draft_rules import DraftError
 
     def _boom(mock, project_root=None):
         raise DraftError("真实 LLM 客户端构造失败（检查 config.json / .env）：无配置")
 
     client, root = make_client(tmp_path)
-    monkeypatch.setattr("weft.web.routes.cards.make_client", _boom)
-    resp = client.post("/p/demo/notes/propose", data={"clues": "x"})
-    assert resp.status_code == 200 and "config.json" in resp.text
+    monkeypatch.setattr("weft.web.api.cards.make_client", _boom)
+    resp = client.post("/api/projects/demo/notes/propose", data={"clues": "x"})
+    assert resp.status_code == 422 and "config.json" in resp.json()["detail"]
     assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
 
 
@@ -99,12 +88,12 @@ def test_propose_with_pdf_full_chain(tmp_path, monkeypatch):
     scripted = ScriptedLLMClient()
     client, root = make_client(tmp_path)
     _patch(monkeypatch, scripted)
-    monkeypatch.setattr("weft.web.routes.cards.extract_text",
+    monkeypatch.setattr("weft.web.api.cards.extract_text",
                         lambda p: "Converted full text. " * 20)
-    resp = client.post("/p/demo/notes/propose", data={"clues": ""},
-                       files=_PDF_FILES, follow_redirects=False)
-    assert resp.status_code == 303
-    assert resp.headers["location"].endswith("/cards/note/smith2020")
+    resp = client.post("/api/projects/demo/notes/propose", data={"clues": ""},
+                       files=_PDF_FILES)
+    assert resp.status_code == 200
+    assert resp.json()["id"] == "smith2020"
     demo = root / "demo"
     card_text = (demo / "metadata" / "notes" / "smith2020.md").read_text(encoding="utf-8")
     assert "pdf: pdfs/smith2020.pdf" in card_text
@@ -121,10 +110,9 @@ def test_propose_pdf_and_manual_clues_merged(tmp_path, monkeypatch):
     scripted = ScriptedLLMClient()
     client, _ = make_client(tmp_path)
     _patch(monkeypatch, scripted)
-    monkeypatch.setattr("weft.web.routes.cards.extract_text",
-                        lambda p: "X" * 300)
-    client.post("/p/demo/notes/propose", data={"clues": "额外线索 DOI 10.1/x"},
-                files=_PDF_FILES)
+    monkeypatch.setattr("weft.web.api.cards.extract_text", lambda p: "X" * 300)
+    client.post("/api/projects/demo/notes/propose",
+                data={"clues": "额外线索 DOI 10.1/x"}, files=_PDF_FILES)
     assert "XXX" in scripted.prompts[0]
     assert "补充线索：额外线索 DOI 10.1/x" in scripted.prompts[0]
 
@@ -136,9 +124,9 @@ def test_propose_clues_truncated_to_clues_chars(tmp_path, monkeypatch):
     scripted = ScriptedLLMClient()
     client, _ = make_client(tmp_path)
     _patch(monkeypatch, scripted)
-    monkeypatch.setattr("weft.web.routes.cards.extract_text",
+    monkeypatch.setattr("weft.web.api.cards.extract_text",
                         lambda p: "Z" * (CLUES_CHARS + 500))
-    client.post("/p/demo/notes/propose", data={"clues": ""},
+    client.post("/api/projects/demo/notes/propose", data={"clues": ""},
                 files=_PDF_FILES)
     assert "Z" * CLUES_CHARS in scripted.prompts[0]
     assert "Z" * (CLUES_CHARS + 1) not in scripted.prompts[0]
@@ -147,8 +135,8 @@ def test_propose_clues_truncated_to_clues_chars(tmp_path, monkeypatch):
 def test_propose_requires_clues_or_file(tmp_path, monkeypatch):
     client, root = make_client(tmp_path)
     _patch(monkeypatch, ScriptedLLMClient())
-    resp = client.post("/p/demo/notes/propose", data={"clues": ""})
-    assert resp.status_code == 200 and "至少其一" in resp.text
+    resp = client.post("/api/projects/demo/notes/propose", data={"clues": ""})
+    assert resp.status_code == 422 and "至少其一" in resp.json()["detail"]
     assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
 
 
@@ -156,9 +144,10 @@ def test_propose_rejects_non_pdf(tmp_path, monkeypatch):
     """U11：非 .pdf 在 staging 之前拒绝，零写入。"""
     client, root = make_client(tmp_path)
     _patch(monkeypatch, ScriptedLLMClient())
-    resp = client.post("/p/demo/notes/propose", data={"clues": ""},
+    resp = client.post("/api/projects/demo/notes/propose",
+                       data={"clues": ""},
                        files={"pdf_file": ("x.md", b"data", "text/markdown")})
-    assert resp.status_code == 200 and "E-PDF-SHAPE" in resp.text
+    assert resp.status_code == 422 and "E-PDF-SHAPE" in resp.json()["detail"]
     assert not (root / "demo" / "articles").exists()
     assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
 
@@ -167,15 +156,15 @@ def test_propose_rejects_empty_pdf(tmp_path, monkeypatch):
     """设计流程序 1：空内容在 staging 之前拒绝（E-PDF-SHAPE），零写入。"""
     client, root = make_client(tmp_path)
     _patch(monkeypatch, ScriptedLLMClient())
-    resp = client.post("/p/demo/notes/propose", data={"clues": ""},
+    resp = client.post("/api/projects/demo/notes/propose",
+                       data={"clues": ""},
                        files={"pdf_file": ("empty.pdf", b"", "application/pdf")})
-    assert resp.status_code == 200 and "E-PDF-SHAPE" in resp.text
+    assert resp.status_code == 422 and "E-PDF-SHAPE" in resp.json()["detail"]
     assert not (root / "demo" / "articles").exists()
-    assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
 
 
-def test_propose_staging_write_failure_rerenders(tmp_path, monkeypatch):
-    """staging 落盘失败（磁盘/文件名）呈现 E-PDF-STAGING banner，不 500、零后续状态。"""
+def test_propose_staging_write_failure_422(tmp_path, monkeypatch):
+    """staging 落盘失败（磁盘/文件名）呈现 E-PDF-STAGING，不 500、零后续状态。"""
     client, root = make_client(tmp_path)
     _patch(monkeypatch, ScriptedLLMClient())
 
@@ -183,9 +172,9 @@ def test_propose_staging_write_failure_rerenders(tmp_path, monkeypatch):
         raise OSError("disk full")
 
     monkeypatch.setattr("pathlib.Path.write_bytes", _boom)
-    resp = client.post("/p/demo/notes/propose", data={"clues": ""},
-                       files=_PDF_FILES)
-    assert resp.status_code == 200 and "E-PDF-STAGING" in resp.text
+    resp = client.post("/api/projects/demo/notes/propose",
+                       data={"clues": ""}, files=_PDF_FILES)
+    assert resp.status_code == 422 and "E-PDF-STAGING" in resp.json()["detail"]
     assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
 
 
@@ -195,30 +184,26 @@ def test_propose_convert_failure_keeps_staging(tmp_path, monkeypatch):
 
     client, root = make_client(tmp_path)
     _patch(monkeypatch, ScriptedLLMClient())
-    monkeypatch.setattr("weft.web.routes.cards.extract_text", _boom)
-    resp = client.post("/p/demo/notes/propose", data={"clues": ""},
-                       files=_PDF_FILES)
-    assert resp.status_code == 200 and "E-PDF-CONVERT" in resp.text
+    monkeypatch.setattr("weft.web.api.cards.extract_text", _boom)
+    resp = client.post("/api/projects/demo/notes/propose",
+                       data={"clues": ""}, files=_PDF_FILES)
+    assert resp.status_code == 422 and "E-PDF-CONVERT" in resp.json()["detail"]
     assert (root / "demo" / "articles" / "smith_paper.pdf").exists()  # 留 staging
     assert not (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
 
 
-def test_propose_placement_failure_shows_pdfwarn(tmp_path, monkeypatch):
-    """U10：落位失败不回滚卡，?pdfwarn=1 提示，staging 未移走。"""
+def test_propose_placement_failure_flags_pdfwarn(tmp_path, monkeypatch):
+    """U10：落位失败不回滚卡，响应 pdfwarn=true，staging 未移走。"""
     client, root = make_client(tmp_path)
     _patch(monkeypatch, ScriptedLLMClient())
-    monkeypatch.setattr("weft.web.routes.cards.extract_text",
-                        lambda p: "Y" * 300)
+    monkeypatch.setattr("weft.web.api.cards.extract_text", lambda p: "Y" * 300)
 
     def _boom_move(src, dst):
         raise OSError("disk full")
 
-    monkeypatch.setattr("weft.web.routes.cards.shutil.move", _boom_move)
-    resp = client.post("/p/demo/notes/propose", data={"clues": ""},
-                       files=_PDF_FILES, follow_redirects=False)
-    assert resp.status_code == 303
-    assert resp.headers["location"].endswith("/cards/note/smith2020?pdfwarn=1")
-    detail = client.get("/p/demo/cards/note/smith2020?pdfwarn=1")
-    assert "PDF 落位失败" in detail.text
+    monkeypatch.setattr("weft.web.api.cards.shutil.move", _boom_move)
+    resp = client.post("/api/projects/demo/notes/propose",
+                       data={"clues": ""}, files=_PDF_FILES)
+    assert resp.status_code == 200 and resp.json()["pdfwarn"] is True
     assert (root / "demo" / "metadata" / "notes" / "smith2020.md").exists()
     assert (root / "demo" / "articles" / "smith_paper.pdf").exists()

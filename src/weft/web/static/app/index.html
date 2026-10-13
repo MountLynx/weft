@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>weft</title>
+    <script>
+      /* 防闪：CSS 加载前同步设定主题（webui 样式设计 §6，try/catch 静默降级） */
+      try {
+        var t = localStorage.getItem("weft-theme");
+        if (t) document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="/static/webui.css" />
+    <link rel="stylesheet" href="/static/themes/academic.css" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" crossorigin src="/static/app/assets/main.js"></script>
+  </body>
+</html>
