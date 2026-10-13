@@ -39,7 +39,7 @@ unmanaged 项目经 PDF/线索提案产生的 draft note 卡携带全新 bib key
 | --- | --- |
 | `to_managed` | 目标模式 |
 | `from_managed` | 当前模式（apply_switch 执行前核对，防竞态） |
-| `bib_files` | 当前 bibliography 声明且存在的文件（loader 口径） |
+| `bib_files` | 当前 bibliography 声明的文件（loader 口径：缺失文件仍列入并报 E-BIB-MISSING 加载级错误——该态项目不可加载，切换/修复前置另行显式检查存在性） |
 | `hand_only_entries` | bib 中存在、但无对应 approved+entry note 卡的 key——managed 化后**下次 sync 将消失**，逐条列出 |
 | `notes_not_in_bib` | 非 rejected note 中 id 不在 bib 的 key——unmanaged 化后将报 E-NOTE-NOT-IN-BIB（entry 非空者可用一键修复） |
 
@@ -68,7 +68,7 @@ unmanaged 项目经 PDF/线索提案产生的 draft note 卡携带全新 bib key
 
 - `project.bib_managed` → 拒绝（提示 managed 用 `weft bib sync`）；
 - `bib_cfg_error` 非空 → 拒绝；
-- `len(project.bib_files) != 1` → 拒绝（含 bibliography 缺失 / 文件不存在两种形态，指引修 `_quarto.yml`）；
+- `len(project.bib_files) != 1` → 拒绝（bibliography 未声明或多声明的形态，指引修 `_quarto.yml`；声明文件缺失属 E-BIB-MISSING 加载级错误，项目不可加载，此态修复不可达，实现上仍按创建兜底）；
 - note 不存在或 `status == "rejected"` → 拒绝；
 - `note.entry is None` → 拒绝（指引补 entry 或改名复用已有 key）。
 

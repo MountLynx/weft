@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from weft.models.bib import BibEntryFields
@@ -149,3 +150,37 @@ def sync_managed_bib(project_root) -> str | None:
     except (BibValueError, OSError, UnicodeDecodeError):
         return "bib_error"
     return "bib_updated"
+
+
+class BibModeError(Exception):
+    """切换/修复动作前置失败（E-BIB-MODE）：操作异常码，非项目状态诊断（bib-mode-fix 设计 §3.1）。"""
+
+
+@dataclass
+class SwitchPlan:
+    """模式切换预检报告（零写入；bib-mode-fix 设计 §3.2）。"""
+
+    to_managed: bool
+    from_managed: bool
+    bib_files: list[str]
+    hand_only_entries: list[str]   # bib 中无 approved+entry 卡覆盖的 key：managed 化后下次 sync 消失
+    notes_not_in_bib: list[str]    # 非 rejected note 中 id 不在 bib：unmanaged 化后报 E-NOTE-NOT-IN-BIB
+
+
+def plan_switch(project: Project, to_managed: bool) -> SwitchPlan:
+    if project.bib_cfg_error:
+        raise BibModeError(f"[E-BIB-MODE] weft.yaml bib 段非法：{project.bib_cfg_error}")
+    if to_managed and len(project.bib_files) != 1:
+        raise BibModeError("[E-BIB-MODE] managed 模式要求 bibliography 恰好指向一个文件"
+                           f"（先修 _quarto.yml；当前：{'、'.join(project.bib_files) or '无'}）")
+    if to_managed and not (project.root / project.bib_files[0]).exists():
+        raise BibModeError(f"[E-BIB-MODE] bibliography 文件不存在：{project.bib_files[0]}"
+                           "（先创建或修 _quarto.yml）")
+    covered = {n.id for n in project.notes.values()
+               if n.status == "approved" and n.entry is not None}
+    return SwitchPlan(
+        to_managed=to_managed, from_managed=project.bib_managed,
+        bib_files=list(project.bib_files),
+        hand_only_entries=sorted(project.bib_keys - covered),
+        notes_not_in_bib=sorted(nid for nid, n in project.notes.items()
+                                if n.status != "rejected" and nid not in project.bib_keys))

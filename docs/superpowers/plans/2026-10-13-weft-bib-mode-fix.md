@@ -924,4 +924,4 @@ git push
 
 | P-M# | 偏离 | 理由 |
 | --- | --- | --- |
-（初始为空，格式：`| P-M# | 偏离 | 理由 |`）
+| P-M1 | bib_files 口径修正：loader 实际保留"声明的缺失文件"（E-BIB-MISSING 为加载级错误）；plan_switch 增加显式存在性检查；涉 bib 缺失的测试改为"未声明 bibliography"可达场景 | 计划误记 loader 行为（实测 `loader.py:270`：`project.bib_files` 取自声明列表，缺失仅报诊断不剔除）；缺文件态项目 project=None，路由 404，预检须自带存在性检查才语义完整 |

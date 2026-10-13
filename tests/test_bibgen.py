@@ -1,8 +1,10 @@
-"""bibgen 单测：确定性渲染（bibgen 设计 §5）+ key minting（§6）。"""
+"""bibgen 单测：确定性渲染（bibgen 设计 §5）+ key minting（§6）+ 模式切换/修复（bib-mode-fix §3）。"""
 import pytest
 
-from tests.helpers import build_project
+from tests.helpers import (NOTE_ENTRY, build_project, make_managed_project,
+                           make_minimal_project, write_card, write_yaml)
 from weft import bibgen
+from weft.store.loader import load_project
 from weft.models.cards import NoteCard
 
 EXPECTED = """\
@@ -174,3 +176,59 @@ def test_sync_tmp_cleaned_on_failure(tmp_path, monkeypatch):
     with pytest.raises(OSError):
         bibgen.sync_bib(project)
     assert not (tmp_path / "references.bib.tmp").exists()
+
+
+# ---------- bib 模式切换与一键修复（bib-mode-fix 设计 §3） ----------
+
+
+def _note_with_entry(root, key="li2021", status="draft"):
+    write_card(root / "metadata" / "notes", key,
+               {"id": key, "summary": "s", "status": status,
+                "entry": dict(NOTE_ENTRY)})
+
+
+def test_plan_switch_to_managed_reports_hand_entries(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")   # bib 有 key2020，note 无 entry
+    project, _ = load_project(root)
+    plan = bibgen.plan_switch(project, True)
+    assert plan.from_managed is False and plan.to_managed is True
+    assert plan.bib_files == ["references.bib"]
+    assert plan.hand_only_entries == ["key2020"]     # 无 approved+entry 卡覆盖
+    assert plan.notes_not_in_bib == []
+
+
+def test_plan_switch_to_unmanaged_reports_notes_not_in_bib(tmp_path):
+    root = make_managed_project(tmp_path / "demo")
+    _note_with_entry(root)
+    project, _ = load_project(root)
+    plan = bibgen.plan_switch(project, False)
+    assert plan.from_managed is True
+    assert plan.notes_not_in_bib == ["li2021"]
+
+
+def test_plan_switch_to_managed_refuses_without_single_bib(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    # 未声明 bibliography → bib_files 空（缺失文件是 E-BIB-MISSING 加载级错误，另一条路）
+    write_yaml(root / "_quarto.yml", {"project": {"type": "default"}})
+    project, _ = load_project(root)
+    with pytest.raises(bibgen.BibModeError, match="bibliography"):
+        bibgen.plan_switch(project, True)
+
+
+def test_plan_switch_to_managed_refuses_missing_bib_file(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    (root / "references.bib").unlink()               # 声明了但文件缺失 → E-BIB-MISSING
+    project, _ = load_project(root)
+    with pytest.raises(bibgen.BibModeError, match="不存在"):
+        bibgen.plan_switch(project, True)
+
+
+def test_plan_switch_refuses_bib_cfg_error(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    write_yaml(root / "weft.yaml", {"bib": "oops"})  # bib 段非映射 → bib_cfg_error
+    project, _ = load_project(root)
+    assert project.bib_cfg_error
+    with pytest.raises(bibgen.BibModeError, match="weft.yaml"):
+        bibgen.plan_switch(project, True)
+    with pytest.raises(bibgen.BibModeError):
+        bibgen.plan_switch(project, False)
