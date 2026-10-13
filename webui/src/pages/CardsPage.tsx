@@ -141,24 +141,28 @@ function CardInspector({pid, kind, cardId, onChanged}: {
 }
 
 export function CardsPage() {
-  const {pid = "", kind = ""} = useParams();
+  const {pid = "", kind = "", cardId: routeCardId} = useParams();
   const navigate = useNavigate();
-  const [selected, setSelected] = useState("");
-
   const effectiveKind = KINDS.includes(kind as never) ? kind : "";
+  const routeSel = routeCardId ? {kind: effectiveKind, id: routeCardId} : null;
+  const [sel, setSel] = useState<{kind: string; id: string} | null>(routeSel);
   const {data} = useApi<CardsList>(
     effectiveKind
       ? `/api/projects/${encodeURIComponent(pid)}/cards/${effectiveKind}`
       : `/api/projects/${encodeURIComponent(pid)}/cards`);
+  const rows = data?.rows ?? [];
 
-  useEffect(() => {
-    const rows = data?.rows;
-    if (effectiveKind && rows && rows.length > 0
-        && !rows.some((r) => r.id === selected)) {
-      setSelected(rows[0].id);
-    }
-    if (!effectiveKind) setSelected("");
-  }, [data, effectiveKind, selected]);
+  // 渲染期同步校正（React adjusting-state-during-render 范式）：
+  // kind 切换/路由直达新卡立即作废旧选中——跨卡种窗口绝不渲染 inspector、不发 404 详情请求
+  if (sel && (sel.kind !== effectiveKind || (routeSel && sel.id !== routeSel.id))) {
+    setSel(routeSel);
+  } else if (!sel && effectiveKind && rows.length > 0) {
+    setSel({kind: effectiveKind, id: rows[0].id});   // 默认选中第一张
+  }
+
+  // inspector 只对「当前卡种列表里真实存在」的选中项渲染（总览队列直达详情也走这条）
+  const validSelected = sel && sel.kind === effectiveKind
+    && rows.some((r) => r.id === sel.id) ? sel.id : "";
 
   const counts = data?.counts ?? {};
 
@@ -207,8 +211,12 @@ export function CardsPage() {
             <div className="row-list">
               {(data?.rows ?? []).map((r) => (
                 <a key={r.id}
-                   className={`row-item${r.id === selected ? " selected" : ""}`}
-                   onClick={(e) => { e.preventDefault(); setSelected(r.id); }}>
+                   className={`row-item${r.id === validSelected ? " selected" : ""}`}
+                   onClick={(e) => {
+                     e.preventDefault();
+                     setSel({kind: effectiveKind, id: r.id});
+                     navigate(`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/${encodeURIComponent(r.id)}`);
+                   }}>
                   <Icon name="file-text" size={15} />
                   <div className="main">
                     <span className="title truncate">{r.id}</span>
@@ -221,8 +229,8 @@ export function CardsPage() {
           )}
         </div>
       </main>
-      {effectiveKind && selected && (
-        <CardInspector pid={pid} kind={effectiveKind} cardId={selected}
+      {validSelected && (
+        <CardInspector pid={pid} kind={effectiveKind} cardId={validSelected}
                        onChanged={() => navigate(0)} />
       )}
     </>

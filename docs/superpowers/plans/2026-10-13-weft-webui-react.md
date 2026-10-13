@@ -64,6 +64,7 @@
 | P5 | figures 用例 15（新增 GET 带病 422）、bib_propose 用例 14（删表单渲染测试，表单属前端职责）；subnav 4（payload 驱动导航） | 计划预期 153 总数不变，逐文件分布微调 |
 | P6 | pnpm v12 拦构建脚本：`webui/pnpm-workspace.yaml` 声明 `onlyBuiltDependencies: [esbuild]` + `dangerouslyAllowAllBuilds`；`package.json` 的 `pnpm` 字段已不被 v12 读取 | esbuild postinstall 需要；CI 模式下 ignored builds 是硬错误 |
 | P7 | 卡片审阅后列表刷新用 `navigate(0)` 整页刷新（单用户工具可接受），后续可换局部 refetch | inspector 与列表数据分属两处 useApi，跨组件刷新的最小实现 |
+| P8 | 实测修复两处前端路由缺陷：① App 漏注册 `/p/:pid/cards/:kind/:cardId`（总览待审队列卡条目直达 404）；② 卡种切换的过渡帧会以「新 kind × 旧卡种行」组合渲染 inspector/自动选中，发出跨类 404 详情请求。修复 = 详情路由补注册 + 选中状态并入 kind（`{kind, id}`）+ CardsPage/useApi 均改用 React「渲染期同步校正」范式（path 变更同帧清 data，不等 effect） | effect（提交后）才清数据会留一帧脏窗口；浏览器实测六卡种快速切换 0 个 404、总览两条队列路径直达可用 |
 
 ## 实测计数回填
 

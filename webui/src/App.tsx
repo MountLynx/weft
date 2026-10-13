@@ -55,6 +55,7 @@ export default function App() {
              element={<WorkspaceRoute element={<NodeFormPage />} />} />
       <Route path="/p/:pid/cards" element={<WorkspaceRoute element={<CardsPage />} />} />
       <Route path="/p/:pid/cards/:kind" element={<WorkspaceRoute element={<CardsPage />} />} />
+      <Route path="/p/:pid/cards/:kind/:cardId" element={<WorkspaceRoute element={<CardsPage />} />} />
       <Route path="/p/:pid/cards/:kind/new" element={<WorkspaceRoute element={<CardFormPage />} />} />
       <Route path="/p/:pid/cards/:kind/:cardId/edit"
              element={<WorkspaceRoute element={<CardFormPage />} />} />
