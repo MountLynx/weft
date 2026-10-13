@@ -7,12 +7,24 @@
 {% if bib_flag == "bib_updated" %}<div class="banner success">references.bib 已同步（bibgen）。</div>{% endif %}
 {% if bib_flag == "bib_error" %}<div class="banner error">bib 同步失败：entry 字段值不合法（E-BIB-VALUE，详见 weft validate）；修正 metadata/notes/&lt;id&gt;.md 后重试。</div>{% endif %}
 {% if pdf_warn %}<div class="banner error">PDF 落位失败：落位未全部完成，请检查 pdfs/&lt;key&gt;.pdf 与 articles/&lt;key&gt;.md 是否齐备；上传原件可能仍在 articles/ 下，可重新上传提案或手动补齐。</div>{% endif %}
+{% set fix = request.query_params.get("fix") %}
+{% if fix == "added" %}<div class="banner success">已把条目写入 bib，错误将在下次加载时消除。</div>
+{% elif fix == "present" %}<div class="banner success">bib 中已有该条目，无需修复。</div>
+{% elif fix == "error" %}<div class="banner error">修复前置已变化，请刷新后重试。</div>{% endif %}
 <table class="list">
   {% for k, v in fields.items() %}
   <tr><th>{{ k }}</th><td {% if k == "entry" %}style="white-space: pre-wrap"{% endif %}><code>{{ v }}</code></td></tr>
   {% endfor %}
   <tr><th>comment</th><td>{{ card.comment or "（无）" }}</td></tr>
 </table>
+{% if kind == "note" and card.id in fixable %}
+<h3>一键修复</h3>
+<form method="post" action="/p/{{ entry.pid }}/bib/fix/{{ card.id }}">
+  <input type="hidden" name="back" value="card">
+  <button class="ok btn-primary" type="submit">🔧 一键修复：条目写入 bib</button>
+  （unmanaged 项目：id 不在 bib 报 E-NOTE-NOT-IN-BIB 时，把上方 entry 确定性追加进 bib）
+</form>
+{% endif %}
 <h3>审阅</h3>
 <form method="post" action="/p/{{ entry.pid }}/cards/{{ kind }}/{{ card.id }}/status">
   <button class="ok btn-primary" type="submit" name="status" value="approved">✅ 批准</button>

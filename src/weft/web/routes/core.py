@@ -179,8 +179,13 @@ def dashboard(request: Request, pid: str):
 def diagnostics_page(request: Request, pid: str):
     # 故意用 load_entry_or_404：损坏项目也要能看诊断——诊断页正是看错误的地方（设计 §2/§7）。
     entry = load_entry_or_404(request, pid)
+    fix_map = {}
+    if entry.project is not None:
+        from weft import bibgen
+        fix_map = {entry.project.card_paths[k].as_posix(): k
+                   for k in bibgen.fixable_notes(entry.project)}
     return templates.TemplateResponse(
-        request, "diagnostics.html", {"entry": entry})
+        request, "diagnostics.html", {"entry": entry, "fix_map": fix_map})
 
 
 @router.get("/p/{pid}/graph")

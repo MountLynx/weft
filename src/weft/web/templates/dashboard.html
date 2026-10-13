@@ -11,6 +11,18 @@
   <div class="stat {% if entry.n_errors %}bad{% endif %}"><b>{{ entry.n_errors }}</b><span>错误</span></div>
   <div class="stat"><b>{{ entry.n_warnings }}</b><span>提醒</span></div>
 </div>
+{% if request.query_params.get("bibmode") == "switched" %}<div class="banner success">bib 模式已切换。</div>{% endif %}
+<h3>bib 模式</h3>
+<p>
+  当前：<span class="badge {{ "approved" if project.bib_managed else "draft" }}">{{ "managed" if project.bib_managed else "unmanaged" }}</span>
+  {% if project.bib_managed %}
+  <a href="/p/{{ entry.pid }}/bib/switch?to=unmanaged">切换为 unmanaged</a>
+  ｜ managed：approved+entry 文献卡经 <code>weft bib sync</code> 生成 bib，勿手改
+  {% else %}
+  <a href="/p/{{ entry.pid }}/bib/switch?to=managed">切换为 managed</a>
+  ｜ unmanaged：bib 手工维护，文献卡 id 须在 bib 中（不在的可在诊断页一键修复）
+  {% endif %}
+</p>
 <h3>待审阅队列</h3>
 {% if review_queue %}
 <table class="list">

@@ -2,6 +2,10 @@
 {% block title %}诊断 · {{ entry.pid }}{% endblock %}
 {% block content %}
 <h2>诊断 · {{ entry.pid }}（{{ entry.n_errors }} 错误 / {{ entry.n_warnings }} 提醒）</h2>
+{% set fix = request.query_params.get("fix") %}
+{% if fix == "added" %}<div class="banner success">已把条目写入 bib，错误将在下次加载时消除。</div>
+{% elif fix == "present" %}<div class="banner success">bib 中已有该条目，无需修复。</div>
+{% elif fix == "error" %}<div class="banner error">修复前置已变化，请刷新后重试。</div>{% endif %}
 {% if entry.diagnostics %}
 <table class="list">
   <thead><tr><th>级别</th><th>码</th><th>位置</th><th>字段</th><th>消息</th></tr></thead>
@@ -11,7 +15,13 @@
     <td>{% if d.is_error %}<span class="badge rejected">ERROR</span>
         {% else %}<span class="badge draft">WARN</span>{% endif %}</td>
     <td><code>{{ d.code }}</code></td><td><code>{{ d.path }}</code></td>
-    <td>{{ d.field or "" }}</td><td>{{ d.message }}</td>
+    <td>{{ d.field or "" }}</td><td>{{ d.message }}
+      {% if d.code == "E-NOTE-NOT-IN-BIB" and d.path in fix_map %}
+      <form method="post" action="/p/{{ entry.pid }}/bib/fix/{{ fix_map[d.path] }}" class="inline">
+        <input type="hidden" name="back" value="diagnostics">
+        <button type="submit">一键修复</button>
+      </form>
+      {% endif %}</td>
   </tr>
   {% endfor %}
   </tbody>

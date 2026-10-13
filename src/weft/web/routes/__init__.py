@@ -21,3 +21,7 @@ def register_all(app: FastAPI) -> None:
     from weft.web.routes import inspire as inspire_routes
 
     inspire_routes.register(app)
+
+    from weft.web.routes import bibmode as bibmode_routes
+
+    bibmode_routes.register(app)

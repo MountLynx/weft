@@ -15,6 +15,7 @@ from fastapi import APIRouter, FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from starlette.datastructures import UploadFile  # 表单解析产生的是 starlette 基类实例
 
+from weft import bibgen
 from weft.engine.bib_propose import BibProposeError, propose_note
 from weft.engine.clients import make_client
 from weft.engine.draft_rules import DraftError
@@ -285,7 +286,8 @@ def _render_detail(request, entry, kind, card, *, rename_error: str | None = Non
                     if k not in ("id", "status", "comment")},
          "bib_flag": request.query_params.get("bib"),
          "pdf_warn": request.query_params.get("pdfwarn"),
-         "rename_error": rename_error})
+         "rename_error": rename_error,
+         "fixable": bibgen.fixable_notes(entry.project) if kind == "note" else []})
 
 
 @router.get("/p/{pid}/cards/{kind}/{card_id}")
