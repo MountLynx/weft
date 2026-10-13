@@ -38,8 +38,10 @@ def create_app(projects_root: Path | None = None,
 
     app.state.runs = RunManager()
     register_all(app)
+    # html=True：/static/app/ 目录访问回落到该目录的 index.html（SPA 外壳）
     if _STATIC_DIR.is_dir():
-        app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
+        app.mount("/static", StaticFiles(directory=_STATIC_DIR, html=True),
+                  name="static")
 
     @app.get("/healthz")
     def healthz() -> dict:

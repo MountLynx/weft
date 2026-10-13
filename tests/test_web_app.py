@@ -29,6 +29,8 @@ def test_shell_served_and_api_unknown_404(tmp_path: Path):
     r404 = client.get("/api/nope")
     assert r404.status_code == 404
     assert r404.headers["content-type"].startswith("application/json")
+    # /static/app/ 目录访问回落 SPA 外壳（StaticFiles html=True）
+    assert client.get("/static/app/").status_code == 200
     # docs/openapi 均禁用：/docs、/openapi.json 无 FastAPI 文档内容（落 SPA 宿主）
     assert "swagger" not in client.get("/docs").text.lower()
     assert '"openapi"' not in client.get("/openapi.json").text
