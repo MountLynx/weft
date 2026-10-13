@@ -8,7 +8,7 @@
 
 **Tech Stack:** pymupdf4llm（web extra 新增）、FastAPI multipart（python-multipart 已有）、pydantic、pytest。
 
-**测试基线：** 744 passed（afae618 口径）。本计划新增 25 个测试，实测 **769 passed**（2 deselected 为 smoke，下同）。
+**测试基线：** 744 passed（afae618 口径）。本计划新增 25 个测试，实测 **769 passed**（2 deselected 为 smoke，下同）。后续 P-D9 死锁修复新增 4 个测试，全量 **773 passed**。
 
 ---
 
@@ -841,3 +841,4 @@ Expected: 合并干净；合并后全量 **769 passed**。注意主检出有无�
 | P-D6 | AGENTS.md 安装命令 `.[dev]` → `.[dev,web]` | 照旧文档安装会缺 web extra → pdftext/web 测试静默 skip；Task 1 质量审查建议 |
 | P-D7 | 测试计数：计划估 765，实测 769 | Task 1 的 +9 中 1 个是修复新增的参数化用例；Task 4 修复增 3 个测试（空内容拒绝 + 截断行使 + staging 落盘失败） |
 | P-D8 | staging 落盘失败增 E-PDF-STAGING 码进表 | 最终整体审查发现 OSError 裸 500 违背设计"任一步失败即 rerender"原则；按红线 5 新码进表 |
+| P-D9 | P-D2 的"POST 侧保持严格"修正为审阅面容错（status/edit/rename/list + dashboard） | 用户实测死锁：unmanaged 项目 PDF 提案 draft note 必带 E-NOTE-NOT-IN-BIB → 严格闸门下 dashboard 变"无法加载"、审阅 POST 404——UI 造出的状态 UI 无法修复，`?pdfwarn` banner 可见却无从下手；改为 `load_reviewable_or_404`（project=None 加载级损坏仍 404，红线 6 生成闸门不受影响，card_new/bib_propose/parts/inspire 维持严格）；dashboard.html 的"不可用"徽章分支由死代码转正（unavailable.html 收窄为加载级损坏专用）；E-NOTE-NOT-IN-BIB unmanaged 分支补补救提示语；新增 4 测试（773 passed） |

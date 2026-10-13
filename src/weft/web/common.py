@@ -39,3 +39,16 @@ def load_project_or_404(request: Request, pid: str) -> ProjectEntry:
     if not entry.available or entry.project is None:
         raise HTTPException(status_code=404, detail="项目不可用")
     return entry
+
+
+def load_reviewable_or_404(request: Request, pid: str) -> ProjectEntry:
+    """审阅面（仪表盘/卡列表/详情/审阅/编辑/改名）：校验错误项目恰恰最需要审卡。
+
+    校验 error（如 unmanaged 提案 note 触发 E-NOTE-NOT-IN-BIB）不阻断——UI 造出的
+    状态必须能经 UI 修复（pdf-ingest 计划 P-D2 延伸至写路径，P-D9）；加载级损坏
+    （project=None，E-PARSE 等）无卡表可查，仍 404。
+    """
+    entry = load_entry_or_404(request, pid)
+    if entry.project is None:
+        raise HTTPException(status_code=404, detail="项目不可用")
+    return entry

@@ -49,6 +49,40 @@ def test_review_invalid_status_400(tmp_path):
     assert project.facts["fact-01"].status == "approved"
 
 
+def test_review_surface_survives_validation_errors(tmp_path):
+    # unmanaged 提案 draft note（id 不在 bib）触发 E-NOTE-NOT-IN-BIB → 项目校验错误：
+    # 卡列表/审阅 POST 不得 404（死锁修复：UI 造出的状态必须能经 UI 修复）。
+    client, root = make_client(tmp_path)
+    write_card(root / "demo" / "metadata" / "notes", "li2021",
+               {"id": "li2021", "summary": "", "status": "draft"})
+    assert client.get("/p/demo/cards").status_code == 200
+    assert client.get("/p/demo/cards/note").status_code == 200
+    resp = client.post("/p/demo/cards/note/li2021/status",
+                       data={"status": "approved", "comment": ""},
+                       follow_redirects=False)
+    assert resp.status_code == 303
+    project, _ = load_project(root / "demo")
+    assert project.notes["li2021"].status == "approved"
+
+
+def test_rename_to_bib_key_clears_validation_error(tmp_path):
+    client, root = make_client(tmp_path)
+    write_card(root / "demo" / "metadata" / "notes", "li2021",
+               {"id": "li2021", "summary": "s", "status": "draft"})
+    bib = root / "demo" / "references.bib"
+    bib.write_text(bib.read_text(encoding="utf-8")
+                   + "@article{altkey2021,\n  title = {T},\n  year = {2021},\n}\n",
+                   encoding="utf-8")
+    resp = client.post("/p/demo/cards/note/li2021/rename",
+                       data={"new_id": "altkey2021"}, follow_redirects=False)
+    assert resp.status_code == 303
+    resp = client.get("/p/demo/")
+    assert resp.status_code == 200
+    # base.html 主题脚本注释含"不可用"字样，须断言徽章标记本身
+    assert 'badge rejected">不可用' not in resp.text
+    assert "altkey2021" in resp.text
+
+
 ENTRY_YAML = "type: article\ntitle: T\nauthor:\n- A, B\nyear: 2020\njournal: J\nvolume: '1'\n"
 
 

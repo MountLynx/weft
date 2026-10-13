@@ -45,8 +45,8 @@ from weft.labels import KEY_FIELD
 from weft.web.common import (
     KIND_ATTRS,
     KIND_LABELS,
-    load_entry_or_404,
     load_project_or_404,
+    load_reviewable_or_404,
     templates,
 )
 
@@ -78,13 +78,13 @@ def _entry_value_error(project, card) -> str | None:
 def _table(request: Request, pid: str, kind: str):
     if kind not in KIND_ATTRS:
         raise HTTPException(status_code=404, detail="未知卡种")
-    entry = load_project_or_404(request, pid)
+    entry = load_reviewable_or_404(request, pid)
     return entry, getattr(entry.project, KIND_ATTRS[kind])
 
 
 @router.get("/p/{pid}/cards")
 def cards_overview(request: Request, pid: str):
-    entry = load_project_or_404(request, pid)
+    entry = load_reviewable_or_404(request, pid)
     counts = {kind: len(getattr(entry.project, attr))
               for kind, attr in KIND_ATTRS.items()}
     return templates.TemplateResponse(
@@ -290,14 +290,12 @@ def _render_detail(request, entry, kind, card, *, rename_error: str | None = Non
 
 @router.get("/p/{pid}/cards/{kind}/{card_id}")
 def card_detail(request: Request, pid: str, kind: str, card_id: str):
-    # 故意用 load_entry_or_404（figures/诊断页先例：校验错误项目恰恰最需要看卡）：
+    # 容错加载同 _table/figures/诊断页先例：校验错误项目恰恰最需要看卡——
     # 提案跳转带 ?pdfwarn=1 时，unmanaged 项目的 draft 卡必触发 E-NOTE-NOT-IN-BIB，
-    # 严格闸门会让落位失败提示永不可见（pdf-ingest 设计 U10）。
+    # 严格闸门会让落位失败提示永不可见（pdf-ingest 设计 U10 / 计划 P-D2）。
     if kind not in KIND_ATTRS:
         raise HTTPException(status_code=404, detail="未知卡种")
-    entry = load_entry_or_404(request, pid)
-    if entry.project is None:   # 加载级错误（E-PARSE 等）：无卡表可查，维持 404
-        raise HTTPException(status_code=404, detail="项目不可用")
+    entry = load_reviewable_or_404(request, pid)
     card = getattr(entry.project, KIND_ATTRS[kind]).get(card_id)
     if card is None:
         raise HTTPException(status_code=404, detail="卡片不存在")

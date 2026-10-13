@@ -143,7 +143,9 @@ def _project_new_registry(request: Request, form, name: str,
 @router.get("/p/{pid}/")
 def dashboard(request: Request, pid: str):
     entry = load_entry_or_404(request, pid)
-    if not entry.available:
+    if entry.project is None:
+        # 只有加载级损坏（E-PARSE 等，无项目对象）才是"无法加载"页；
+        # 校验错误项目照常渲染（不可用徽章 + 错误计数 + 待审队列指路修复）。
         return templates.TemplateResponse(
             request, "unavailable.html",
             {"pid": pid, "diagnostics": entry.diagnostics})

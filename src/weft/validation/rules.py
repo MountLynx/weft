@@ -91,7 +91,9 @@ def _check_notes_in_bib(project: Project) -> list[Diagnostic]:
             continue  # managed：draft/rejected 豁免（未批准提案本就不在 bib，设计 §7）
         if nid not in project.bib_keys:
             hint = ("（approved 文献卡应有 entry 并已同步进 bib：缺 entry 或未跑 "
-                    "weft bib sync）" if project.bib_managed else "")
+                    "weft bib sync）" if project.bib_managed else
+                    "（unmanaged 项目 note id 必须是 bib 已有 key：把条目抄进 bib、"
+                    "改名复用已有 key，或删除该卡）")
             out.append(Diagnostic(Level.ERROR, "E-NOTE-NOT-IN-BIB",
                                   _card_rel(project, nid), "id",
                                   f"note 的 id（bib key）不在 bib 中：{nid}{hint}"))
