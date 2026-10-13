@@ -96,3 +96,48 @@ def test_check_missing_bib_exits_1_clean(tmp_path):
     result = runner.invoke(app, ["bib", "sync", str(tmp_path), "--check"])
     assert result.exit_code == 1 and "E-BIB-MISSING" in result.output
     assert type(result.exception) is SystemExit  # 清洁退出而非 traceback 崩溃
+
+
+# ---------- bib mode / fix（bib-mode-fix 设计 §5） ----------
+
+
+def test_bib_mode_shows_current(tmp_path):
+    make_minimal_project(tmp_path)
+    result = runner.invoke(app, ["bib", "mode", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "unmanaged" in result.output
+
+
+def test_bib_mode_switch_with_yes(tmp_path):
+    make_minimal_project(tmp_path)
+    result = runner.invoke(app, ["bib", "mode", str(tmp_path), "managed", "--yes"])
+    assert result.exit_code == 0, result.output
+    assert "managed: true" in (tmp_path / "weft.yaml").read_text(encoding="utf-8")
+    assert "weft bib sync" in result.output
+
+
+def test_bib_mode_refuses_same_mode(tmp_path):
+    make_minimal_project(tmp_path)
+    result = runner.invoke(app, ["bib", "mode", str(tmp_path), "unmanaged", "--yes"])
+    assert result.exit_code == 0
+    assert "无需切换" in result.output
+
+
+def test_bib_mode_precondition_refusal(tmp_path):
+    make_minimal_project(tmp_path)
+    write_yaml(tmp_path / "_quarto.yml", {"project": {"type": "default"}})
+    result = runner.invoke(app, ["bib", "mode", str(tmp_path), "managed", "--yes"])
+    assert result.exit_code == 1
+    assert "E-BIB-MODE" in result.output
+
+
+def test_bib_fix_all(tmp_path):
+    make_minimal_project(tmp_path)
+    write_card(tmp_path / "metadata" / "notes", "li2021",
+               {"id": "li2021", "summary": "s", "status": "draft",
+                "entry": {"type": "article", "title": "T", "author": ["A, B"],
+                          "year": 2021, "journal": "J", "volume": "1"}})
+    result = runner.invoke(app, ["bib", "fix", str(tmp_path), "--all"])
+    assert result.exit_code == 0, result.output
+    assert "已写入 bib：li2021" in result.output
+    assert "@article{li2021," in (tmp_path / "references.bib").read_text(encoding="utf-8")

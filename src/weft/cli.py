@@ -711,6 +711,90 @@ def bib_sync(
                f"（{stats['total']} 条，+{stats['added']} / -{stats['removed']}）")
 
 
+@bib_app.command("mode")
+def bib_mode(
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+    to: str = typer.Argument(None, help="目标模式 managed|unmanaged（缺省只显示当前模式）"),
+    yes: bool = typer.Option(False, "--yes", help="跳过确认"),
+) -> None:
+    """显示或切换 bib 模式（bib-mode-fix 设计 §5）。"""
+    from weft import bibgen
+
+    project, load_diags = load_project(project_dir)
+    if any(d.is_error for d in load_diags):
+        _print_diagnostics(load_diags)
+        raise typer.Exit(code=1)
+    if to is None:
+        typer.echo(f"当前 bib 模式：{'managed' if project.bib_managed else 'unmanaged'}")
+        return
+    if to not in ("managed", "unmanaged"):
+        typer.echo("ERROR 目标模式必须是 managed 或 unmanaged")
+        raise typer.Exit(code=1)
+    target = to == "managed"
+    if target == project.bib_managed:
+        typer.echo(f"已是 {to} 模式，无需切换")
+        return
+    try:
+        plan = bibgen.plan_switch(project, target)
+    except bibgen.BibModeError as exc:
+        typer.echo(f"ERROR {exc}")
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"切换预检（→ {to}）：")
+    if plan.hand_only_entries:
+        typer.echo(f"  警告：{len(plan.hand_only_entries)} 条 bib 条目无对应文献卡，"
+                   "下次 weft bib sync 后消失：")
+        for k in plan.hand_only_entries:
+            typer.echo(f"    - {k}")
+    if plan.notes_not_in_bib:
+        typer.echo(f"  提示：{len(plan.notes_not_in_bib)} 张非否决文献卡不在 bib 中")
+    if not yes and not typer.confirm("确认切换？"):
+        typer.echo("已取消")
+        return
+    bibgen.apply_switch(project.root, plan)
+    typer.echo(f"已切换为 {to} 模式（weft.yaml: bib.managed = {'true' if target else 'false'}）")
+    typer.echo("下一步：检查无误后运行 weft bib sync 生成 bib" if target
+               else "下一步：可用 weft bib fix <key> 把文献卡条目写入 bib")
+
+
+@bib_app.command("fix")
+def bib_fix(
+    project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
+    key: str = typer.Argument(None, help="文献卡 id（bib key）；--all 时可省略"),
+    all_fixable: bool = typer.Option(False, "--all", help="修复全部可修复文献卡"),
+) -> None:
+    """把文献卡 entry 追加进 unmanaged bib（一键修复；bib-mode-fix 设计 §5）。"""
+    from weft import bibgen
+
+    project, load_diags = load_project(project_dir)
+    if any(d.is_error for d in load_diags):
+        _print_diagnostics(load_diags)
+        raise typer.Exit(code=1)
+    if all_fixable:
+        keys = bibgen.fixable_notes(project)
+        if not keys:
+            typer.echo("没有可一键修复的文献卡")
+            return
+    elif key:
+        keys = [key]
+    else:
+        typer.echo("ERROR 需要提供 key 或使用 --all")
+        raise typer.Exit(code=1)
+    failed = False
+    for k in keys:
+        try:
+            result = bibgen.fix_note_in_bib(project, k)
+        except bibgen.BibValueError as exc:
+            typer.echo(f"ERROR [E-BIB-VALUE] {k}：{exc}")
+            failed = True
+        except bibgen.BibModeError as exc:
+            typer.echo(f"ERROR {exc}")
+            failed = True
+        else:
+            typer.echo(f"{'已写入 bib' if result == 'added' else 'bib 中已存在，跳过'}：{k}")
+    if failed:
+        raise typer.Exit(code=1)
+
+
 class _CardKind(str, Enum):
     data = "data"
     fact = "fact"
