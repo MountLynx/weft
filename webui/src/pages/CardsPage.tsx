@@ -1,0 +1,230 @@
+/** 卡片列表 + 右栏 inspector（详情/审阅/改名/一键修复）。 */
+import {useEffect, useState} from "react";
+import {Link, useNavigate, useParams} from "react-router-dom";
+import {api, ApiError} from "../api/client";
+import type {CardDetail, CardsList} from "../api/types";
+import {useApi} from "../hooks/useApi";
+import {Icon} from "../components/Icon";
+import {StatusBadge} from "../components/StatusBadge";
+import {toast} from "../state/toast";
+
+const KINDS = ["data", "fact", "claim", "note", "method", "param"] as const;
+
+function CardInspector({pid, kind, cardId, onChanged}: {
+  pid: string;
+  kind: string;
+  cardId: string;
+  onChanged: () => void;
+}) {
+  const navigate = useNavigate();
+  const {data: card, reload} = useApi<CardDetail>(
+    `/api/projects/${encodeURIComponent(pid)}/cards/${kind}/${encodeURIComponent(cardId)}`);
+  const [comment, setComment] = useState("");
+  const [renaming, setRenaming] = useState(false);
+  const [newId, setNewId] = useState("");
+  const [fixing, setFixing] = useState(false);
+
+  useEffect(() => {
+    setComment("");
+    setRenaming(false);
+  }, [cardId]);
+
+  async function review(status: string) {
+    try {
+      const resp = await api.post<{ok: boolean; bib: string | null}>(
+        `/api/projects/${encodeURIComponent(pid)}/cards/${kind}/${encodeURIComponent(cardId)}/status`,
+        {status, comment});
+      toast.success(`已${status === "approved" ? "批准" : status === "rejected" ? "否决" : "退回 draft"}：${cardId}`);
+      if (resp.bib) toast.info(`managed bib 已同步（${resp.bib}）`);
+      reload();
+      onChanged();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : String(err));
+    }
+  }
+
+  async function rename(e: React.FormEvent) {
+    e.preventDefault();
+    try {
+      const resp = await api.post<{ok: boolean; id: string}>(
+        `/api/projects/${encodeURIComponent(pid)}/cards/${kind}/${encodeURIComponent(cardId)}/rename`,
+        {new_id: newId});
+      toast.success(`已改名：${resp.id}`);
+      navigate(`/p/${encodeURIComponent(pid)}/cards/${kind}/${resp.id}`);
+      onChanged();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : String(err));
+    }
+  }
+
+  async function fix() {
+    setFixing(true);
+    try {
+      const resp = await api.post<{ok: boolean; result: string}>(
+        `/api/projects/${encodeURIComponent(pid)}/bib/fix/${encodeURIComponent(cardId)}`);
+      if (resp.result === "added") toast.success("条目已追加进 bib");
+      else if (resp.result === "present") toast.info("bib 中已有该 key");
+      else toast.error("修复失败（bib 不可写或形状非法）");
+      reload();
+      onChanged();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.detail : String(err));
+    } finally {
+      setFixing(false);
+    }
+  }
+
+  if (!card) return null;
+  return (
+    <aside className="right-panel">
+      <div className="panel-head">
+        <Icon name="file-text" size={15} />
+        <strong style={{fontSize: "var(--fs-sm)"}} className="truncate">{card.id}</strong>
+        <StatusBadge status={card.status} />
+        <span className="spacer" style={{flex: 1}} />
+        <Link className="icon-btn" title="编辑"
+              to={`/p/${encodeURIComponent(pid)}/cards/${kind}/${encodeURIComponent(cardId)}/edit`}>
+          <Icon name="pencil" size={14} />
+        </Link>
+      </div>
+      <div className="panel-body">
+        <div className="field-table">
+          {Object.entries(card.fields).map(([k, v]) => (
+            <div className="field" key={k}>
+              <span className="k">{k}</span>
+              <span className={`v${k === "entry" ? " mono" : ""}`}>{v || "—"}</span>
+            </div>
+          ))}
+        </div>
+        {card.fixable && (
+          <div className="banner warning">
+            <div>note id 不在 bib 中（E-NOTE-NOT-IN-BIB）</div>
+            <button className="primary" onClick={fix} disabled={fixing}>
+              <Icon name="wrench" size={13} />一键修复：追加进 bib
+            </button>
+          </div>
+        )}
+        <div className="form-row">
+          <label>审阅备注</label>
+          <textarea rows={2} value={comment} placeholder="可选"
+                    onChange={(e) => setComment(e.target.value)} />
+        </div>
+        <div style={{display: "flex", gap: 6}}>
+          <button className="primary" style={{flex: 1}} onClick={() => review("approved")}>
+            <Icon name="check" size={14} />批准
+          </button>
+          <button className="danger" style={{flex: 1}} onClick={() => review("rejected")}>
+            <Icon name="x" size={14} />否决
+          </button>
+          <button onClick={() => review("draft")}>↩ 退回</button>
+        </div>
+        {renaming ? (
+          <form className="form-row" onSubmit={rename}>
+            <label>新 id（bib key / slug）</label>
+            <div className="row-inline">
+              <input autoFocus value={newId} onChange={(e) => setNewId(e.target.value)} />
+              <button type="submit" className="primary">确定</button>
+              <button type="button" className="ghost" onClick={() => setRenaming(false)}>
+                取消
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button className="ghost" onClick={() => { setRenaming(true); setNewId(cardId); }}>
+            <Icon name="pencil" size={13} />改名
+          </button>
+        )}
+        <div className="text-xs text-muted">{card.rel}</div>
+      </div>
+    </aside>
+  );
+}
+
+export function CardsPage() {
+  const {pid = "", kind = ""} = useParams();
+  const navigate = useNavigate();
+  const [selected, setSelected] = useState("");
+
+  const effectiveKind = KINDS.includes(kind as never) ? kind : "";
+  const {data} = useApi<CardsList>(
+    effectiveKind
+      ? `/api/projects/${encodeURIComponent(pid)}/cards/${effectiveKind}`
+      : `/api/projects/${encodeURIComponent(pid)}/cards`);
+
+  useEffect(() => {
+    const rows = data?.rows;
+    if (effectiveKind && rows && rows.length > 0
+        && !rows.some((r) => r.id === selected)) {
+      setSelected(rows[0].id);
+    }
+    if (!effectiveKind) setSelected("");
+  }, [data, effectiveKind, selected]);
+
+  const counts = data?.counts ?? {};
+
+  return (
+    <>
+      <main className="center">
+        <div className="tabs">
+          {KINDS.map((k) => (
+            <Link key={k}
+                  to={`/p/${encodeURIComponent(pid)}/cards/${k}`}
+                  className={`tab${k === effectiveKind ? " active" : ""}`}>
+              {k} {counts[k] ?? 0}
+            </Link>
+          ))}
+        </div>
+        <div className="page-head">
+          <h2>{data?.label ?? "卡片"}</h2>
+          <span className="spacer" />
+          {effectiveKind && (
+            <>
+              <Link className="btn" style={{display: "inline-flex", alignItems: "center", gap: 6}}
+                    to={`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/new`}>
+                <Icon name="plus" size={14} />新建
+              </Link>
+              {effectiveKind === "note" && (
+                <button onClick={() => navigate(`/p/${encodeURIComponent(pid)}/inspire`)}>
+                  <Icon name="upload" size={14} />AI 提案文献
+                </button>
+              )}
+            </>
+          )}
+        </div>
+        <div className="page-body">
+          {!effectiveKind ? (
+            <div className="text-muted">从上方页签选择卡种，或从侧栏进入。</div>
+          ) : (data?.rows ?? []).length === 0 ? (
+            <div className="empty-state">
+              <span className="big-icon"><Icon name="file-text" size={56} /></span>
+              <div className="hint">还没有 {effectiveKind} 卡</div>
+              <Link className="btn primary" style={{display: "inline-flex", alignItems: "center", gap: 6}}
+                    to={`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/new`}>
+                <Icon name="plus" size={14} />新建 {effectiveKind} 卡
+              </Link>
+            </div>
+          ) : (
+            <div className="row-list">
+              {(data?.rows ?? []).map((r) => (
+                <a key={r.id}
+                   className={`row-item${r.id === selected ? " selected" : ""}`}
+                   onClick={(e) => { e.preventDefault(); setSelected(r.id); }}>
+                  <Icon name="file-text" size={15} />
+                  <div className="main">
+                    <span className="title truncate">{r.id}</span>
+                    {r.key && <span className="meta text-muted truncate">{r.key}</span>}
+                  </div>
+                  <span className="end"><StatusBadge status={r.status} /></span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+      {effectiveKind && selected && (
+        <CardInspector pid={pid} kind={effectiveKind} cardId={selected}
+                       onChanged={() => navigate(0)} />
+      )}
+    </>
+  );
+}

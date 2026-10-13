@@ -57,8 +57,17 @@
 
 | # | 偏离/补充 | 理由 |
 |---|---|---|
-| P1 | （待回填） | |
+| P1 | 宿主 catch-all 路由对 `/` 也返回 SPA shell；`/docs`、`/openapi.json` 在 openapi_url=None 后同样落 SPA 宿主（无 FastAPI 文档内容即视为禁用生效） | starlette 路由匹配顺序决定，测试断言按实际语义写 |
+| P2 | dashboard payload 的 `available` 取 `entry.available`（校验错误项目 available=False 但仍带完整 stats/review_queue；加载级损坏才只有 diagnostics） | 修复执行中发现的语义 bug：available 原被写死 True，丢失「不可用徽章」语义 |
+| P3 | `openapi_url=None` 追加于应用工厂 | docs_url=None 只关 UI 页，schema 端点仍在；一并关闭更符合「禁用文档」意图 |
+| P4 | 图谱页数据适配按旧 graph.html 内联脚本语义重写（`entities` 字典 + `referenced_by` 反向边 + 旧调色板） | 首版误假设 nodes/edges 数组形状，浏览器走查发现后对齐 |
+| P5 | figures 用例 15（新增 GET 带病 422）、bib_propose 用例 14（删表单渲染测试，表单属前端职责）；subnav 4（payload 驱动导航） | 计划预期 153 总数不变，逐文件分布微调 |
+| P6 | pnpm v12 拦构建脚本：`webui/pnpm-workspace.yaml` 声明 `onlyBuiltDependencies: [esbuild]` + `dangerouslyAllowAllBuilds`；`package.json` 的 `pnpm` 字段已不被 v12 读取 | esbuild postinstall 需要；CI 模式下 ignored builds 是硬错误 |
+| P7 | 卡片审阅后列表刷新用 `navigate(0)` 整页刷新（单用户工具可接受），后续可换局部 refetch | inspector 与列表数据分属两处 useApi，跨组件刷新的最小实现 |
 
 ## 实测计数回填
 
-- （执行完成后回填：pytest 总数、web/API 用例数、vitest 数）
+- pytest 全量：**812 passed, 2 deselected**（与基线持平；旧 153 条 web 用例由 153 条 JSON API 用例等语义替换）
+- 逐文件（旧→新）：app 3→4、bib_propose 15→14、bibmode 9→9、card_edit 7→7、card_new 8→8、cards 19→19、discovery 3→3、figures 14→15、generate 4→4、inspire 10→10、misc 3→3、new_project 20→20、node_edit 4→4、pages 5→5、parts 8→8、registry 13→13、subnav 5→4、theme 3→3
+- 前端 vitest：**6 passed**（client 归一 ×2、theme、toast、App 网格、404 态）
+- 构建产物：`static/app/index.html` + `assets/index-*.js` 224 KB（gzip 69 KB）；浏览器走查通过（网格/总览/卡片 inspector/叙事/图谱 cytoscape/academic 主题）

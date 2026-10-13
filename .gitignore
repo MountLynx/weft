@@ -9,3 +9,8 @@ generated/
 .worktrees/
 .env
 .superpowers/
+
+# webui（React SPA 源码目录；构建产物 static/app 提交入库）
+webui/node_modules/
+webui/dist/
+webui/tsconfig.tsbuildinfo

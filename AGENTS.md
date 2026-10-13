@@ -19,6 +19,7 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 - `docs/superpowers/specs/2026-09-09-weft-webui-style-design.md` — WebUI 样式令牌化主题架构定案（webui.css 令牌 + themes/*.css 纯令牌覆盖、导航切换/localStorage/防闪脚本；主题文件只许含令牌声明，有守卫测试）
 - `docs/superpowers/specs/2026-10-13-weft-bib-mode-fix-design.md` — bib 模式切换与一键修复设计定案（unmanaged↔managed 切换预检/逐行改 weft.yaml 保注释、E-NOTE-NOT-IN-BIB 一键修复、`weft bib mode/fix`；E-BIB-MODE 操作码；决策 M1–M8）
 - `docs/superpowers/specs/2026-10-13-weft-webui-proposal-diff-design.md` — WebUI 替换提案对比查看设计定案（字段对照差异高亮 + 逐行统一 diff、目标缺失/解析失败 fail-closed 隐藏应用按钮；决策 C1–C6）
+- `docs/superpowers/specs/2026-10-13-weft-webui-react-design.md` — WebUI React 化设计定案（FastAPI `/api/*` JSON 端点 + React SPA 三栏工作台；源码在 `webui/`，构建产物 `static/app/` 提交入库；决策 D1–D12）；其计划文档 `2026-10-13-weft-webui-react.md` 含执行期决策
 
 ## 常用命令（Windows + Git Bash）
 
@@ -28,6 +29,8 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 .venv/Scripts/python.exe -m pytest tests/test_xxx.py -v # 聚焦测试
 .venv/Scripts/weft.exe --help                           # CLI：init / new / validate / graph / review / show / rename / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve
 WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实 LLM 冒烟（默认排除，双保险门）
+cd webui && pnpm test                                   # WebUI 前端冒烟（vitest，6 passed）
+cd webui && pnpm build                                  # 构建产物 → src/weft/web/static/app/（须提交）
 ```
 
 - 远程仓库：GitHub `MountLynx/weft`（公开，origin 已配置）。提交到本地 main 后可推送 `git push`（main 跟踪 origin/main）；密钥/敏感文件严禁入库（.env 已 gitignore）。
@@ -56,4 +59,5 @@ WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实
 
 - 功能开发用 git worktree（`.worktrees/<分支名>`，已 gitignore），完成后合回 main 并删除 worktree/分支；实施计划写在 `docs/superpowers/plans/YYYY-MM-DD-*.md`（含 TDD 任务分解与精确预期计数），执行期的设计偏离回填到计划的"设计决策"表。
 - Windows 注意：诊断输出统一切 UTF-8（cli.py 的 `_ensure_utf8_stdout` 已处理）；生成文件固定 LF。
+- WebUI 是「FastAPI JSON API（`src/weft/web/api/`）+ React SPA（源码 `webui/`）」；改 API 契约要同步 `webui/src/api/types.ts` 并重新 `cd webui && pnpm build`，构建产物 `static/app/` 提交入库（wheel 分发 + 离线可运行）；`webui/node_modules/` 不入库，`pnpm-lock.yaml` 入库。
 - 样例项目 `examples/paper-demo/` 是 M1 验收基准（graph 黄金文件在 `tests/golden/`）；手动冒烟产生的 `examples/paper-demo/drafts/` 用完要删。
