@@ -18,12 +18,13 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 - `docs/superpowers/specs/2026-10-10-weft-new-template-design.md` — weft new 模板化创建设计定案（`weft new part/card`、自动编号、E-NEW-* 诊断码；决策 N1–N10）
 - `docs/superpowers/specs/2026-09-09-weft-webui-style-design.md` — WebUI 样式令牌化主题架构定案（webui.css 令牌 + themes/*.css 纯令牌覆盖、导航切换/localStorage/防闪脚本；主题文件只许含令牌声明，有守卫测试）
 - `docs/superpowers/specs/2026-10-13-weft-bib-mode-fix-design.md` — bib 模式切换与一键修复设计定案（unmanaged↔managed 切换预检/逐行改 weft.yaml 保注释、E-NOTE-NOT-IN-BIB 一键修复、`weft bib mode/fix`；E-BIB-MODE 操作码；决策 M1–M8）
+- `docs/superpowers/specs/2026-10-13-weft-webui-proposal-diff-design.md` — WebUI 替换提案对比查看设计定案（字段对照差异高亮 + 逐行统一 diff、目标缺失/解析失败 fail-closed 隐藏应用按钮；决策 C1–C6）
 
 ## 常用命令（Windows + Git Bash）
 
 ```bash
 .venv/Scripts/python.exe -m pip install -e ".[dev,web]"     # 安装（含 pytest 与 WebUI 依赖）
-.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（805 passed, 2 deselected）
+.venv/Scripts/python.exe -m pytest tests -q             # 全量测试（812 passed, 2 deselected）
 .venv/Scripts/python.exe -m pytest tests/test_xxx.py -v # 聚焦测试
 .venv/Scripts/weft.exe --help                           # CLI：init / new / validate / graph / review / show / rename / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve
 WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实 LLM 冒烟（默认排除，双保险门）

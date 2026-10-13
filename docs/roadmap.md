@@ -44,6 +44,7 @@
 - WebUI 图表管理 ✅（2026-10-12）：figures.yaml 图表页（键序列表 + 引用卡链接 + 文件缺失/未被引用标记）与图注条目新增/编辑/删除（fig-/tbl- 自动编号、删除被引用键 `E-FIG-IN-USE` 阻断、解析失败 `E-FIG-LOAD` 转只读、degraded 项目删除 fail-closed）；`figures_edit` 纯函数引擎（确定性 LF 重写、YAML 重定型防护）。设计见 `docs/superpowers/specs/2026-10-12-weft-webui-figures-design.md`。
 - 文献 PDF 上传收录 ✅（2026-10-12）：文献提案表单支持 PDF 上传——pymupdf4llm 确定性转文本作线索拟 entry 草案卡，原件归档 `pdfs/<key>.pdf` 自动填卡 `pdf` 字段，转换全文落 `articles/<key>.md` 供 `weft parse --key` 富化 summary；`W-NOTE-PDF-MISSING` 校验提醒。设计见 `docs/superpowers/specs/2026-10-12-weft-pdf-ingest-design.md`。
 - bib 模式切换与一键修复 ✅（2026-10-13）：unmanaged↔managed 双向切换（预检报告 + 逐行改 weft.yaml 保注释 + `weft bib mode`/确认页）与 unmanaged 项目 `E-NOTE-NOT-IN-BIB` 一键修复（note entry 确定性追加进 bib，幂等；`weft bib fix [--all]` + 诊断页/note 详情页按钮）；`E-BIB-MODE` 操作码。设计见 `docs/superpowers/specs/2026-10-13-weft-bib-mode-fix-design.md`。
+- WebUI 替换提案对比页 ✅（2026-10-13）：灵感页每张替换提案可进对比查看——逐字段对照（差异单元格高亮）+ 原文逐行统一 diff（+/− 着色），确认后页内应用；目标卡缺失/提案解析失败/id 不一致 fail-closed 呈现警示并隐藏应用按钮。设计见 `docs/superpowers/specs/2026-10-13-weft-webui-proposal-diff-design.md`。
 - 断点续跑/回滚接入 CLI（复用 SpecModule 原生能力）。
 - 溯源注释完善与用户文档。
 - bib 自动生成（bibgen）✅（2026-09-29）：`weft bib sync`；managed 模式以已批准文献卡为真源（note 卡 entry 书目字段，spec 2026-09-29-weft-bibgen），WebUI 批准/编辑即同步，AI 提案与 parse 文献模式两条草案入口。
