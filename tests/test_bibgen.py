@@ -232,3 +232,57 @@ def test_plan_switch_refuses_bib_cfg_error(tmp_path):
         bibgen.plan_switch(project, True)
     with pytest.raises(bibgen.BibModeError):
         bibgen.plan_switch(project, False)
+
+
+def test_apply_switch_flips_line_and_keeps_comments(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    (root / "weft.yaml").write_text(
+        "# weft 项目配置\nbib:\n"
+        "  managed: false            # true：由 weft 从已批准文献卡生成（勿手改）\n"
+        "figures_dir: figures\n", encoding="utf-8")
+    project, _ = load_project(root)
+    bibgen.apply_switch(root, bibgen.plan_switch(project, True))
+    text = (root / "weft.yaml").read_text(encoding="utf-8")
+    assert "managed: true" in text
+    assert "# weft 项目配置" in text                      # 注释全保留（M2）
+    assert "由 weft 从已批准文献卡生成" in text
+    project2, diags = load_project(root)
+    assert not any(d.is_error for d in diags)
+    assert project2.bib_managed is True
+
+
+def test_apply_switch_appends_block_when_no_weft_yaml(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")   # 夹具不写 weft.yaml → 无 bib 块
+    assert not (root / "weft.yaml").exists()
+    project, _ = load_project(root)
+    bibgen.apply_switch(root, bibgen.plan_switch(project, True))
+    project2, _ = load_project(root)
+    assert project2.bib_managed is True
+
+
+def test_apply_switch_inserts_key_when_block_has_no_managed(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    (root / "weft.yaml").write_text("# 配置\nbib:\nfigures_dir: figures\n",
+                                    encoding="utf-8")
+    project, _ = load_project(root)
+    bibgen.apply_switch(root, bibgen.plan_switch(project, True))
+    project2, diags = load_project(root)
+    assert not any(d.is_error for d in diags)
+    assert project2.bib_managed is True
+    assert "figures_dir: figures" in (root / "weft.yaml").read_text(encoding="utf-8")
+
+
+def test_apply_switch_refuses_when_file_drifted(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    project, _ = load_project(root)                  # from_managed=False
+    (root / "weft.yaml").write_text("bib:\n  managed: true\n", encoding="utf-8")
+    with pytest.raises(bibgen.BibModeError, match="已变化"):
+        bibgen.apply_switch(root, bibgen.plan_switch(project, True))
+
+
+def test_apply_switch_refuses_flow_style_bib(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    (root / "weft.yaml").write_text("bib: {managed: false}\n", encoding="utf-8")
+    project, _ = load_project(root)
+    with pytest.raises(bibgen.BibModeError, match="流式"):
+        bibgen.apply_switch(root, bibgen.plan_switch(project, True))

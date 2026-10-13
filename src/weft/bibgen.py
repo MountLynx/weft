@@ -184,3 +184,39 @@ def plan_switch(project: Project, to_managed: bool) -> SwitchPlan:
         hand_only_entries=sorted(project.bib_keys - covered),
         notes_not_in_bib=sorted(nid for nid, n in project.notes.items()
                                 if n.status != "rejected" and nid not in project.bib_keys))
+
+
+def apply_switch(project_root: Path, plan: SwitchPlan) -> None:
+    """写 weft.yaml 的 bib.managed（bib-mode-fix 设计 §3.3 / M2）：逐行改保注释，原子写，LF。"""
+    path = project_root / "weft.yaml"
+    text = path.read_text(encoding="utf-8") if path.exists() else ""
+    lines = text.splitlines()
+    flag = "true" if plan.to_managed else "false"
+    start = next((i for i, ln in enumerate(lines) if ln.startswith("bib:")), None)
+    if start is not None and lines[start].split(":", 1)[1].strip():
+        raise BibModeError("[E-BIB-MODE] weft.yaml 的 bib 段为流式写法，请手工修改 bib.managed")
+    if start is None:
+        new_lines = lines + ["", "bib:", f"  managed: {flag}"]
+    else:
+        end = next((i for i in range(start + 1, len(lines))
+                    if lines[i] and not lines[i][0].isspace()), len(lines))
+        managed_idx = next((i for i in range(start + 1, end)
+                            if lines[i].strip().startswith("managed:")), None)
+        if managed_idx is None:
+            if plan.from_managed:
+                raise BibModeError("[E-BIB-MODE] weft.yaml 已变化，请刷新后重试")
+            new_lines = lines[:start + 1] + [f"  managed: {flag}"] + lines[start + 1:]
+        else:
+            value = lines[managed_idx].split(":", 1)[1].split("#", 1)[0].strip()
+            if value != ("true" if plan.from_managed else "false"):
+                raise BibModeError("[E-BIB-MODE] weft.yaml 已变化，请刷新后重试")
+            new_lines = list(lines)
+            new_lines[managed_idx] = re.sub(r"\b(?:true|false)\b", flag,
+                                            lines[managed_idx], count=1)
+    tmp = path.with_name(path.name + ".tmp")
+    try:
+        tmp.write_text("\n".join(new_lines) + "\n", encoding="utf-8", newline="\n")
+        os.replace(tmp, path)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
