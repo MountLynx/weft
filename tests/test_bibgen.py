@@ -286,3 +286,78 @@ def test_apply_switch_refuses_flow_style_bib(tmp_path):
     project, _ = load_project(root)
     with pytest.raises(bibgen.BibModeError, match="流式"):
         bibgen.apply_switch(root, bibgen.plan_switch(project, True))
+
+
+def test_fix_appends_entry_and_clears_error(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    _note_with_entry(root)                           # draft + entry，不在 bib
+    project, _ = load_project(root)
+    assert bibgen.fix_note_in_bib(project, "li2021") == "added"
+    text = (root / "references.bib").read_text(encoding="utf-8")
+    assert "@article{li2021," in text and "key2020" in text   # 追加而非覆盖
+    project2, diags = load_project(root)
+    assert not any(d.code == "E-NOTE-NOT-IN-BIB" for d in diags)
+
+
+def test_fix_is_idempotent(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    _note_with_entry(root)
+    project, _ = load_project(root)
+    bibgen.fix_note_in_bib(project, "li2021")
+    before = (root / "references.bib").read_text(encoding="utf-8")
+    assert bibgen.fix_note_in_bib(project, "li2021") == "present"
+    assert (root / "references.bib").read_text(encoding="utf-8") == before
+
+
+def test_fix_refuses_on_managed(tmp_path):
+    root = make_managed_project(tmp_path / "demo")
+    project, _ = load_project(root)
+    with pytest.raises(bibgen.BibModeError, match="sync"):
+        bibgen.fix_note_in_bib(project, "key2020")
+
+
+def test_fix_refuses_without_entry(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    write_card(root / "metadata" / "notes", "noent",
+               {"id": "noent", "summary": "s", "status": "draft"})
+    project, _ = load_project(root)
+    with pytest.raises(bibgen.BibModeError, match="entry"):
+        bibgen.fix_note_in_bib(project, "noent")
+
+
+def test_fix_refuses_rejected_or_missing_note(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    project, _ = load_project(root)
+    with pytest.raises(bibgen.BibModeError, match="不存在"):
+        bibgen.fix_note_in_bib(project, "ghost2020")
+
+
+def test_fix_refuses_without_declared_bib(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    _note_with_entry(root)
+    write_yaml(root / "_quarto.yml", {"project": {"type": "default"}})
+    project, _ = load_project(root)
+    with pytest.raises(bibgen.BibModeError, match="bibliography"):
+        bibgen.fix_note_in_bib(project, "li2021")
+
+
+def test_fix_propagates_render_error(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    write_card(root / "metadata" / "notes", "badent",
+               {"id": "badent", "summary": "s", "status": "draft",
+                "entry": {"type": "article", "title": "T{", "year": 2020}})
+    project, _ = load_project(root)
+    with pytest.raises(bibgen.BibValueError):
+        bibgen.fix_note_in_bib(project, "badent")
+
+
+def test_fixable_notes_scope(tmp_path):
+    root = make_minimal_project(tmp_path / "demo")
+    _note_with_entry(root, "fixme")                          # 可修复
+    _note_with_entry(root, "gone", status="rejected")        # rejected → 排除
+    write_card(root / "metadata" / "notes", "noent",         # 无 entry → 排除
+               {"id": "noent", "summary": "s", "status": "draft"})
+    project, _ = load_project(root)
+    assert bibgen.fixable_notes(project) == ["fixme"]
+    managed_root = make_managed_project(tmp_path / "m")
+    assert bibgen.fixable_notes(load_project(managed_root)[0]) == []

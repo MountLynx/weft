@@ -220,3 +220,45 @@ def apply_switch(project_root: Path, plan: SwitchPlan) -> None:
     except OSError:
         tmp.unlink(missing_ok=True)
         raise
+
+
+def fix_note_in_bib(project: Project, key: str) -> str:
+    """把 note 卡 entry 确定性追加进 unmanaged bib（设计 §3.4）；返回 "added"/"present"。"""
+    if project.bib_managed:
+        raise BibModeError("[E-BIB-MODE] managed 项目由 weft bib sync 管辖，无需修复")
+    if project.bib_cfg_error:
+        raise BibModeError(f"[E-BIB-MODE] weft.yaml bib 段非法：{project.bib_cfg_error}")
+    if len(project.bib_files) != 1:
+        raise BibModeError("[E-BIB-MODE] 修复要求 bibliography 恰好指向一个文件"
+                           "（先修 _quarto.yml）")
+    note = project.notes.get(key)
+    if note is None or note.status == "rejected":
+        raise BibModeError(f"[E-BIB-MODE] note 卡不存在或已否决：{key}")
+    if note.entry is None:
+        raise BibModeError(f"[E-BIB-MODE] note 卡缺 entry 字段，无从写 bib：{key}"
+                           "（补 entry 或改名复用已有 key）")
+    if key in project.bib_keys:
+        return "present"
+    target = project.root / project.bib_files[0]
+    old = target.read_text(encoding="utf-8") if target.exists() else ""
+    block = render_entry(note)   # BibValueError 裸穿：调用方标 [E-BIB-VALUE]
+    sep = "" if (not old or old.endswith("\n")) else "\n"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    tmp = target.with_name(target.name + ".tmp")
+    try:
+        tmp.write_text(old + sep + block + "\n", encoding="utf-8", newline="\n")
+        os.replace(tmp, target)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        raise
+    project.bib_keys.add(key)   # 内存态同步：同进程连续调用幂等（P-M2）
+    return "added"
+
+
+def fixable_notes(project: Project) -> list[str]:
+    """一键修复适用卡（设计 §3.5）：非 rejected + entry 非空 + id 不在 bib + unmanaged + bib 恰一个。"""
+    if project.bib_managed or project.bib_cfg_error or len(project.bib_files) != 1:
+        return []
+    return sorted(nid for nid, n in project.notes.items()
+                  if n.status != "rejected" and n.entry is not None
+                  and nid not in project.bib_keys)
