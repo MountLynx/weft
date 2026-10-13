@@ -318,3 +318,34 @@ form textarea { width: 100%; }
 .new-project { display: flex; gap: var(--space-3); align-items: center; margin: var(--space-3) 0; }
 .new-project label { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: 14px; }
 .new-project input { width: 300px; }
+
+/* ── 替换提案对比页（proposal-diff 设计 §5）────────── */
+.compare td.changed { background: var(--warning-subtle); }
+.diff {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  background: var(--bg-subtle);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+.diff .diff-add { display: inline-block; min-width: 100%; background: var(--success-subtle); color: var(--success-fg); }
+.diff .diff-del { display: inline-block; min-width: 100%; background: var(--danger-subtle); color: var(--danger-fg); }
+.diff .diff-hunk { color: var(--accent); }
+.diff .diff-meta { color: var(--fg-muted); }
+.proposal-raw {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  background: var(--bg-subtle);
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}

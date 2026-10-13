@@ -24,6 +24,7 @@
       <tr>
         <td>{{ p.id }}</td>
         <td>
+          <a href="/p/{{ entry.pid }}/inspire/proposals/{{ p.id }}">对比</a>
           <form method="post" action="/p/{{ entry.pid }}/inspire/proposals/{{ p.id }}/apply">
             <button type="submit">应用（旧卡归档）</button>
           </form>
