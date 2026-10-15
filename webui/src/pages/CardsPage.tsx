@@ -1,18 +1,26 @@
-/** 卡片列表 + 右栏 inspector（详情/审阅/改名/一键修复）。卡种导航只在侧栏，无页签。 */
+/** 卡片列表 + 右栏 inspector（详情/审阅/改名/一键修复/内联新建与编辑）。卡种导航只在侧栏，无页签。 */
 import {useEffect, useState} from "react";
-import {Link, Navigate, useNavigate, useParams} from "react-router-dom";
+import {Navigate, useNavigate, useParams} from "react-router-dom";
 import {api, ApiError} from "../api/client";
-import type {CardDetail, CardsList} from "../api/types";
+import type {CardDetail, CardsList, FormSpec} from "../api/types";
 import {useApi} from "../hooks/useApi";
+import {CardForm} from "../components/CardForm";
 import {Icon} from "../components/Icon";
 import {KINDS, kindIcon} from "../components/kinds";
 import {StatusBadge} from "../components/StatusBadge";
 import {toast} from "../state/toast";
 
-function CardInspector({pid, kind, cardId, onChanged}: {
+/** 右栏模式（组件态，不入 URL；kind 切换即失效回落 view，D1/D6）。 */
+type PanelMode =
+  | {type: "view"}
+  | {type: "new"; kind: string}
+  | {type: "edit"; kind: string; id: string};
+
+function CardInspector({pid, kind, cardId, onEdit, onChanged}: {
   pid: string;
   kind: string;
   cardId: string;
+  onEdit: () => void;
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
@@ -81,10 +89,9 @@ function CardInspector({pid, kind, cardId, onChanged}: {
         <strong style={{fontSize: "var(--fs-sm)"}} className="truncate">{card.id}</strong>
         <StatusBadge status={card.status} />
         <span className="spacer" style={{flex: 1}} />
-        <Link className="icon-btn" title="编辑"
-              to={`/p/${encodeURIComponent(pid)}/cards/${kind}/${encodeURIComponent(cardId)}/edit`}>
+        <button className="icon-btn" title="编辑" onClick={onEdit}>
           <Icon name="pencil" size={14} />
-        </Link>
+        </button>
       </div>
       <div className="panel-body">
         <div className="field-table">
@@ -139,13 +146,75 @@ function CardInspector({pid, kind, cardId, onChanged}: {
   );
 }
 
+/** 右栏编辑面板：specs 驱动表单（保存/取消均留在卡片页）。 */
+function CardEditPanel({pid, kind, cardId, onClose, onSaved}: {
+  pid: string;
+  kind: string;
+  cardId: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const {data: spec} = useApi<FormSpec>(
+    `/api/projects/${encodeURIComponent(pid)}/cards/${kind}/${encodeURIComponent(cardId)}/edit`);
+  return (
+    <aside className="right-panel">
+      <div className="panel-head">
+        <Icon name={kindIcon(kind)} size={15} />
+        <strong style={{fontSize: "var(--fs-sm)"}} className="truncate">编辑 {cardId}</strong>
+        <span className="spacer" style={{flex: 1}} />
+        <button className="icon-btn" title="关闭" onClick={onClose}>
+          <Icon name="x" size={14} />
+        </button>
+      </div>
+      <div className="panel-body">
+        {spec && (
+          <CardForm key={cardId} pid={pid} kind={kind} spec={spec} isNew={false}
+                    cardId={cardId} onSaved={onSaved} onCancel={onClose} />
+        )}
+      </div>
+    </aside>
+  );
+}
+
+/** 右栏新建面板：保存后选中新卡并刷新列表。 */
+function NewCardPanel({pid, kind, onClose, onCreated}: {
+  pid: string;
+  kind: string;
+  onClose: () => void;
+  onCreated: (id: string) => void;
+}) {
+  const {data: spec} = useApi<FormSpec>(
+    `/api/projects/${encodeURIComponent(pid)}/card-forms/${kind}`);
+  return (
+    <aside className="right-panel">
+      <div className="panel-head">
+        <Icon name={kindIcon(kind)} size={15} />
+        <strong style={{fontSize: "var(--fs-sm)"}} className="truncate">
+          新建 {spec?.label ?? kind}
+        </strong>
+        <span className="spacer" style={{flex: 1}} />
+        <button className="icon-btn" title="关闭" onClick={onClose}>
+          <Icon name="x" size={14} />
+        </button>
+      </div>
+      <div className="panel-body">
+        {spec && (
+          <CardForm key={kind} pid={pid} kind={kind} spec={spec} isNew={true}
+                    onSaved={(id) => onCreated(id)} onCancel={onClose} />
+        )}
+      </div>
+    </aside>
+  );
+}
+
 export function CardsPage() {
   const {pid = "", kind = "", cardId: routeCardId} = useParams();
   const navigate = useNavigate();
   const effectiveKind = KINDS.includes(kind as never) ? kind : "";
   const routeSel = routeCardId ? {kind: effectiveKind, id: routeCardId} : null;
   const [sel, setSel] = useState<{kind: string; id: string} | null>(routeSel);
-  const {data, loading} = useApi<CardsList>(
+  const [mode, setMode] = useState<PanelMode>({type: "view"});
+  const {data, loading, reload: reloadList} = useApi<CardsList>(
     effectiveKind
       ? `/api/projects/${encodeURIComponent(pid)}/cards/${effectiveKind}`
       : `/api/projects/${encodeURIComponent(pid)}/cards`);
@@ -158,12 +227,32 @@ export function CardsPage() {
   } else if (!sel && effectiveKind && rows.length > 0) {
     setSel({kind: effectiveKind, id: rows[0].id});   // 默认选中第一张
   }
+  // mode 同帧失效：卡种切换后 new/edit 模式不再成立，回落查看态（D6）
+  const activeMode: PanelMode =
+    mode.type !== "view" && mode.kind !== effectiveKind ? {type: "view"} : mode;
 
   // inspector 只对「当前卡种列表里真实存在」的选中项渲染（总览队列直达详情也走这条）
   const validSelected = sel && sel.kind === effectiveKind
     && rows.some((r) => r.id === sel.id) ? sel.id : "";
 
   const counts = data?.counts ?? {};
+  const creating = activeMode.type === "new";
+  const editing = activeMode.type === "edit" && validSelected !== ""
+    && activeMode.id === validSelected;
+
+  function startView() {
+    setMode({type: "view"});
+  }
+
+  function openCreate() {
+    setMode({type: "new", kind: effectiveKind});
+  }
+
+  function selectRow(id: string) {
+    startView();
+    setSel({kind: effectiveKind, id});
+    navigate(`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/${encodeURIComponent(id)}`);
+  }
 
   // 无 kind 落地（/cards）：卡种导航只保留侧栏一处，等 counts 到手后
   // 直接落到首个非空卡种（全空则 data），不渲染任何页签。
@@ -179,18 +268,14 @@ export function CardsPage() {
         <div className="page-head">
           <h2>{data?.label ?? "卡片"}</h2>
           <span className="spacer" />
-          {effectiveKind && (
-            <>
-              <Link className="btn" style={{display: "inline-flex", alignItems: "center", gap: 6}}
-                    to={`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/new`}>
-                <Icon name="plus" size={14} />新建
-              </Link>
-              {effectiveKind === "note" && (
-                <button onClick={() => navigate(`/p/${encodeURIComponent(pid)}/inspire`)}>
-                  <Icon name="upload" size={14} />AI 提案文献
-                </button>
-              )}
-            </>
+          <button className="btn" style={{display: "inline-flex", alignItems: "center", gap: 6}}
+                  onClick={openCreate}>
+            <Icon name="plus" size={14} />新建
+          </button>
+          {effectiveKind === "note" && (
+            <button onClick={() => navigate(`/p/${encodeURIComponent(pid)}/inspire`)}>
+              <Icon name="upload" size={14} />AI 提案文献
+            </button>
           )}
         </div>
         <div className="page-body">
@@ -198,10 +283,10 @@ export function CardsPage() {
             <div className="empty-state">
               <span className="big-icon"><Icon name={kindIcon(effectiveKind)} size={56} /></span>
               <div className="hint">还没有 {effectiveKind} 卡</div>
-              <Link className="btn primary" style={{display: "inline-flex", alignItems: "center", gap: 6}}
-                    to={`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/new`}>
+              <button className="btn primary" style={{display: "inline-flex", alignItems: "center", gap: 6}}
+                      onClick={openCreate}>
                 <Icon name="plus" size={14} />新建 {effectiveKind} 卡
-              </Link>
+              </button>
             </div>
           ) : (
             <div className="row-list">
@@ -210,8 +295,7 @@ export function CardsPage() {
                    className={`row-item${r.id === validSelected ? " selected" : ""}`}
                    onClick={(e) => {
                      e.preventDefault();
-                     setSel({kind: effectiveKind, id: r.id});
-                     navigate(`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/${encodeURIComponent(r.id)}`);
+                     selectRow(r.id);
                    }}>
                   <Icon name={kindIcon(effectiveKind)} size={15} />
                   <div className="main">
@@ -225,10 +309,24 @@ export function CardsPage() {
           )}
         </div>
       </main>
-      {validSelected && (
-        <CardInspector pid={pid} kind={effectiveKind} cardId={validSelected}
-                       onChanged={() => navigate(0)} />
-      )}
+      {creating ? (
+        <NewCardPanel pid={pid} kind={effectiveKind} onClose={startView}
+                      onCreated={(id) => {
+                        startView();
+                        reloadList();
+                        navigate(`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/${encodeURIComponent(id)}`);
+                      }} />
+      ) : validSelected ? (
+        editing ? (
+          <CardEditPanel pid={pid} kind={effectiveKind} cardId={validSelected}
+                         onClose={startView}
+                         onSaved={() => { startView(); reloadList(); }} />
+        ) : (
+          <CardInspector pid={pid} kind={effectiveKind} cardId={validSelected}
+                         onEdit={() => setMode({type: "edit", kind: effectiveKind, id: validSelected})}
+                         onChanged={() => navigate(0)} />
+        )
+      ) : null}
     </>
   );
 }

@@ -90,6 +90,142 @@ describe("App 两态", () => {
   });
 });
 
+type ApiCall = {method: string; url: string; body?: string};
+
+/** fetch 桩：按 URL 精确匹配返回（"POST url" 键优先于方法无关键），同时记录调用供断言。 */
+function mockApi(handlers: Record<string, () => unknown>, calls: ApiCall[]) {
+  return vi.fn(async (url: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    calls.push({method, url,
+                body: typeof init?.body === "string" ? init.body : undefined});
+    const h = handlers[`${method} ${url}`] ?? handlers[url];
+    return jsonOk(h ? h() : {});
+  });
+}
+
+describe("卡片右栏新建/编辑", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const counts = {data: 0, fact: 0, claim: 0, note: 1, method: 0, param: 0};
+  const list = {kind: "note", label: "note 卡",
+                rows: [{id: "note-001", status: "draft", key: "",
+                        rel: "metadata/note/note-001.md"}],
+                counts};
+  const dash = {n_parts: 0, n_cards: 1, n_errors: 0, n_warnings: 0,
+                kind_counts: counts, review_queue: []};
+  const detail = (id: string) => ({
+    kind: "note", label: "note 卡", id, status: "draft", comment: "",
+    rel: `metadata/note/${id}.md`, fields: {title: "旧标题"},
+    fixable: false, bib_managed: false});
+  const editSpec = {
+    kind: "note", label: "note 卡", is_new: false, id_widget: "auto",
+    prefilled_id: "", id_choices: [],
+    specs: [{name: "title", label: "标题", widget: "text", choices: null,
+             required: true}],
+    choices: {}, labels: {},
+    values: {title: "旧标题", status: "draft", comment: ""},
+  };
+
+  function cardHandlers(extra: Record<string, () => unknown>) {
+    return {
+      "/api/projects/demo": () => dash,
+      "/api/projects/demo/cards/note": () => list,
+      "/api/projects/demo/cards/note/note-001": () => detail("note-001"),
+      ...extra,
+    };
+  }
+
+  async function renderCards() {
+    const {default: App} = await import("./App");
+    render(<MemoryRouter initialEntries={["/p/demo/cards/note"]}><App /></MemoryRouter>);
+    await waitFor(() =>
+      expect(document.querySelector('[title="编辑"]')).not.toBeNull());
+  }
+
+  it("编辑走右栏表单：提交 PATCH 后回查看态", async () => {
+    const calls: ApiCall[] = [];
+    vi.stubGlobal("fetch", mockApi(cardHandlers({
+      "/api/projects/demo/cards/note/note-001/edit": () => editSpec,
+    }), calls));
+    await renderCards();
+    fireEvent.click(document.querySelector('[title="编辑"]') as HTMLButtonElement);
+    await waitFor(() =>
+      expect(document.querySelector(".right-panel form")).not.toBeNull());
+    const title = document.querySelector(".right-panel form input") as HTMLInputElement;
+    expect(title.value).toBe("旧标题");
+    fireEvent.change(title, {target: {value: "新标题"}});
+    fireEvent.submit(document.querySelector(".right-panel form") as HTMLFormElement);
+    await waitFor(() =>
+      expect(calls.some((c) => c.method === "PATCH")).toBe(true));
+    const patch = calls.find((c) => c.method === "PATCH");
+    expect(patch?.url).toBe("/api/projects/demo/cards/note/note-001");
+    expect(JSON.parse(patch?.body ?? "{}").title).toBe("新标题");
+    await waitFor(() =>
+      expect(document.querySelector(".right-panel form")).toBeNull());
+    expect(screen.getByText("审阅备注")).toBeInTheDocument();
+    expect(document.querySelector("main form")).toBeNull();
+  });
+
+  it("新建走右栏表单：提交 POST 后选中新卡并刷新列表", async () => {
+    const calls: ApiCall[] = [];
+    let created = false;
+    vi.stubGlobal("fetch", mockApi({
+      "/api/projects/demo": () => dash,
+      "/api/projects/demo/cards/note": () => ({
+        ...list,
+        rows: created
+          ? [...list.rows, {id: "note-002", status: "draft", key: "",
+                            rel: "metadata/note/note-002.md"}]
+          : list.rows}),
+      "/api/projects/demo/cards/note/note-001": () => detail("note-001"),
+      "/api/projects/demo/cards/note/note-002": () => detail("note-002"),
+      "POST /api/projects/demo/cards/note": () => {
+        created = true;
+        return {ok: true, id: "note-002", bib: null};
+      },
+      "/api/projects/demo/card-forms/note": () => ({
+        ...editSpec, is_new: true, prefilled_id: "note-002",
+        values: {status: "draft", comment: ""}}),
+    }, calls));
+    await renderCards();
+    fireEvent.click(screen.getByText("新建"));
+    await waitFor(() =>
+      expect(document.querySelector(".right-panel form")).not.toBeNull());
+    const inputs = document.querySelectorAll(".right-panel form input");
+    fireEvent.change(inputs[0], {target: {value: "note-002"}});
+    fireEvent.change(inputs[1], {target: {value: "T2"}});
+    fireEvent.submit(document.querySelector(".right-panel form") as HTMLFormElement);
+    await waitFor(() =>
+      expect(calls.some((c) => c.method === "POST")).toBe(true));
+    const post = calls.find((c) => c.method === "POST");
+    expect(post?.url).toBe("/api/projects/demo/cards/note");
+    expect(JSON.parse(post?.body ?? "{}").id).toBe("note-002");
+    await waitFor(() =>
+      expect(document.querySelector(".right-panel")?.textContent)
+        .toContain("note-002"));
+    expect(calls.filter((c) => c.url === "/api/projects/demo/cards/note")
+      .length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("取消编辑回查看态，无写请求", async () => {
+    const calls: ApiCall[] = [];
+    vi.stubGlobal("fetch", mockApi(cardHandlers({
+      "/api/projects/demo/cards/note/note-001/edit": () => editSpec,
+    }), calls));
+    await renderCards();
+    fireEvent.click(document.querySelector('[title="编辑"]') as HTMLButtonElement);
+    await waitFor(() =>
+      expect(document.querySelector(".right-panel form")).not.toBeNull());
+    fireEvent.click(screen.getByText("取消"));
+    await waitFor(() =>
+      expect(document.querySelector(".right-panel form")).toBeNull());
+    expect(screen.getByText("审阅备注")).toBeInTheDocument();
+    expect(document.querySelector("main form")).toBeNull();
+    expect(calls.filter((c) => c.method === "PATCH" || c.method === "POST")
+      .length).toBe(0);
+  });
+});
+
 describe("卡片页", () => {
   afterEach(() => vi.unstubAllGlobals());
 

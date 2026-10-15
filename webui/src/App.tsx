@@ -1,5 +1,5 @@
 /** App：两态布局（项目网格 ↔ 工作台）+ 路由表（webui-react 设计 §4/§6）。 */
-import {Route, Routes} from "react-router-dom";
+import {Navigate, Route, Routes} from "react-router-dom";
 import {Sidebar} from "./components/Sidebar";
 import {StatusBar} from "./components/StatusBar";
 import {ToastHost} from "./state/toast";
@@ -10,7 +10,6 @@ import {useParams} from "react-router-dom";
 import {ProjectsGrid} from "./pages/ProjectsGrid";
 import {Overview} from "./pages/Overview";
 import {CardsPage} from "./pages/CardsPage";
-import {CardFormPage} from "./pages/CardFormPage";
 import {PartsPage} from "./pages/PartsPage";
 import {NodeFormPage} from "./pages/NodeFormPage";
 import {FiguresPage} from "./pages/FiguresPage";
@@ -44,6 +43,13 @@ function WorkspaceRoute({element}: {element: React.ReactNode}) {
   return <Workspace>{element}</Workspace>;
 }
 
+/** 旧表单页路由兜底重定向（卡片新建/编辑已迁入卡片页右栏，历史/书签不 404）。 */
+function CardFormRedirect({toDetail}: {toDetail?: boolean}) {
+  const {pid = "", kind = "", cardId = ""} = useParams();
+  const base = `/p/${encodeURIComponent(pid)}/cards/${encodeURIComponent(kind)}`;
+  return <Navigate replace to={toDetail ? `${base}/${encodeURIComponent(cardId)}` : base} />;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -56,9 +62,9 @@ export default function App() {
       <Route path="/p/:pid/cards" element={<WorkspaceRoute element={<CardsPage />} />} />
       <Route path="/p/:pid/cards/:kind" element={<WorkspaceRoute element={<CardsPage />} />} />
       <Route path="/p/:pid/cards/:kind/:cardId" element={<WorkspaceRoute element={<CardsPage />} />} />
-      <Route path="/p/:pid/cards/:kind/new" element={<WorkspaceRoute element={<CardFormPage />} />} />
+      <Route path="/p/:pid/cards/:kind/new" element={<CardFormRedirect />} />
       <Route path="/p/:pid/cards/:kind/:cardId/edit"
-             element={<WorkspaceRoute element={<CardFormPage />} />} />
+             element={<CardFormRedirect toDetail />} />
       <Route path="/p/:pid/figures" element={<WorkspaceRoute element={<FiguresPage />} />} />
       <Route path="/p/:pid/graph" element={<WorkspaceRoute element={<GraphPage />} />} />
       <Route path="/p/:pid/inspire" element={<WorkspaceRoute element={<InspirePage />} />} />
