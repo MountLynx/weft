@@ -1,6 +1,6 @@
 /** 前端冒烟（不进 pytest 计数）：client 归一 / theme / toast / App 两态渲染。 */
 import {describe, expect, it, vi, beforeEach, afterEach} from "vitest";
-import {render, screen, waitFor, act} from "@testing-library/react";
+import {render, screen, waitFor, act, fireEvent} from "@testing-library/react";
 import {MemoryRouter} from "react-router-dom";
 import {ApiError, api} from "./api/client";
 import {applyTheme, cycleTheme, currentTheme} from "./state/theme";
@@ -119,5 +119,36 @@ describe("卡片页", () => {
     await waitFor(() => expect(screen.getByText("note-001")).toBeInTheDocument());
     expect(document.querySelector(".tabs")).toBeNull();
     expect(document.querySelectorAll(".sidebar a.nav-item.sub svg").length).toBe(6);
+  });
+
+  it("侧栏卡片组默认收缩，点「卡片」展开跳转，再点收起不换页", async () => {
+    const counts = {data: 0, fact: 0, claim: 0, note: 0, method: 0, param: 0};
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/projects") {
+        return jsonOk({entries: [{pid: "demo", path: "C:/p/demo", available: true,
+                                   missing: false, n_cards: 0, n_errors: 0, n_warnings: 0}],
+                       reg_error: null, kind_labels: {}, registry_mode: false,
+                       projects_root: "C:/p", registry_path: ""});
+      }
+      if (url === "/api/projects/demo") {
+        return jsonOk({n_parts: 0, n_cards: 0, n_errors: 0, n_warnings: 0,
+                       kind_counts: counts, review_queue: []});
+      }
+      if (url === "/api/projects/demo/cards") return jsonOk({counts, labels: {}});
+      if (url === "/api/projects/demo/cards/data") {
+        return jsonOk({kind: "data", label: "data 卡", rows: [], counts});
+      }
+      return jsonOk({});
+    }));
+    const {default: App} = await import("./App");
+    render(<MemoryRouter initialEntries={["/p/demo"]}><App /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText("总览")).toBeInTheDocument());
+    expect(document.querySelectorAll(".sidebar a.nav-item.sub").length).toBe(0);
+    fireEvent.click(document.querySelector('a[href="/p/demo/cards"]') as HTMLAnchorElement);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".sidebar a.nav-item.sub").length).toBe(6));
+    fireEvent.click(document.querySelector('a[href="/p/demo/cards"]') as HTMLAnchorElement);
+    await waitFor(() =>
+      expect(document.querySelectorAll(".sidebar a.nav-item.sub").length).toBe(0));
   });
 });

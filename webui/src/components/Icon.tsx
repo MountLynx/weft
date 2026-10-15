@@ -154,7 +154,11 @@ const PATHS: Record<string, React.ReactNode> = {
   ),
 };
 
-export function Icon({name, size = 16}: {name: string; size?: number}) {
+export function Icon({name, size = 16, className}: {
+  name: string;
+  size?: number;
+  className?: string;
+}) {
   return (
     <svg
       width={size}
@@ -166,6 +170,7 @@ export function Icon({name, size = 16}: {name: string; size?: number}) {
       strokeLinecap="round"
       strokeLinejoin="round"
       aria-hidden="true"
+      className={className}
       style={{flex: "none"}}
     >
       {PATHS[name] ?? <circle cx="12" cy="12" r="9" />}

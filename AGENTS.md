@@ -29,7 +29,7 @@ weft：AI 学术写作引擎（Python 包，src 布局）。核心模型：元�
 .venv/Scripts/python.exe -m pytest tests/test_xxx.py -v # 聚焦测试
 .venv/Scripts/weft.exe --help                           # CLI：init / new / validate / graph / review / show / rename / draft / assemble / render / inspire / parse / replace / missing-cites / bib / projects / serve
 WEFT_SMOKE_LLM=1 .venv/Scripts/python.exe -m pytest tests -m smoke -v   # 真实 LLM 冒烟（默认排除，双保险门）
-cd webui && pnpm test                                   # WebUI 前端冒烟（vitest，7 passed）
+cd webui && pnpm test                                   # WebUI 前端冒烟（vitest，8 passed）
 cd webui && pnpm build                                  # 构建产物 → src/weft/web/static/app/（须提交）
 ```
 

@@ -260,6 +260,8 @@ code, pre, .font-mono { font-family: var(--font-mono); }
   padding: 1px 7px;
 }
 .sidebar a.nav-item.sub { padding-left: 30px; }
+.sidebar a.nav-item .chev { flex: none; transition: transform 0.15s ease; }
+.sidebar a.nav-item .chev.closed { transform: rotate(-90deg); }
 
 .center { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 
