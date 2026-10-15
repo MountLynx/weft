@@ -3,6 +3,7 @@ import {Link, useNavigate, useParams} from "react-router-dom";
 import type {Dashboard} from "../api/types";
 import {useApi} from "../hooks/useApi";
 import {Icon} from "../components/Icon";
+import {kindIcon} from "../components/kinds";
 import {EmptyState} from "../components/EmptyState";
 
 export function Overview() {
@@ -103,7 +104,7 @@ export function Overview() {
                        navigate(`/p/${encodeURIComponent(pid)}/parts/${q.part_id}/nodes/${q.id}`);
                      }
                    }}>
-                  <Icon name={q.type === "card" ? "file-text" : "layers"} size={15} />
+                  <Icon name={q.type === "card" ? kindIcon(q.card_kind) : "layers"} size={15} />
                   <div className="main">
                     <span className="title">{q.id}</span>
                     <span className="meta text-muted">{q.label} · {q.rel}</span>

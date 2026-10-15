@@ -89,3 +89,35 @@ describe("App 两态", () => {
     expect(screen.getByText("页面不存在")).toBeInTheDocument();
   });
 });
+
+describe("卡片页", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("无 kind 落地自动落到首个非空卡种，无页签；侧栏卡种各带专属图标", async () => {
+    const counts = {data: 0, fact: 0, claim: 0, note: 2, method: 1, param: 0};
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url === "/api/projects/demo") {
+        return jsonOk({n_parts: 0, n_cards: 3, n_errors: 0, n_warnings: 0,
+                       kind_counts: counts, review_queue: []});
+      }
+      if (url === "/api/projects/demo/cards") return jsonOk({counts, labels: {}});
+      if (url === "/api/projects/demo/cards/note") {
+        return jsonOk({kind: "note", label: "note 卡",
+                       rows: [{id: "note-001", status: "draft", key: "smith2020",
+                               rel: "metadata/note/note-001.md"}],
+                       counts});
+      }
+      if (url === "/api/projects/demo/cards/note/note-001") {
+        return jsonOk({kind: "note", label: "note 卡", id: "note-001", status: "draft",
+                       comment: "", rel: "metadata/note/note-001.md", fields: {title: "T"},
+                       fixable: false, bib_managed: false});
+      }
+      return jsonOk({});
+    }));
+    const {default: App} = await import("./App");
+    render(<MemoryRouter initialEntries={["/p/demo/cards"]}><App /></MemoryRouter>);
+    await waitFor(() => expect(screen.getByText("note-001")).toBeInTheDocument());
+    expect(document.querySelector(".tabs")).toBeNull();
+    expect(document.querySelectorAll(".sidebar a.nav-item.sub svg").length).toBe(6);
+  });
+});

@@ -1,14 +1,13 @@
-/** 卡片列表 + 右栏 inspector（详情/审阅/改名/一键修复）。 */
+/** 卡片列表 + 右栏 inspector（详情/审阅/改名/一键修复）。卡种导航只在侧栏，无页签。 */
 import {useEffect, useState} from "react";
-import {Link, useNavigate, useParams} from "react-router-dom";
+import {Link, Navigate, useNavigate, useParams} from "react-router-dom";
 import {api, ApiError} from "../api/client";
 import type {CardDetail, CardsList} from "../api/types";
 import {useApi} from "../hooks/useApi";
 import {Icon} from "../components/Icon";
+import {KINDS, kindIcon} from "../components/kinds";
 import {StatusBadge} from "../components/StatusBadge";
 import {toast} from "../state/toast";
-
-const KINDS = ["data", "fact", "claim", "note", "method", "param"] as const;
 
 function CardInspector({pid, kind, cardId, onChanged}: {
   pid: string;
@@ -78,7 +77,7 @@ function CardInspector({pid, kind, cardId, onChanged}: {
   return (
     <aside className="right-panel">
       <div className="panel-head">
-        <Icon name="file-text" size={15} />
+        <Icon name={kindIcon(kind)} size={15} />
         <strong style={{fontSize: "var(--fs-sm)"}} className="truncate">{card.id}</strong>
         <StatusBadge status={card.status} />
         <span className="spacer" style={{flex: 1}} />
@@ -146,7 +145,7 @@ export function CardsPage() {
   const effectiveKind = KINDS.includes(kind as never) ? kind : "";
   const routeSel = routeCardId ? {kind: effectiveKind, id: routeCardId} : null;
   const [sel, setSel] = useState<{kind: string; id: string} | null>(routeSel);
-  const {data} = useApi<CardsList>(
+  const {data, loading} = useApi<CardsList>(
     effectiveKind
       ? `/api/projects/${encodeURIComponent(pid)}/cards/${effectiveKind}`
       : `/api/projects/${encodeURIComponent(pid)}/cards`);
@@ -166,18 +165,17 @@ export function CardsPage() {
 
   const counts = data?.counts ?? {};
 
+  // 无 kind 落地（/cards）：卡种导航只保留侧栏一处，等 counts 到手后
+  // 直接落到首个非空卡种（全空则 data），不渲染任何页签。
+  if (!effectiveKind) {
+    if (loading) return <main className="center" />;
+    const target = KINDS.find((k) => (counts[k] ?? 0) > 0) ?? "data";
+    return <Navigate to={`/p/${encodeURIComponent(pid)}/cards/${target}`} replace />;
+  }
+
   return (
     <>
       <main className="center">
-        <div className="tabs">
-          {KINDS.map((k) => (
-            <Link key={k}
-                  to={`/p/${encodeURIComponent(pid)}/cards/${k}`}
-                  className={`tab${k === effectiveKind ? " active" : ""}`}>
-              {k} {counts[k] ?? 0}
-            </Link>
-          ))}
-        </div>
         <div className="page-head">
           <h2>{data?.label ?? "卡片"}</h2>
           <span className="spacer" />
@@ -196,11 +194,9 @@ export function CardsPage() {
           )}
         </div>
         <div className="page-body">
-          {!effectiveKind ? (
-            <div className="text-muted">从上方页签选择卡种，或从侧栏进入。</div>
-          ) : (data?.rows ?? []).length === 0 ? (
+          {(data?.rows ?? []).length === 0 ? (
             <div className="empty-state">
-              <span className="big-icon"><Icon name="file-text" size={56} /></span>
+              <span className="big-icon"><Icon name={kindIcon(effectiveKind)} size={56} /></span>
               <div className="hint">还没有 {effectiveKind} 卡</div>
               <Link className="btn primary" style={{display: "inline-flex", alignItems: "center", gap: 6}}
                     to={`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/new`}>
@@ -217,7 +213,7 @@ export function CardsPage() {
                      setSel({kind: effectiveKind, id: r.id});
                      navigate(`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/${encodeURIComponent(r.id)}`);
                    }}>
-                  <Icon name="file-text" size={15} />
+                  <Icon name={kindIcon(effectiveKind)} size={15} />
                   <div className="main">
                     <span className="title truncate">{r.id}</span>
                     {r.key && <span className="meta text-muted truncate">{r.key}</span>}

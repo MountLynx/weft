@@ -5,6 +5,7 @@ import {api, ApiError} from "../api/client";
 import type {FormSpec} from "../api/types";
 import {useApi} from "../hooks/useApi";
 import {Icon} from "../components/Icon";
+import {kindIcon} from "../components/kinds";
 import {toast} from "../state/toast";
 
 export function CardFormPage() {
@@ -60,7 +61,10 @@ export function CardFormPage() {
   return (
     <main className="center">
       <div className="page-head">
-        <h2>{isNew ? `新建 ${spec.label}` : `编辑 ${cardId}`}</h2>
+        <h2 style={{display: "inline-flex", alignItems: "center", gap: 8}}>
+          <Icon name={kindIcon(kind)} size={18} />
+          {isNew ? `新建 ${spec.label}` : `编辑 ${cardId}`}
+        </h2>
       </div>
       <div className="page-body">
         <form className="form" onSubmit={submit}>

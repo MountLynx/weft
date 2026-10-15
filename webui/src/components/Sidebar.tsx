@@ -2,17 +2,12 @@
 import {NavLink, useParams} from "react-router-dom";
 import type {Dashboard} from "../api/types";
 import {Icon} from "./Icon";
-
-const KIND_ORDER = ["data", "fact", "claim", "note", "method", "param"] as const;
+import {KINDS, KIND_ICONS} from "./kinds";
 
 export function Sidebar({dash}: {dash: Dashboard | null}) {
   const {pid = ""} = useParams();
   const base = `/p/${encodeURIComponent(pid)}`;
   const counts = dash?.kind_counts ?? {};
-  const kindLabels: Record<string, string> = {
-    data: "data", fact: "fact", claim: "claim",
-    note: "note", method: "method", param: "param",
-  };
 
   return (
     <nav className="sidebar">
@@ -44,9 +39,10 @@ export function Sidebar({dash}: {dash: Dashboard | null}) {
         {(dash?.n_errors ?? 0) > 0 && <span className="count">{dash?.n_errors}</span>}
       </NavLink>
       <div className="section-label">卡片</div>
-      {KIND_ORDER.map((kind) => (
+      {KINDS.map((kind) => (
         <NavLink key={kind} to={`${base}/cards/${kind}`} className="nav-item sub">
-          {kindLabels[kind]}
+          <Icon name={KIND_ICONS[kind]} size={14} />
+          {kind}
           <span className="count">{counts[kind] ?? 0}</span>
         </NavLink>
       ))}
