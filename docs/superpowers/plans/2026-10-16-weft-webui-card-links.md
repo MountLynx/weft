@@ -233,7 +233,7 @@ export interface CardLinks {
 ```ts
 /** 卡片链路纯函数（webui-card-links 设计 §4.1）：邻接判定 / 邻居分组 / 计数 / 行筛选。
  * 统一规则：卡 a 连通卡 b ⟺ a 引用 b（a.links[b.kind] 含 b）或 b 引用 a
- * （b.referenced_by[复数(b.kind)] 含 a）。悬空引用不在 entities，天然不连通。 */
+ * （a.referenced_by[复数(b.kind)] 含 b；键 = 引用方卡种复数，记录在被引用方）。悬空引用不在 entities，天然不连通。 */
 import type {CardLinkEntity, CardLinks} from "../api/types";
 import {KINDS} from "../components/kinds";
 
@@ -254,7 +254,7 @@ export const FIELD_LINK_KINDS: Record<string, Record<string, string>> = {
 export function linked(a: CardLinkEntity, aId: string,
                        b: CardLinkEntity, bId: string): boolean {
   return (a.links[b.kind] ?? []).includes(bId)
-      || (b.referenced_by[PLURAL[b.kind]] ?? []).includes(aId);
+      || (a.referenced_by[PLURAL[b.kind]] ?? []).includes(bId);
 }
 
 export interface NeighborGroup {kind: string; ids: string[]}
@@ -1003,4 +1003,6 @@ Expected: `817 passed, 2 deselected`；push 到 origin/main 成功。
 | D1 | Task 1 | 测试夹具 param 卡落盘路径 `metadata/params/` → `metadata/methods/params/` | store loader 只从 `metadata/methods/params/` 加载（loader.py），原路径卡不加载必 KeyError；与全部既有测试一致 |
 | D2 | Task 1 | 端点实现 `list(getattr(card, field))` → list 字段拷贝、标量字段（`param.method`）包单元素列表 | 标量 `list("m-xt")` 拆成字符数组，破坏设计 §2/§4.3 的 `links["method"] == ["m-xt"]` 形状；测试补断言 param links 含 method+note |
 | D3 | 全局 | vitest 基线 8 → 实测 11，目标 12 → 15 | Task 0 基线自检实测；AGENTS.md 的「8 passed」已过时 |
-| D4 | Task 1 | pytest 目标 817 → 818：质量审查建议补强 cited claim 非空反向边 + 重复值透传两个断言点（+1 用例） | 代码质量审查 Minor #1
+| D4 | Task 1 | pytest 目标 817 → 818：质量审查建议补强 cited claim 非空反向边 + 重复值透传两个断言点（+1 用例） | 代码质量审查 Minor #1/#2，一次提交解决 |
+| D5 | Task 2 | `linked()` 反向判据 `b.referenced_by[PLURAL[b.kind]].includes(aId)` → `a.referenced_by[PLURAL[b.kind]].includes(bId)`（计划公式写反：应在被引用方身上查、键取引用方卡种复数；原式恒空使 data/note 反向邻居静默失效）；`aId` 随之未用，改名 `_aId` 保 4 参签名（noUnusedParameters） | 规格审查对照 graphgen `_edge` 语义发现，commit ea56b99 |
+| D6 | Task 3 | 测试 4 末尾补反向路径断言：跳转 data 页后断言筛选区出现 fact 组 pills（data-01.referenced_by.facts） | D5 修复后的回归覆盖——原 4 用例只走正向判据，抓不到该类缺陷 |
