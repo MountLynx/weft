@@ -147,7 +147,7 @@
 4. 筛选条 chip 名跳转 + ✕ 移除；inspector 悬空 chip 警示类。
 5. inspector 非悬空 chip 点击跳转目标卡种页；筛选条「清除」复原（执行期质量审查补强，见计划 D12）。
 
-预期全量：**pytest 817 passed, 2 deselected**（基线 812 + 5）；
+预期全量：**pytest 818 passed, 2 deselected**（基线 812 + 6；质量审查补强 +1，见计划 D4）；
 **vitest 16 passed**（基线 11 + 5；主仓 AGENTS.md 的「8 passed」基线已过时）。
 
 ## 9 决策表
