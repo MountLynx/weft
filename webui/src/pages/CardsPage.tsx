@@ -8,6 +8,8 @@ import {CardForm} from "../components/CardForm";
 import {Icon} from "../components/Icon";
 import {KINDS, kindIcon} from "../components/kinds";
 import {StatusBadge} from "../components/StatusBadge";
+import {matchesAny} from "../state/cardLinks";
+import {useCardsUi} from "../state/cardsUi";
 import {toast} from "../state/toast";
 
 /** 右栏模式（组件态，不入 URL；kind 切换即失效回落 view，D1/D6）。 */
@@ -218,7 +220,17 @@ export function CardsPage() {
     effectiveKind
       ? `/api/projects/${encodeURIComponent(pid)}/cards/${effectiveKind}`
       : `/api/projects/${encodeURIComponent(pid)}/cards`);
-  const rows = data?.rows ?? [];
+  const {links, tags, reportSel, toggleTag, clearTags} = useCardsUi();
+  const allRows = data?.rows ?? [];
+  // 多选并集过滤（设计 §4.1）：选中卡连通自己的每个邻居，恒在结果集，无空态分支
+  const rows = tags.length === 0 ? allRows
+    : allRows.filter((r) => links !== null && matchesAny(links, r.id, tags));
+
+  // 选中卡镜像上报（侧栏筛选区数据源；换卡清空标签在 Provider 内完成）
+  useEffect(() => {
+    reportSel(sel ? `${sel.kind}/${sel.id}` : "");
+  }, [sel, reportSel]);
+  useEffect(() => () => reportSel(""), []);   // 离开卡片页清镜像
 
   // 渲染期同步校正（React adjusting-state-during-render 范式）：
   // kind 切换/路由直达新卡立即作废旧选中——跨卡种窗口绝不渲染 inspector、不发 404 详情请求
@@ -279,6 +291,28 @@ export function CardsPage() {
           )}
         </div>
         <div className="page-body">
+          {tags.length > 0 && (
+            <div className="filter-bar">
+              <span className="label">筛选：</span>
+              {tags.map((tag) => {
+                const slash = tag.indexOf("/");
+                const tagKind = tag.slice(0, slash);
+                const tagId = tag.slice(slash + 1);
+                return (
+                  <span key={tag} className="chip active">
+                    <a href="#"
+                       onClick={(e) => {
+                         e.preventDefault();
+                         navigate(`/p/${encodeURIComponent(pid)}/cards/${tagKind}/${encodeURIComponent(tagId)}`);
+                       }}>{tagId}</a>
+                    <button className="chip-x" title="移除"
+                            onClick={() => toggleTag(tag)}>×</button>
+                  </span>
+                );
+              })}
+              <button className="filter-clear" onClick={clearTags}>清除</button>
+            </div>
+          )}
           {(data?.rows ?? []).length === 0 ? (
             <div className="empty-state">
               <span className="big-icon"><Icon name={kindIcon(effectiveKind)} size={56} /></span>
@@ -290,7 +324,7 @@ export function CardsPage() {
             </div>
           ) : (
             <div className="row-list">
-              {(data?.rows ?? []).map((r) => (
+              {rows.map((r) => (
                 <a key={r.id}
                    className={`row-item${r.id === validSelected ? " selected" : ""}`}
                    onClick={(e) => {

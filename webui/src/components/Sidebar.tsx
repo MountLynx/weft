@@ -4,6 +4,7 @@ import {NavLink, useLocation, useParams} from "react-router-dom";
 import type {Dashboard} from "../api/types";
 import {Icon} from "./Icon";
 import {KINDS, KIND_ICONS} from "./kinds";
+import {CardFilterPanel} from "./CardFilterPanel";
 
 export function Sidebar({dash}: {dash: Dashboard | null}) {
   const {pid = ""} = useParams();
@@ -67,6 +68,7 @@ export function Sidebar({dash}: {dash: Dashboard | null}) {
         <Icon name="pulse" size={14} />诊断
         {(dash?.n_errors ?? 0) > 0 && <span className="count">{dash?.n_errors}</span>}
       </NavLink>
+      <CardFilterPanel />
     </nav>
   );
 }
