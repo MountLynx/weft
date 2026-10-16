@@ -107,6 +107,13 @@ describe("侧栏筛选区（随选中卡的邻居标签）", () => {
     fireEvent.click(document.querySelector(".filter-head .filter-clear") as HTMLButtonElement);
     await waitFor(() =>
       expect(document.querySelectorAll(".row-list .row-item").length).toBe(3));
+    fireEvent.click(pills()[0]);   // 再点一枚 pill 出筛选条，筛条内「清除」同样复原
+    await waitFor(() =>
+      expect(document.querySelector(".filter-bar")).not.toBeNull());
+    fireEvent.click(document.querySelector(".filter-bar .filter-clear") as HTMLButtonElement);
+    await waitFor(() =>
+      expect(document.querySelector(".filter-bar")).toBeNull());
+    expect(document.querySelectorAll(".row-list .row-item").length).toBe(3);
   });
 
   it("筛选激活时点其他行换选中卡：标签清空、过滤失效、pills 随新卡切换", async () => {
@@ -165,5 +172,13 @@ describe("筛选条与引用 chips", () => {
       .map((p) => p.textContent);
     expect(dataPills[0]).toContain("fact-01");
     expect(dataPills[1]).toContain("fact-03");
+  });
+
+  it("inspector chip 点击跳转目标卡种页", async () => {
+    await renderCards();   // fact-01：data-01 chip 存在于 entities，非悬空
+    fireEvent.click(document.querySelector(".right-panel .chip") as HTMLElement);
+    await waitFor(() => expect(
+      (document.querySelector("a.nav-item.sub.active") as HTMLAnchorElement)
+        .getAttribute("href")).toBe("/p/demo/cards/data"));
   });
 });

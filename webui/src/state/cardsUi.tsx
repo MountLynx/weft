@@ -15,12 +15,13 @@ interface CardsUiValue {
   tags: string[];
   toggleTag: (tag: string) => void;
   clearTags: () => void;
+  reloadLinks: () => void;
 }
 
 const noop = () => {};
 const CardsUiContext = createContext<CardsUiValue>({
   links: null, sel: null, reportSel: noop, tags: [], toggleTag: noop,
-  clearTags: noop,
+  clearTags: noop, reloadLinks: noop,
 });
 
 export function useCardsUi(): CardsUiValue {
@@ -33,7 +34,7 @@ export function CardsUiProvider({pid, children}: {
 }) {
   const {pathname} = useLocation();
   const onCards = pathname.startsWith(`/p/${encodeURIComponent(pid)}/cards`);
-  const {data} = useApi<CardLinks>(onCards
+  const {data, reload: reloadLinks} = useApi<CardLinks>(onCards
     ? `/api/projects/${encodeURIComponent(pid)}/cards/links` : null);
   // 载荷畸形（entities 缺失）按无数据降级：筛选区隐藏、过滤不生效
   const links = data !== null && data.entities !== undefined ? data : null;
@@ -72,8 +73,8 @@ export function CardsUiProvider({pid, children}: {
   }, [selKey]);
 
   const value = useMemo<CardsUiValue>(
-    () => ({links, sel, reportSel, tags, toggleTag, clearTags}),
-    [links, sel, reportSel, tags, toggleTag, clearTags]);
+    () => ({links, sel, reportSel, tags, toggleTag, clearTags, reloadLinks}),
+    [links, sel, reportSel, tags, toggleTag, clearTags, reloadLinks]);
 
   return <CardsUiContext.Provider value={value}>{children}</CardsUiContext.Provider>;
 }

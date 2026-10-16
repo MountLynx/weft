@@ -109,17 +109,16 @@ function CardInspector({pid, kind, cardId, onEdit, onChanged}: {
                 <span className="k">{k}</span>
                 {linkKind ? (
                   <span className="v">
-                    {refs.length === 0 ? "—" : refs.map((ref) => {
+                    {refs.length === 0 ? "—" : refs.map((ref, i) => {
                       const target = links?.entities[ref];
                       const dangling = links !== null && target === undefined;
                       return (
-                        <a key={ref}
-                           className={`chip${dangling ? " dangling" : ""}`}
-                           title={dangling ? "悬空引用" : (target?.summary || ref)}
-                           onClick={() => navigate(
-                             `/p/${encodeURIComponent(pid)}/cards/${linkKind}/${encodeURIComponent(ref)}`)}>
+                        <Link key={`${ref}-${i}`}
+                              className={`chip${dangling ? " dangling" : ""}`}
+                              title={dangling ? "悬空引用" : (target?.summary || ref)}
+                              to={`/p/${encodeURIComponent(pid)}/cards/${linkKind}/${encodeURIComponent(ref)}`}>
                           {ref}
-                        </a>
+                        </Link>
                       );
                     })}
                   </span>
@@ -246,7 +245,7 @@ export function CardsPage() {
     effectiveKind
       ? `/api/projects/${encodeURIComponent(pid)}/cards/${effectiveKind}`
       : `/api/projects/${encodeURIComponent(pid)}/cards`);
-  const {links, tags, reportSel, toggleTag, clearTags} = useCardsUi();
+  const {links, tags, reportSel, toggleTag, clearTags, reloadLinks} = useCardsUi();
   const allRows = data?.rows ?? [];
   // 多选并集过滤（设计 §4.1）：选中卡连通自己的每个邻居，恒在结果集，无空态分支
   const rows = tags.length === 0 || links === null ? allRows
@@ -370,13 +369,14 @@ export function CardsPage() {
                       onCreated={(id) => {
                         startView();
                         reloadList();
+                        reloadLinks();   // 新卡可能成为别卡的链接目标，防悬空误报
                         navigate(`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/${encodeURIComponent(id)}`);
                       }} />
       ) : validSelected ? (
         editing ? (
           <CardEditPanel pid={pid} kind={effectiveKind} cardId={validSelected}
                          onClose={startView}
-                         onSaved={() => { startView(); reloadList(); }} />
+                         onSaved={() => { startView(); reloadList(); reloadLinks(); }} />
         ) : (
           <CardInspector pid={pid} kind={effectiveKind} cardId={validSelected}
                          onEdit={() => setMode({type: "edit", kind: effectiveKind, id: validSelected})}
