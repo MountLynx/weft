@@ -933,6 +933,8 @@ git commit -m "feat: WebUI inspector 引用字段 chip 化——跨卡种跳转 
 }
 a.chip { text-decoration: none; }
 a.chip:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+.chip.active { border-color: var(--border-strong); background: var(--accent-subtle); }
+.chip a { color: inherit; text-decoration: none; }
 .chip.dangling { color: var(--warning); border-color: var(--warning); }
 .chip-x {
   height: auto; padding: 0; border: none; background: none;
@@ -1008,3 +1010,5 @@ Expected: `817 passed, 2 deselected`；push 到 origin/main 成功。
 | D6 | Task 3 | 测试 4 末尾补反向路径断言：跳转 data 页后断言筛选区出现 fact 组 pills（data-01.referenced_by.facts） | D5 修复后的回归覆盖——原 4 用例只走正向判据，抓不到该类缺陷 |
 | D7 | Task 2 | `linkedCount` 增加 `tag.kind !== tagKind` fail-closed 守卫（计划函数体未用 tagKind 参数，`noUnusedParameters` 编译失败）；Task 2 产物增量更正为 +938 B minified（Provider 入包，纯函数模块被 tree-shake）——此前「无字节变化」口径有误 | tsconfig `noUnusedParameters: true`；Task 2 质量审查 Important #1/#2 |
 | D8 | Task 3（备查） | 质量审查建议为 cardLinks.ts 纯函数补直测（~30 行）；本期维持 spec 的 vitest +4 不变，反向路径由 D6 的 UI 断言覆盖，直测留待后续需要时增补 | Task 2 质量审查 Minor #7，范围纪律优先 |
+| D9 | Task 4 | 接线块原位替换（渲染期校正代码读取 `rows`，计划注记「放校正之后」与「原位替换」自相矛盾）；`FIELD_LINK_KINDS` import 留 Task 5（`noUnusedLocals`） | 实现者发现计划内部矛盾，规格审查确认 |
+| D10 | Task 5 | (a) rows 过滤守卫方向修正为 `tags.length === 0 || links === null ? allRows : filter(...)`（links null 应回落全量，与 Provider 契约对齐）；(b) 筛选条 chip 名 `<a href=
