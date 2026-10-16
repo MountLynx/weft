@@ -1006,3 +1006,5 @@ Expected: `817 passed, 2 deselected`；push 到 origin/main 成功。
 | D4 | Task 1 | pytest 目标 817 → 818：质量审查建议补强 cited claim 非空反向边 + 重复值透传两个断言点（+1 用例） | 代码质量审查 Minor #1/#2，一次提交解决 |
 | D5 | Task 2 | `linked()` 反向判据 `b.referenced_by[PLURAL[b.kind]].includes(aId)` → `a.referenced_by[PLURAL[b.kind]].includes(bId)`（计划公式写反：应在被引用方身上查、键取引用方卡种复数；原式恒空使 data/note 反向邻居静默失效）；`aId` 随之未用，改名 `_aId` 保 4 参签名（noUnusedParameters） | 规格审查对照 graphgen `_edge` 语义发现，commit ea56b99 |
 | D6 | Task 3 | 测试 4 末尾补反向路径断言：跳转 data 页后断言筛选区出现 fact 组 pills（data-01.referenced_by.facts） | D5 修复后的回归覆盖——原 4 用例只走正向判据，抓不到该类缺陷 |
+| D7 | Task 2 | `linkedCount` 增加 `tag.kind !== tagKind` fail-closed 守卫（计划函数体未用 tagKind 参数，`noUnusedParameters` 编译失败）；Task 2 产物增量更正为 +938 B minified（Provider 入包，纯函数模块被 tree-shake）——此前「无字节变化」口径有误 | tsconfig `noUnusedParameters: true`；Task 2 质量审查 Important #1/#2 |
+| D8 | Task 3（备查） | 质量审查建议为 cardLinks.ts 纯函数补直测（~30 行）；本期维持 spec 的 vitest +4 不变，反向路径由 D6 的 UI 断言覆盖，直测留待后续需要时增补 | Task 2 质量审查 Minor #7，范围纪律优先 |
