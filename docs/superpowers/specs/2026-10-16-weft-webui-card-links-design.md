@@ -147,7 +147,7 @@
 4. 筛选条 chip 名跳转 + ✕ 移除；inspector 悬空 chip 警示类。
 
 预期全量：**pytest 817 passed, 2 deselected**（基线 812 + 5）；
-**vitest 12 passed**（基线 8 + 4）。
+**vitest 15 passed**（基线 11 + 4；主仓 AGENTS.md 的「8 passed」基线已过时）。
 
 ## 9 决策表
 

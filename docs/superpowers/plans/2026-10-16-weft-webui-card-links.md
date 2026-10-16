@@ -10,7 +10,7 @@
 
 **设计文档:** `docs/superpowers/specs/2026-10-16-weft-webui-card-links-design.md`（决策 L1–L10）。
 
-**测试计数（登记）:** pytest 基线 **812 passed, 2 deselected** → 目标 **817 passed, 2 deselected**（+5，新建 `tests/test_web_card_links.py`）；vitest 基线 **8 passed** → 目标 **12 passed**（+4，新建 `webui/src/CardFilter.test.tsx`）。
+**测试计数（登记）:** pytest 基线 **812 passed, 2 deselected** → 目标 **817 passed, 2 deselected**（+5，新建 `tests/test_web_card_links.py`）；vitest 基线 **11 passed**（实测，AGENTS.md 的 8 已过时） → 目标 **15 passed**（+4，新建 `webui/src/CardFilter.test.tsx`）。
 
 ---
 
@@ -50,7 +50,7 @@ Expected: `812 passed, 2 deselected`。
 ```bash
 cd webui && pnpm test
 ```
-Expected: `8 passed`。
+Expected: `11 passed`。
 
 ---
 
@@ -426,7 +426,7 @@ function Workspace({children}: {children: React.ReactNode}) {
 ```bash
 cd webui && pnpm build && pnpm test && cd ..
 ```
-Expected: build 成功；`8 passed`（基建 inert：无消费方，Provider 空转）。
+Expected: build 成功；`11 passed`（基建 inert：无消费方，Provider 空转）。
 
 - [ ] **Step 6: 提交**
 
@@ -618,7 +618,7 @@ describe("筛选条与引用 chips", () => {
 ```bash
 cd webui && pnpm test
 ```
-Expected: 4 个新用例 FAIL（`.filter-panel`/`.filter-bar`/`.chip.dangling` 均不存在），既有 8 个 PASS。
+Expected: 4 个新用例 FAIL（`.filter-panel`/`.filter-bar`/`.chip.dangling` 均不存在），既有 11 个 PASS。
 
 不提交（红测试不入库，Task 4/5 转绿后随实现一起提交）。
 
@@ -793,9 +793,9 @@ import {useCardsUi} from "../state/cardsUi";
 ```bash
 cd webui && pnpm test
 ```
-Expected: 11 passed, 1 failed（失败的是「筛选条与引用 chips」用例——`.chip.dangling` 尚不存在）。
+Expected: 14 passed, 1 failed（失败的是「筛选条与引用 chips」用例——`.chip.dangling` 尚不存在）。
 
-既有 8 个用例必须全绿（回归门）。
+既有 11 个用例必须全绿（回归门）。
 
 - [ ] **Step 5: 提交**
 
@@ -864,7 +864,7 @@ field-table 一块替换为：
 ```bash
 cd webui && pnpm test
 ```
-Expected: `12 passed`。
+Expected: `15 passed`。
 
 - [ ] **Step 3: 提交**
 
@@ -969,7 +969,7 @@ Expected: `817 passed, 2 deselected`。
 ```bash
 cd webui && pnpm test && cd ..
 ```
-Expected: `12 passed`。
+Expected: `15 passed`。
 
 - [ ] **Step 2: 浏览器手动冒烟（examples/paper-demo）**
 
