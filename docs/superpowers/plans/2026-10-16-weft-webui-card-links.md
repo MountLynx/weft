@@ -10,7 +10,7 @@
 
 **设计文档:** `docs/superpowers/specs/2026-10-16-weft-webui-card-links-design.md`（决策 L1–L10）。
 
-**测试计数（登记）:** pytest 基线 **812 passed, 2 deselected** → 目标 **817 passed, 2 deselected**（+5，新建 `tests/test_web_card_links.py`）；vitest 基线 **11 passed**（实测，AGENTS.md 的 8 已过时） → 目标 **15 passed**（+4，新建 `webui/src/CardFilter.test.tsx`）。
+**测试计数（登记）:** pytest 基线 **812 passed, 2 deselected** → 目标 **818 passed, 2 deselected**（+6：Task 1 五用例 + 质量审查补强一用例，新建 `tests/test_web_card_links.py`）；vitest 基线 **11 passed**（实测，AGENTS.md 的 8 已过时） → 目标 **15 passed**（+4，新建 `webui/src/CardFilter.test.tsx`）。
 
 ---
 
@@ -1003,3 +1003,4 @@ Expected: `817 passed, 2 deselected`；push 到 origin/main 成功。
 | D1 | Task 1 | 测试夹具 param 卡落盘路径 `metadata/params/` → `metadata/methods/params/` | store loader 只从 `metadata/methods/params/` 加载（loader.py），原路径卡不加载必 KeyError；与全部既有测试一致 |
 | D2 | Task 1 | 端点实现 `list(getattr(card, field))` → list 字段拷贝、标量字段（`param.method`）包单元素列表 | 标量 `list("m-xt")` 拆成字符数组，破坏设计 §2/§4.3 的 `links["method"] == ["m-xt"]` 形状；测试补断言 param links 含 method+note |
 | D3 | 全局 | vitest 基线 8 → 实测 11，目标 12 → 15 | Task 0 基线自检实测；AGENTS.md 的「8 passed」已过时 |
+| D4 | Task 1 | pytest 目标 817 → 818：质量审查建议补强 cited claim 非空反向边 + 重复值透传两个断言点（+1 用例） | 代码质量审查 Minor #1
