@@ -24,6 +24,7 @@ from weft.bibgen import sync_managed_bib
 from weft.engine.bib_propose import BibProposeError, propose_note
 from weft.engine.clients import make_client
 from weft.engine.draft_rules import DraftError
+from weft.graphgen.index import build_index
 from weft.labels import KEY_FIELD
 from weft.pdftext import (
     CLUES_CHARS,
@@ -75,6 +76,36 @@ def _kind_counts(entry) -> dict[str, int]:
 def cards_overview(request: Request, pid: str):
     entry = load_reviewable_or_404(request, pid)
     return {"counts": _kind_counts(entry), "labels": KIND_LABELS}
+
+
+# 正向链接字段 → 目标卡种（值是真实落盘内容：悬空引用保留；反向边由 build_index 过滤）
+_LINK_FIELDS: dict[str, dict[str, str]] = {
+    "fact": {"data": "data", "supports": "claim"},
+    "claim": {"cites": "note"},
+    "method": {"derived_from": "note"},
+    "param": {"method": "method", "derived_from": "note"},
+}
+
+
+@router.get("/projects/{pid}/cards/links")
+def cards_links(request: Request, pid: str):
+    """全量卡链路（webui-card-links 设计 §2）：实时反向索引 + 正向链接合并。
+
+    只读、无落盘；rejected 卡包含（决策 L8）。路由先于 /cards/{kind}（决策 L2）。
+    """
+    entry = load_reviewable_or_404(request, pid)
+    entities = build_index(entry.project)["entities"]
+    for kind, fields in _LINK_FIELDS.items():
+        for cid, card in getattr(entry.project, KIND_ATTRS[kind]).items():
+            links: dict[str, list[str]] = {}
+            for field, target in fields.items():
+                value = getattr(card, field)
+                # param.method 是标量 str，其余链接字段均为 list（模型层 schema 冻结）
+                links[target] = list(value) if isinstance(value, list) else [value]
+            entities[cid]["links"] = links
+    for ent in entities.values():
+        ent.setdefault("links", {})
+    return {"entities": entities}
 
 
 @router.get("/projects/{pid}/cards/{kind}")
