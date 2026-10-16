@@ -1,6 +1,7 @@
 /** 卡片链路纯函数（webui-card-links 设计 §4.1）：邻接判定 / 邻居分组 / 计数 / 行筛选。
  * 统一规则：卡 a 连通卡 b ⟺ a 引用 b（a.links[b.kind] 含 b）或 b 引用 a
- * （b.referenced_by[复数(b.kind)] 含 a）。悬空引用不在 entities，天然不连通。 */
+ * （a.referenced_by[复数(b.kind)] 含 b；referenced_by 记录在被引用方、键 = 引用方卡种复数）。
+ * 悬空引用不在 entities，天然不连通。 */
 import type {CardLinkEntity, CardLinks} from "../api/types";
 import {KINDS} from "../components/kinds";
 
@@ -17,11 +18,12 @@ export const FIELD_LINK_KINDS: Record<string, Record<string, string>> = {
   param: {method: "method", derived_from: "note"},
 };
 
-/** 卡 a 与卡 b 是否有边（任一方向；两参可为同一张卡时不保证有意义，调用方避开）。 */
-export function linked(a: CardLinkEntity, aId: string,
+/** 卡 a 与卡 b 是否有边（任一方向；两参可为同一张卡时不保证有意义，调用方避开）。
+ * 两个判据都是「bId 是否出现在 a 的邻接表」，aId 仅为调用点对称性保留。 */
+export function linked(a: CardLinkEntity, _aId: string,
                        b: CardLinkEntity, bId: string): boolean {
   return (a.links[b.kind] ?? []).includes(bId)
-      || (b.referenced_by[PLURAL[b.kind]] ?? []).includes(aId);
+      || (a.referenced_by[PLURAL[b.kind]] ?? []).includes(bId);
 }
 
 export interface NeighborGroup {kind: string; ids: string[]}
