@@ -1,6 +1,6 @@
 /** 卡片列表 + 右栏 inspector（详情/审阅/改名/一键修复/内联新建与编辑）。卡种导航只在侧栏，无页签。 */
 import {useEffect, useState} from "react";
-import {Navigate, useNavigate, useParams} from "react-router-dom";
+import {Link, Navigate, useNavigate, useParams} from "react-router-dom";
 import {api, ApiError} from "../api/client";
 import type {CardDetail, CardsList, FormSpec} from "../api/types";
 import {useApi} from "../hooks/useApi";
@@ -8,7 +8,7 @@ import {CardForm} from "../components/CardForm";
 import {Icon} from "../components/Icon";
 import {KINDS, kindIcon} from "../components/kinds";
 import {StatusBadge} from "../components/StatusBadge";
-import {matchesAny} from "../state/cardLinks";
+import {FIELD_LINK_KINDS, matchesAny} from "../state/cardLinks";
 import {useCardsUi} from "../state/cardsUi";
 import {toast} from "../state/toast";
 
@@ -26,6 +26,7 @@ function CardInspector({pid, kind, cardId, onEdit, onChanged}: {
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
+  const {links} = useCardsUi();
   const {data: card, reload} = useApi<CardDetail>(
     `/api/projects/${encodeURIComponent(pid)}/cards/${kind}/${encodeURIComponent(cardId)}`);
   const [comment, setComment] = useState("");
@@ -97,12 +98,37 @@ function CardInspector({pid, kind, cardId, onEdit, onChanged}: {
       </div>
       <div className="panel-body">
         <div className="field-table">
-          {Object.entries(card.fields).map(([k, v]) => (
-            <div className="field" key={k}>
-              <span className="k">{k}</span>
-              <span className={`v${k === "entry" ? " mono" : ""}`}>{v || "—"}</span>
-            </div>
-          ))}
+          {Object.entries(card.fields).map(([k, v]) => {
+            const linkKind = FIELD_LINK_KINDS[kind]?.[k];
+            const raw = v as unknown;
+            const refs: string[] = linkKind
+              ? (Array.isArray(raw) ? raw.map(String) : raw ? [String(raw)] : [])
+              : [];
+            return (
+              <div className="field" key={k}>
+                <span className="k">{k}</span>
+                {linkKind ? (
+                  <span className="v">
+                    {refs.length === 0 ? "—" : refs.map((ref) => {
+                      const target = links?.entities[ref];
+                      const dangling = links !== null && target === undefined;
+                      return (
+                        <a key={ref}
+                           className={`chip${dangling ? " dangling" : ""}`}
+                           title={dangling ? "悬空引用" : (target?.summary || ref)}
+                           onClick={() => navigate(
+                             `/p/${encodeURIComponent(pid)}/cards/${linkKind}/${encodeURIComponent(ref)}`)}>
+                          {ref}
+                        </a>
+                      );
+                    })}
+                  </span>
+                ) : (
+                  <span className={`v${k === "entry" ? " mono" : ""}`}>{v || "—"}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
         {card.fixable && (
           <div className="banner warning">
@@ -223,8 +249,8 @@ export function CardsPage() {
   const {links, tags, reportSel, toggleTag, clearTags} = useCardsUi();
   const allRows = data?.rows ?? [];
   // 多选并集过滤（设计 §4.1）：选中卡连通自己的每个邻居，恒在结果集，无空态分支
-  const rows = tags.length === 0 ? allRows
-    : allRows.filter((r) => links !== null && matchesAny(links, r.id, tags));
+  const rows = tags.length === 0 || links === null ? allRows
+    : allRows.filter((r) => matchesAny(links, r.id, tags));
 
   // 选中卡镜像上报（侧栏筛选区数据源；换卡清空标签在 Provider 内完成）
   useEffect(() => {
@@ -300,11 +326,7 @@ export function CardsPage() {
                 const tagId = tag.slice(slash + 1);
                 return (
                   <span key={tag} className="chip active">
-                    <a href="#"
-                       onClick={(e) => {
-                         e.preventDefault();
-                         navigate(`/p/${encodeURIComponent(pid)}/cards/${tagKind}/${encodeURIComponent(tagId)}`);
-                       }}>{tagId}</a>
+                    <Link to={`/p/${encodeURIComponent(pid)}/cards/${tagKind}/${encodeURIComponent(tagId)}`}>{tagId}</Link>
                     <button className="chip-x" title="移除"
                             onClick={() => toggleTag(tag)}>×</button>
                   </span>
