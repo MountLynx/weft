@@ -10,7 +10,7 @@
 
 **设计文档:** `docs/superpowers/specs/2026-10-16-weft-webui-card-links-design.md`（决策 L1–L10）。
 
-**测试计数（登记）:** pytest 基线 **812 passed, 2 deselected** → 目标 **817 passed, 2 deselected**（+5，新建 `tests/test_web_card_links.py`）；vitest 基线 **8 passed** → 目标 **12 passed**（+4，新建 `webui/src/CardFilter.test.tsx`）。
+**测试计数（登记）:** pytest 基线 **812 passed, 2 deselected** → 目标 **818 passed, 2 deselected**（+6：Task 1 五用例 + 质量审查补强一用例，新建 `tests/test_web_card_links.py`）；vitest 基线 **11 passed**（实测，AGENTS.md 的 8 已过时） → 目标 **16 passed**（+5，新建 `webui/src/CardFilter.test.tsx`，第 5 用例见 D12）。
 
 ---
 
@@ -50,7 +50,7 @@ Expected: `812 passed, 2 deselected`。
 ```bash
 cd webui && pnpm test
 ```
-Expected: `8 passed`。
+Expected: `11 passed`。
 
 ---
 
@@ -233,7 +233,7 @@ export interface CardLinks {
 ```ts
 /** 卡片链路纯函数（webui-card-links 设计 §4.1）：邻接判定 / 邻居分组 / 计数 / 行筛选。
  * 统一规则：卡 a 连通卡 b ⟺ a 引用 b（a.links[b.kind] 含 b）或 b 引用 a
- * （b.referenced_by[复数(b.kind)] 含 a）。悬空引用不在 entities，天然不连通。 */
+ * （a.referenced_by[复数(b.kind)] 含 b；键 = 引用方卡种复数，记录在被引用方）。悬空引用不在 entities，天然不连通。 */
 import type {CardLinkEntity, CardLinks} from "../api/types";
 import {KINDS} from "../components/kinds";
 
@@ -254,7 +254,7 @@ export const FIELD_LINK_KINDS: Record<string, Record<string, string>> = {
 export function linked(a: CardLinkEntity, aId: string,
                        b: CardLinkEntity, bId: string): boolean {
   return (a.links[b.kind] ?? []).includes(bId)
-      || (b.referenced_by[PLURAL[b.kind]] ?? []).includes(aId);
+      || (a.referenced_by[PLURAL[b.kind]] ?? []).includes(bId);
 }
 
 export interface NeighborGroup {kind: string; ids: string[]}
@@ -426,7 +426,7 @@ function Workspace({children}: {children: React.ReactNode}) {
 ```bash
 cd webui && pnpm build && pnpm test && cd ..
 ```
-Expected: build 成功；`8 passed`（基建 inert：无消费方，Provider 空转）。
+Expected: build 成功；`11 passed`（基建 inert：无消费方，Provider 空转）。
 
 - [ ] **Step 6: 提交**
 
@@ -618,7 +618,7 @@ describe("筛选条与引用 chips", () => {
 ```bash
 cd webui && pnpm test
 ```
-Expected: 4 个新用例 FAIL（`.filter-panel`/`.filter-bar`/`.chip.dangling` 均不存在），既有 8 个 PASS。
+Expected: 4 个新用例 FAIL（`.filter-panel`/`.filter-bar`/`.chip.dangling` 均不存在），既有 11 个 PASS。
 
 不提交（红测试不入库，Task 4/5 转绿后随实现一起提交）。
 
@@ -793,9 +793,9 @@ import {useCardsUi} from "../state/cardsUi";
 ```bash
 cd webui && pnpm test
 ```
-Expected: 11 passed, 1 failed（失败的是「筛选条与引用 chips」用例——`.chip.dangling` 尚不存在）。
+Expected: 14 passed, 1 failed（失败的是「筛选条与引用 chips」用例——`.chip.dangling` 尚不存在）。
 
-既有 8 个用例必须全绿（回归门）。
+既有 11 个用例必须全绿（回归门）。
 
 - [ ] **Step 5: 提交**
 
@@ -864,7 +864,7 @@ field-table 一块替换为：
 ```bash
 cd webui && pnpm test
 ```
-Expected: `12 passed`。
+Expected: `16 passed`。
 
 - [ ] **Step 3: 提交**
 
@@ -933,6 +933,8 @@ git commit -m "feat: WebUI inspector 引用字段 chip 化——跨卡种跳转 
 }
 a.chip { text-decoration: none; }
 a.chip:hover { border-color: var(--border-strong); background: var(--surface-hover); }
+.chip.active { border-color: var(--border-strong); background: var(--accent-subtle); }
+.chip a { color: inherit; text-decoration: none; }
 .chip.dangling { color: var(--warning); border-color: var(--warning); }
 .chip-x {
   height: auto; padding: 0; border: none; background: none;
@@ -969,7 +971,7 @@ Expected: `817 passed, 2 deselected`。
 ```bash
 cd webui && pnpm test && cd ..
 ```
-Expected: `12 passed`。
+Expected: `16 passed`。
 
 - [ ] **Step 2: 浏览器手动冒烟（examples/paper-demo）**
 
@@ -995,3 +997,20 @@ git worktree remove .worktrees/webui-card-links
 git push
 ```
 Expected: `817 passed, 2 deselected`；push 到 origin/main 成功。
+
+## 执行期设计偏离记录
+
+| # | 任务 | 偏离 | 依据 |
+|---|---|---|---|
+| D1 | Task 1 | 测试夹具 param 卡落盘路径 `metadata/params/` → `metadata/methods/params/` | store loader 只从 `metadata/methods/params/` 加载（loader.py），原路径卡不加载必 KeyError；与全部既有测试一致 |
+| D2 | Task 1 | 端点实现 `list(getattr(card, field))` → list 字段拷贝、标量字段（`param.method`）包单元素列表 | 标量 `list("m-xt")` 拆成字符数组，破坏设计 §2/§4.3 的 `links["method"] == ["m-xt"]` 形状；测试补断言 param links 含 method+note |
+| D3 | 全局 | vitest 基线 8 → 实测 11，目标 12 → 15 | Task 0 基线自检实测；AGENTS.md 的「8 passed」已过时 |
+| D4 | Task 1 | pytest 目标 817 → 818：质量审查建议补强 cited claim 非空反向边 + 重复值透传两个断言点（+1 用例） | 代码质量审查 Minor #1/#2，一次提交解决 |
+| D5 | Task 2 | `linked()` 反向判据 `b.referenced_by[PLURAL[b.kind]].includes(aId)` → `a.referenced_by[PLURAL[b.kind]].includes(bId)`（计划公式写反：应在被引用方身上查、键取引用方卡种复数；原式恒空使 data/note 反向邻居静默失效）；`aId` 随之未用，改名 `_aId` 保 4 参签名（noUnusedParameters） | 规格审查对照 graphgen `_edge` 语义发现，commit ea56b99 |
+| D6 | Task 3 | 测试 4 末尾补反向路径断言：跳转 data 页后断言筛选区出现 fact 组 pills（data-01.referenced_by.facts） | D5 修复后的回归覆盖——原 4 用例只走正向判据，抓不到该类缺陷 |
+| D7 | Task 2 | `linkedCount` 增加 `tag.kind !== tagKind` fail-closed 守卫（计划函数体未用 tagKind 参数，`noUnusedParameters` 编译失败）；Task 2 产物增量更正为 +938 B minified（Provider 入包，纯函数模块被 tree-shake）——此前「无字节变化」口径有误 | tsconfig `noUnusedParameters: true`；Task 2 质量审查 Important #1/#2 |
+| D8 | Task 3（备查） | 质量审查建议为 cardLinks.ts 纯函数补直测（~30 行）；本期维持 spec 的 vitest +4 不变，反向路径由 D6 的 UI 断言覆盖，直测留待后续需要时增补 | Task 2 质量审查 Minor #7，范围纪律优先 |
+| D9 | Task 4 | 接线块原位替换（渲染期校正代码读取 `rows`，计划注记「放校正之后」与「原位替换」自相矛盾）；`FIELD_LINK_KINDS` import 留 Task 5（`noUnusedLocals`） | 实现者发现计划内部矛盾，规格审查确认 |
+| D10 | Task 5 | (a) rows 过滤守卫方向修正为 `tags.length === 0 || links === null ? allRows : filter(...)`（links null 应回落全量，与 Provider 契约对齐）；(b) 筛选条 chip 名 `<a href="#">` 改 react-router `<Link>`；(c) Task 6 CSS 补 `.chip.active` 与 `.chip a`（已改计划原文） | Task 4 质量审查 Important #1/#2、Minor #3 |
+| D11 | Task 5 | 测试 4 跳转断言选择器 `a.nav-item.active` → `a.nav-item.sub.active`——原选择器是从未执行过的潜伏 bug（/cards/* 下「卡片」父项 NavLink 前缀匹配同为 active 且 DOM 序在前）；测试文件随 Task 5 转绿入库 | Task 5 实现者发现，规格审查确认 |
+| D12 | Task 5 | 质量审查 With fixes 补修：`reloadLinks` 透传（编辑/新建后刷新链路数据，杜绝新卡悬空误报）；inspector chips 改 `<Link>`（键盘可达）；chips key 加序号防重复；测试补第 5 用例（chip 跳转）与筛选条清除断言——vitest 目标 15 → **16** | Task 5 质量审查 Important #1、Minor #3/#4/#6/#7，commit 5bf843c |

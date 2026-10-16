@@ -3,6 +3,7 @@ import {Navigate, Route, Routes} from "react-router-dom";
 import {Sidebar} from "./components/Sidebar";
 import {StatusBar} from "./components/StatusBar";
 import {ToastHost} from "./state/toast";
+import {CardsUiProvider} from "./state/cardsUi";
 import {Topbar} from "./components/Topbar";
 import {useApi} from "./hooks/useApi";
 import type {Dashboard} from "./api/types";
@@ -29,8 +30,10 @@ function Workspace({children}: {children: React.ReactNode}) {
     <div className="app">
       <Topbar />
       <div className="workspace">
-        <Sidebar dash={dash} />
-        {children}
+        <CardsUiProvider pid={pid}>
+          <Sidebar dash={dash} />
+          {children}
+        </CardsUiProvider>
       </div>
       <StatusBar dash={dash} />
       <ToastHost />

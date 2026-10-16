@@ -190,3 +190,15 @@ export interface FilePayload {
 export interface GraphPayload {
   graph: Record<string, unknown> | null;
 }
+
+export interface CardLinkEntity {
+  kind: string;
+  status: string;
+  summary: string;
+  links: Record<string, string[]>;
+  referenced_by: Record<string, string[]>;
+}
+
+export interface CardLinks {
+  entities: Record<string, CardLinkEntity>;
+}

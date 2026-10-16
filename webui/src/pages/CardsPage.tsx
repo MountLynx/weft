@@ -1,6 +1,6 @@
 /** 卡片列表 + 右栏 inspector（详情/审阅/改名/一键修复/内联新建与编辑）。卡种导航只在侧栏，无页签。 */
 import {useEffect, useState} from "react";
-import {Navigate, useNavigate, useParams} from "react-router-dom";
+import {Link, Navigate, useNavigate, useParams} from "react-router-dom";
 import {api, ApiError} from "../api/client";
 import type {CardDetail, CardsList, FormSpec} from "../api/types";
 import {useApi} from "../hooks/useApi";
@@ -8,6 +8,8 @@ import {CardForm} from "../components/CardForm";
 import {Icon} from "../components/Icon";
 import {KINDS, kindIcon} from "../components/kinds";
 import {StatusBadge} from "../components/StatusBadge";
+import {FIELD_LINK_KINDS, matchesAny} from "../state/cardLinks";
+import {useCardsUi} from "../state/cardsUi";
 import {toast} from "../state/toast";
 
 /** 右栏模式（组件态，不入 URL；kind 切换即失效回落 view，D1/D6）。 */
@@ -24,6 +26,7 @@ function CardInspector({pid, kind, cardId, onEdit, onChanged}: {
   onChanged: () => void;
 }) {
   const navigate = useNavigate();
+  const {links} = useCardsUi();
   const {data: card, reload} = useApi<CardDetail>(
     `/api/projects/${encodeURIComponent(pid)}/cards/${kind}/${encodeURIComponent(cardId)}`);
   const [comment, setComment] = useState("");
@@ -95,12 +98,36 @@ function CardInspector({pid, kind, cardId, onEdit, onChanged}: {
       </div>
       <div className="panel-body">
         <div className="field-table">
-          {Object.entries(card.fields).map(([k, v]) => (
-            <div className="field" key={k}>
-              <span className="k">{k}</span>
-              <span className={`v${k === "entry" ? " mono" : ""}`}>{v || "—"}</span>
-            </div>
-          ))}
+          {Object.entries(card.fields).map(([k, v]) => {
+            const linkKind = FIELD_LINK_KINDS[kind]?.[k];
+            const raw = v as unknown;
+            const refs: string[] = linkKind
+              ? (Array.isArray(raw) ? raw.map(String) : raw ? [String(raw)] : [])
+              : [];
+            return (
+              <div className="field" key={k}>
+                <span className="k">{k}</span>
+                {linkKind ? (
+                  <span className="v">
+                    {refs.length === 0 ? "—" : refs.map((ref, i) => {
+                      const target = links?.entities[ref];
+                      const dangling = links !== null && target === undefined;
+                      return (
+                        <Link key={`${ref}-${i}`}
+                              className={`chip${dangling ? " dangling" : ""}`}
+                              title={dangling ? "悬空引用" : (target?.summary || ref)}
+                              to={`/p/${encodeURIComponent(pid)}/cards/${linkKind}/${encodeURIComponent(ref)}`}>
+                          {ref}
+                        </Link>
+                      );
+                    })}
+                  </span>
+                ) : (
+                  <span className={`v${k === "entry" ? " mono" : ""}`}>{v || "—"}</span>
+                )}
+              </div>
+            );
+          })}
         </div>
         {card.fixable && (
           <div className="banner warning">
@@ -218,7 +245,17 @@ export function CardsPage() {
     effectiveKind
       ? `/api/projects/${encodeURIComponent(pid)}/cards/${effectiveKind}`
       : `/api/projects/${encodeURIComponent(pid)}/cards`);
-  const rows = data?.rows ?? [];
+  const {links, tags, reportSel, toggleTag, clearTags, reloadLinks} = useCardsUi();
+  const allRows = data?.rows ?? [];
+  // 多选并集过滤（设计 §4.1）：选中卡连通自己的每个邻居，恒在结果集，无空态分支
+  const rows = tags.length === 0 || links === null ? allRows
+    : allRows.filter((r) => matchesAny(links, r.id, tags));
+
+  // 选中卡镜像上报（侧栏筛选区数据源；换卡清空标签在 Provider 内完成）
+  useEffect(() => {
+    reportSel(sel ? `${sel.kind}/${sel.id}` : "");
+  }, [sel, reportSel]);
+  useEffect(() => () => reportSel(""), []);   // 离开卡片页清镜像
 
   // 渲染期同步校正（React adjusting-state-during-render 范式）：
   // kind 切换/路由直达新卡立即作废旧选中——跨卡种窗口绝不渲染 inspector、不发 404 详情请求
@@ -279,6 +316,24 @@ export function CardsPage() {
           )}
         </div>
         <div className="page-body">
+          {tags.length > 0 && (
+            <div className="filter-bar">
+              <span className="label">筛选：</span>
+              {tags.map((tag) => {
+                const slash = tag.indexOf("/");
+                const tagKind = tag.slice(0, slash);
+                const tagId = tag.slice(slash + 1);
+                return (
+                  <span key={tag} className="chip active">
+                    <Link to={`/p/${encodeURIComponent(pid)}/cards/${tagKind}/${encodeURIComponent(tagId)}`}>{tagId}</Link>
+                    <button className="chip-x" title="移除"
+                            onClick={() => toggleTag(tag)}>×</button>
+                  </span>
+                );
+              })}
+              <button className="filter-clear" onClick={clearTags}>清除</button>
+            </div>
+          )}
           {(data?.rows ?? []).length === 0 ? (
             <div className="empty-state">
               <span className="big-icon"><Icon name={kindIcon(effectiveKind)} size={56} /></span>
@@ -290,7 +345,7 @@ export function CardsPage() {
             </div>
           ) : (
             <div className="row-list">
-              {(data?.rows ?? []).map((r) => (
+              {rows.map((r) => (
                 <a key={r.id}
                    className={`row-item${r.id === validSelected ? " selected" : ""}`}
                    onClick={(e) => {
@@ -314,13 +369,14 @@ export function CardsPage() {
                       onCreated={(id) => {
                         startView();
                         reloadList();
+                        reloadLinks();   // 新卡可能成为别卡的链接目标，防悬空误报
                         navigate(`/p/${encodeURIComponent(pid)}/cards/${effectiveKind}/${encodeURIComponent(id)}`);
                       }} />
       ) : validSelected ? (
         editing ? (
           <CardEditPanel pid={pid} kind={effectiveKind} cardId={validSelected}
                          onClose={startView}
-                         onSaved={() => { startView(); reloadList(); }} />
+                         onSaved={() => { startView(); reloadList(); reloadLinks(); }} />
         ) : (
           <CardInspector pid={pid} kind={effectiveKind} cardId={validSelected}
                          onEdit={() => setMode({type: "edit", kind: effectiveKind, id: validSelected})}
