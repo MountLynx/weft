@@ -10,7 +10,7 @@
 
 **设计文档:** `docs/superpowers/specs/2026-10-16-weft-webui-card-links-design.md`（决策 L1–L10）。
 
-**测试计数（登记）:** pytest 基线 **812 passed, 2 deselected** → 目标 **818 passed, 2 deselected**（+6：Task 1 五用例 + 质量审查补强一用例，新建 `tests/test_web_card_links.py`）；vitest 基线 **11 passed**（实测，AGENTS.md 的 8 已过时） → 目标 **15 passed**（+4，新建 `webui/src/CardFilter.test.tsx`）。
+**测试计数（登记）:** pytest 基线 **812 passed, 2 deselected** → 目标 **818 passed, 2 deselected**（+6：Task 1 五用例 + 质量审查补强一用例，新建 `tests/test_web_card_links.py`）；vitest 基线 **11 passed**（实测，AGENTS.md 的 8 已过时） → 目标 **16 passed**（+5，新建 `webui/src/CardFilter.test.tsx`，第 5 用例见 D12）。
 
 ---
 
@@ -864,7 +864,7 @@ field-table 一块替换为：
 ```bash
 cd webui && pnpm test
 ```
-Expected: `15 passed`。
+Expected: `16 passed`。
 
 - [ ] **Step 3: 提交**
 
@@ -971,7 +971,7 @@ Expected: `817 passed, 2 deselected`。
 ```bash
 cd webui && pnpm test && cd ..
 ```
-Expected: `15 passed`。
+Expected: `16 passed`。
 
 - [ ] **Step 2: 浏览器手动冒烟（examples/paper-demo）**
 
@@ -1011,4 +1011,6 @@ Expected: `817 passed, 2 deselected`；push 到 origin/main 成功。
 | D7 | Task 2 | `linkedCount` 增加 `tag.kind !== tagKind` fail-closed 守卫（计划函数体未用 tagKind 参数，`noUnusedParameters` 编译失败）；Task 2 产物增量更正为 +938 B minified（Provider 入包，纯函数模块被 tree-shake）——此前「无字节变化」口径有误 | tsconfig `noUnusedParameters: true`；Task 2 质量审查 Important #1/#2 |
 | D8 | Task 3（备查） | 质量审查建议为 cardLinks.ts 纯函数补直测（~30 行）；本期维持 spec 的 vitest +4 不变，反向路径由 D6 的 UI 断言覆盖，直测留待后续需要时增补 | Task 2 质量审查 Minor #7，范围纪律优先 |
 | D9 | Task 4 | 接线块原位替换（渲染期校正代码读取 `rows`，计划注记「放校正之后」与「原位替换」自相矛盾）；`FIELD_LINK_KINDS` import 留 Task 5（`noUnusedLocals`） | 实现者发现计划内部矛盾，规格审查确认 |
-| D10 | Task 5 | (a) rows 过滤守卫方向修正为 `tags.length === 0 || links === null ? allRows : filter(...)`（links null 应回落全量，与 Provider 契约对齐）；(b) 筛选条 chip 名 `<a href=
+| D10 | Task 5 | (a) rows 过滤守卫方向修正为 `tags.length === 0 || links === null ? allRows : filter(...)`（links null 应回落全量，与 Provider 契约对齐）；(b) 筛选条 chip 名 `<a href="#">` 改 react-router `<Link>`；(c) Task 6 CSS 补 `.chip.active` 与 `.chip a`（已改计划原文） | Task 4 质量审查 Important #1/#2、Minor #3 |
+| D11 | Task 5 | 测试 4 跳转断言选择器 `a.nav-item.active` → `a.nav-item.sub.active`——原选择器是从未执行过的潜伏 bug（/cards/* 下「卡片」父项 NavLink 前缀匹配同为 active 且 DOM 序在前）；测试文件随 Task 5 转绿入库 | Task 5 实现者发现，规格审查确认 |
+| D12 | Task 5 | 质量审查 With fixes 补修：`reloadLinks` 透传（编辑/新建后刷新链路数据，杜绝新卡悬空误报）；inspector chips 改 `<Link>`（键盘可达）；chips key 加序号防重复；测试补第 5 用例（chip 跳转）与筛选条清除断言——vitest 目标 15 → **16** | Task 5 质量审查 Important #1、Minor #3/#4/#6/#7，commit 5bf843c |
