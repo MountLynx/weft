@@ -11,12 +11,17 @@ def test_card_links_payload(tmp_path):
     write_card(root / "demo" / "metadata" / "methods" / "params", "p-xt",
                {"id": "p-xt", "method": "m-xt", "values": {"rate": "5"},
                 "derived_from": ["key2020"], "status": "draft"})
+    write_card(root / "demo" / "metadata" / "claims" / "cited", "claim-02",
+               {"id": "claim-02", "claim_type": "cited",
+                "statement": "已引用断言。", "cites": ["key2020"],
+                "status": "draft"})
     ents = client.get("/api/projects/demo/cards/links").json()["entities"]
-    assert set(ents) == {"data-01", "fact-01", "claim-01", "key2020",
-                         "m-xt", "p-xt"}
+    assert set(ents) == {"data-01", "fact-01", "claim-01", "claim-02",
+                         "key2020", "m-xt", "p-xt"}
     assert ents["fact-01"]["links"] == {"data": ["data-01"],
                                         "claim": ["claim-01"]}
     assert ents["claim-01"]["links"] == {"note": []}
+    assert ents["claim-02"]["links"] == {"note": ["key2020"]}
     assert ents["data-01"]["links"] == {}
     assert ents["fact-01"]["summary"] == "温度提高速率。"
     assert ents["data-01"]["referenced_by"]["facts"] == ["fact-01"]
@@ -24,6 +29,7 @@ def test_card_links_payload(tmp_path):
     assert ents["m-xt"]["referenced_by"]["params"] == ["p-xt"]
     assert ents["key2020"]["referenced_by"]["methods"] == ["m-xt"]
     assert ents["key2020"]["referenced_by"]["params"] == ["p-xt"]
+    assert ents["key2020"]["referenced_by"]["claims"] == ["claim-02"]
     assert ents["fact-01"]["referenced_by"]["nodes"] == ["para-01-01"]
     assert ents["p-xt"]["status"] == "draft"
     assert ents["p-xt"]["links"] == {"method": ["m-xt"], "note": ["key2020"]}
@@ -41,6 +47,17 @@ def test_card_links_forward_keeps_dangling(tmp_path):
     assert ents["fact-02"]["links"]["claim"] == ["claim-ghost"]
     assert "data-ghost" not in ents and "claim-ghost" not in ents
     assert ents["data-01"]["referenced_by"]["facts"] == ["fact-01", "fact-02"]
+
+
+def test_card_links_keeps_duplicates(tmp_path):
+    # 正向 links 原样透传落盘列表（含重复项）；referenced_by 去重排序形成对照
+    client, root = make_client(tmp_path)
+    write_card(root / "demo" / "metadata" / "facts", "fact-04",
+               {"id": "fact-04", "data": ["data-01", "data-01"],
+                "statement": "重复引用。", "supports": [], "status": "draft"})
+    ents = client.get("/api/projects/demo/cards/links").json()["entities"]
+    assert ents["fact-04"]["links"]["data"] == ["data-01", "data-01"]
+    assert ents["data-01"]["referenced_by"]["facts"] == ["fact-01", "fact-04"]
 
 
 def test_card_links_includes_rejected(tmp_path):
