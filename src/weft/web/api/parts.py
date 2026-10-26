@@ -13,15 +13,15 @@ from pydantic import BaseModel, ValidationError
 
 from weft.engine import make_client
 from weft.engine.part_draft import run_part_draft
-from weft.labels import label_map
+from weft.labels import KEY_FIELD, label_map
 from weft.models.narrative import Node, Use
 from weft.store.loader import load_project
 from weft.store.writer import save_part
 from weft.validation import validate_project
 from weft.validation.rules import PURPOSE_VOCAB, ROLE_VOCAB
-from weft.web.common import load_entry_or_404, load_project_or_404
+from weft.web.common import KIND_ATTRS, load_entry_or_404, load_project_or_404
 from weft.web.runs import RunEvent
-from weft.workflow import WORKFLOW_VOCAB
+from weft.workflow import WORKFLOW_VOCAB, normalize_chapter
 
 router = APIRouter(prefix="/api")
 
@@ -47,10 +47,34 @@ def _draft_text(project, part_id: str) -> str | None:
     return path.read_text(encoding="utf-8") if path.exists() else None
 
 
+def _chapter_cards(project, part) -> list[dict]:
+    """本章标签卡（card-chapters 设计 §5.1）：chapters 匹配本 part 章节的全部
+    标签卡（六卡种、含全状态），used = 已被本 part 任一节点 uses 引用。"""
+    chapter = project.part_chapters.get(part.id, "")
+    if not chapter:
+        return []
+    target = normalize_chapter(chapter)
+    used_ids = {u.id for n in part.nodes for u in n.uses}
+    cards = []
+    for kind, attr in KIND_ATTRS.items():
+        for cid, card in getattr(project, attr).items():
+            if not any(normalize_chapter(t) == target for t in card.chapters):
+                continue
+            cards.append({"id": cid, "kind": kind, "status": card.status,
+                          "key": getattr(card, KEY_FIELD[kind], "") or "",
+                          "used": cid in used_ids})
+    cards.sort(key=lambda c: (c["kind"], c["id"]))
+    return cards
+
+
 def _panel_payload(entry, part) -> dict:
     project = entry.project
+    chapter = project.part_chapters.get(part.id, "")
     return {"ok": True, "part": {"id": part.id, "workflow": part.workflow},
             "workflow_vocab": list(WORKFLOW_VOCAB),
+            "chapter": chapter,
+            "chapter_norm": normalize_chapter(chapter) if chapter else "",
+            "chapter_cards": _chapter_cards(project, part),
             "nodes": [{"id": n.id, "purpose": n.purpose, "status": n.status,
                        "comment": n.comment,
                        "uses": [{"id": u.id, "role": u.role} for u in n.uses]}

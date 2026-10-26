@@ -43,6 +43,7 @@ from weft.web.card_forms import (
     KIND_PREFIX,
     build_choices,
     build_labels,
+    parse_tags,
     validation_errors,
     values_for_template,
 )
@@ -116,13 +117,14 @@ def card_list(request: Request, pid: str, kind: str):
         rows.append({
             "id": cid, "status": card.status,
             "key": getattr(card, KEY_FIELD[kind], "") or "",
+            "chapters": list(card.chapters),
             "rel": entry.project.card_paths[cid].as_posix()})
     return {"kind": kind, "label": KIND_LABELS[kind], "rows": rows,
             "counts": _kind_counts(entry)}
 
 
 def _blank_values(kind: str) -> dict:
-    blank = {"status": "draft", "comment": ""}
+    blank = {"status": "draft", "comment": "", "chapters": ""}
     if kind == "param":
         blank["values"] = ""
     return blank
@@ -175,6 +177,10 @@ def payload_to_meta(kind: str, payload: dict, *, is_new: bool,
                 meta[spec.name] = [str(v) for v in raw]
             else:
                 meta[spec.name] = [str(raw)]
+        elif spec.widget == "tags":
+            # tags 控件收字符串（前端直接提交表单态）；列表也容忍（API 直调）
+            meta[spec.name] = parse_tags(raw) if not isinstance(raw, list) \
+                else [str(v).strip() for v in raw if str(v).strip()]
         elif spec.widget == "yaml_map":
             if isinstance(raw, dict):
                 meta[spec.name] = raw

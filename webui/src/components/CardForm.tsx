@@ -82,6 +82,18 @@ export function CardForm({pid, kind, spec, isNew, cardId = "", onSaved, onCancel
             <input value={String(v[s.name] ?? "")}
                    onChange={(e) => set(s.name, e.target.value)} />
           )}
+          {s.widget === "tags" && (
+            <>
+              <input list={`dl-${s.name}`} value={String(v[s.name] ?? "")}
+                     placeholder="章节标签，逗号分隔" spellCheck={false}
+                     onChange={(e) => set(s.name, e.target.value)} />
+              <datalist id={`dl-${s.name}`}>
+                {(spec.choices[s.choices ?? ""] ?? []).map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </>
+          )}
           {s.widget === "yaml_map" && (
             <textarea rows={4} spellCheck={false}
                       value={String(v[s.name] ?? "")}

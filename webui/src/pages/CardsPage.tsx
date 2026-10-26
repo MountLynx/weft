@@ -247,9 +247,23 @@ export function CardsPage() {
       : `/api/projects/${encodeURIComponent(pid)}/cards`);
   const {links, tags, reportSel, toggleTag, clearTags, reloadLinks} = useCardsUi();
   const allRows = data?.rows ?? [];
-  // 多选并集过滤（设计 §4.1）：选中卡连通自己的每个邻居，恒在结果集，无空态分支
-  const rows = tags.length === 0 || links === null ? allRows
-    : allRows.filter((r) => matchesAny(links, r.id, tags));
+  // 章节筛选（card-chapters 设计 §5.2）：chips 来自当前卡种 rows 的 chapters 并集，
+  // 多选并集、组件态不入 URL（H9）；选中态随行集修剪，kind 切换即失效
+  const [chapterSel, setChapterSel] = useState<string[]>([]);
+  const chapterOptions = [...new Set(allRows.flatMap((r) => r.chapters ?? []))].sort();
+  const chapterTags = chapterSel.filter((c) => chapterOptions.includes(c));
+  function toggleChapter(tag: string) {
+    setChapterSel(chapterTags.includes(tag)
+      ? chapterTags.filter((c) => c !== tag)
+      : [...chapterTags, tag]);
+  }
+  // 两筛选维度叠加 = 行须同时满足（AND）；维度内各自并集
+  const rows = allRows.filter((r) => {
+    if (chapterTags.length > 0
+        && !(r.chapters ?? []).some((c) => chapterTags.includes(c))) return false;
+    if (tags.length > 0 && links !== null && !matchesAny(links, r.id, tags)) return false;
+    return true;
+  });
 
   // 选中卡镜像上报（侧栏筛选区数据源；换卡清空标签在 Provider 内完成）
   useEffect(() => {
@@ -316,6 +330,22 @@ export function CardsPage() {
           )}
         </div>
         <div className="page-body">
+          {chapterOptions.length > 0 && (
+            <div className="filter-bar chapter-bar">
+              <span className="label">章节：</span>
+              {chapterOptions.map((c) => (
+                <button key={c} type="button"
+                        className={`chip${chapterTags.includes(c) ? " active" : ""}`}
+                        onClick={() => toggleChapter(c)}>
+                  {c}
+                </button>
+              ))}
+              {chapterTags.length > 0 && (
+                <button className="filter-clear"
+                        onClick={() => setChapterSel([])}>清除</button>
+              )}
+            </div>
+          )}
           {tags.length > 0 && (
             <div className="filter-bar">
               <span className="label">筛选：</span>

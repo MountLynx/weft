@@ -59,6 +59,8 @@ def _yaml_scalar(value: str) -> str:
 
 _PART_BODY = """\
 # 节点 = 审阅单位；status 改 approved 后 `weft draft {part_id}` 生成草稿。
+# 提示：给卡片 frontmatter 标章节标签（chapters: [本章节名]，如 introduction），
+# 生成时同章已批卡自动并入「本章素材」，节点 uses 只需列主干实体。
 # nodes 示例（uses 引用元数据卡 id，role 常用 evidence / conclusion）：
 # nodes:
 # - id: para-{nn}-01
@@ -86,6 +88,7 @@ _CARD_TEMPLATES: dict[str, str] = {
     "data": """\
 id: {card_id}
 status: draft
+# chapters: []       # 可选：章节标签（生成时同章已批卡并入本章素材）
 # refs: []           # 可选：子图级 Quarto label（fig-01a / tbl-01），需先登记进 metadata/figures.yaml
 # source: 数据来源（路径/URL/说明）
 # description: 数据说明
@@ -95,6 +98,7 @@ id: {card_id}
 status: draft
 data: []             # 必填（至少 1 项）：依赖的 data 卡 id；填好前加载报 E-PARSE
 statement: ""        # 必填：事实陈述
+# chapters: []       # 可选：章节标签（生成时同章已批卡并入本章素材）
 # supports: []       # 可选：支持的 claim 卡 id
 """,
     "claim": """\
@@ -102,12 +106,14 @@ id: {card_id}
 status: draft
 claim_type: uncited  # uncited | cited；cited 时 cites 填 bib key（改类型需连同目录迁移）
 statement: ""        # 必填：论点陈述
+# chapters: []       # 可选：章节标签（生成时同章已批 claim 并入本章素材，可 {{claim-xx}} 引用）
 # cites: []          # claim_type: cited 时填 bib key（须已在 assets/references.bib）
 """,
     "note": """\
 id: {card_id}        # note 卡 id = bib key；须已登记进 assets/references.bib（否则报 E-NOTE-NOT-IN-BIB）
 status: draft
 # summary: 文献要点（缺省报 W-NOTE-NO-SUMMARY 提醒）
+# chapters: []       # 可选：章节标签（生成时同章已批卡并入本章素材背景）
 # pdf: 文献 PDF 路径（可选）
 # entry: {{}}          # 书目字段；bib managed 模式下 approved + entry 进 references.bib
 """,
@@ -116,21 +122,30 @@ id: {card_id}
 status: draft
 statement: ""        # 必填：方法陈述
 protocol: ""         # 必填：操作协议
+# chapters: []       # 可选：章节标签（不进素材池，仅组织用）
 # derived_from: []   # 可选：方法来源文献 bib key
 """,
     "param": """\
 id: {card_id}
 status: draft
 method: ""           # 必填：所属 method 卡 id；悬空报 E-DANGLING-REF
+# chapters: []       # 可选：章节标签（不进素材池，仅组织用）
 # values: {{}}         # 实验参数键值（每篇不同、逐项核对）
 # derived_from: []   # 可选：参数来源文献 bib key
 """,
 }
 
 
-def render_card_template(kind: str, card_id: str) -> str:
-    """按种类生成卡片模板（id + status: draft 实体键 + 必填空占位 + 注释示例）。"""
-    return "---\n" + _CARD_TEMPLATES[kind].format(card_id=card_id) + "---\n"
+def render_card_template(kind: str, card_id: str,
+                         chapters: list[str] | None = None) -> str:
+    """按种类生成卡片模板（id + status: draft 实体键 + 必填空占位 + 注释示例）。
+
+    --chapter 指定时写入真实 chapters 键；未指定保持注释形态（模板最小）。
+    """
+    body = _CARD_TEMPLATES[kind].format(card_id=card_id)
+    if chapters:
+        body += f"chapters: [{', '.join(chapters)}]\n"
+    return "---\n" + body + "---\n"
 
 
 # ---------------------------------------------------------------- 规划纯函数

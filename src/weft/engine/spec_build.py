@@ -11,6 +11,7 @@ from module_harness import TaskDefinition, Tasklist
 
 from weft.models.narrative import Node
 from weft.store.project import Project
+from weft.workflow import normalize_chapter
 
 _TEMPERATURE = 0.4
 
@@ -49,9 +50,41 @@ def _ref_view(label: str, project: Project) -> dict:
     return view
 
 
-def build_node_spec(project: Project, node: Node) -> dict:
+def collect_chapter_materials(project: Project, chapter_dir: str) -> dict:
+    """本章素材（card-chapters 设计 §4.1）：approved 且 chapters 归一化匹配
+    当前章节的 claim（可引用）与 note（背景要点）。
+
+    data/fact/method/param 不进素材池（H6：fact 是本文发现，method/param 走
+    logic 承载）；note 空 summary 无行文供给，排除。claims 形状与 uses 内
+    claim 完全一致（无 role），占位符通道零新增。
+    """
+    target = normalize_chapter(chapter_dir)
+
+    def _tagged(card) -> bool:
+        return any(normalize_chapter(t) == target for t in card.chapters)
+
+    claims = []
+    for cid, card in sorted(project.claims.items()):
+        if card.status != "approved" or not _tagged(card):
+            continue
+        claims.append({
+            "id": cid, "claim_type": card.claim_type,
+            "statement": card.statement, "cites": list(card.cites),
+            "note_summaries": [{"key": k, "summary": project.notes[k].summary}
+                               for k in card.cites if k in project.notes],
+        })
+    notes = [{"key": nid, "summary": card.summary}
+             for nid, card in sorted(project.notes.items())
+             if card.status == "approved" and card.summary.strip()
+             and _tagged(card)]
+    return {"claims": claims, "notes": notes}
+
+
+def build_node_spec(project: Project, node: Node,
+                    materials: dict | None = None) -> dict:
     """单节点 → uses 实体全文 bundle（只收 approved；fact 附 data 描述与图注，
-    claim 带分类与 note 摘要）。"""
+    claim 带分类与 note 摘要）。materials 非空时挂 spec["materials"]（本章素材，
+    card-chapters 设计 §4.2）；为空则不含该键，prompt 与旧版逐字节一致（H8）。"""
     uses = []
     for u in node.uses:
         if u.id in project.facts:
@@ -78,12 +111,25 @@ def build_node_spec(project: Project, node: Node) -> dict:
                 "note_summaries": [{"key": k, "summary": project.notes[k].summary}
                                    for k in card.cites if k in project.notes],
             })
-    return {"node": {"id": node.id, "purpose": node.purpose, "logic": node.logic},
+    spec = {"node": {"id": node.id, "purpose": node.purpose, "logic": node.logic},
             "uses": uses}
+    if materials:
+        spec["materials"] = materials
+    return spec
 
 
 def _uses_json(spec: dict) -> str:
     return json.dumps(spec["uses"], ensure_ascii=False, indent=1)
+
+
+def _materials_block(spec: dict) -> str:
+    """本章素材提示段（card-chapters 设计 §4.2）；无素材返回空串（H8）。"""
+    materials = spec.get("materials")
+    if not materials:
+        return ""
+    return ("本章素材（卡片 chapters 标签自动并入，可选补充；"
+            "引用其中的 claim 时同样写 {{claim-xx}} 占位符）：\n"
+            f"{json.dumps(materials, ensure_ascii=False, indent=1)}\n\n")
 
 
 def gen_prompt(overview: str, spec: dict, workflow_core: str) -> str:
@@ -95,13 +141,15 @@ def gen_prompt(overview: str, spec: dict, workflow_core: str) -> str:
         f"本段任务：purpose={spec['node']['purpose']}；"
         f"logic={spec['node']['logic'] or '（无）'}\n"
         f"本段 uses（已审实体全文 JSON，只准使用这些）：\n{_uses_json(spec)}\n\n"
+        f"{_materials_block(spec)}"
         f"{_CLAIM_CLASS_EXPLAIN}\n{_PLACEHOLDER_RULES}\n"
         "输出：仅输出段落全文（纯文本，含 {{fact-xx}}/{{claim-xx}} 占位符），无 JSON 无解释。"
     )
 
 
 _CONSISTENCY_BASIS = (
-    "一致性基准 = uses 实体全文 + 节点 logic（两者共同构成本段合法素材来源；"
+    "一致性基准 = uses 实体全文 + 本章素材（若有）+ 节点 logic"
+    "（共同构成本段合法素材来源；"
     "method/param 管线的协议与参数全部承载于节点 logic，同样是一致性基准）。"
 )
 
@@ -109,10 +157,10 @@ def check_prompt(spec: dict, gen_text: str, stage: str) -> str:
     return (
         f"【draft·校验】\n任务（{stage}）：逐项审查并只输出 JSON"
         ' {"verdict": "pass"} 或 {"verdict": "fix", "paragraph": "修正后全文"}。\n'
-        "审查项：① 内容与 uses 实体及节点 logic 一致"
-        "（不得引入两者之外的事实，不得改写数据与数值）；"
+        "审查项：① 内容与 uses 实体、本章素材（若有）及节点 logic 一致"
+        "（不得引入三者之外的事实，不得改写数据与数值）；"
         "② 覆盖 uses 与节点 logic 的全部要点，不遗漏；"
-        "③ 占位符只使用 uses 内的"
+        "③ 占位符只使用 uses 与本章素材内的"
         " {{fact-xx}}/{{claim-xx}}、同一占位符只出现一次、且只是括注位置"
         "（替换或移除后句子仍完整），cited claim 的论断处有占位符、"
         "uncited claim 无占位符；"
@@ -125,6 +173,7 @@ def check_prompt(spec: dict, gen_text: str, stage: str) -> str:
         "宁可 fix 不要放过事实偏移）。\n"
         f"{_CONSISTENCY_BASIS}\n"
         f"uses（JSON）：\n{_uses_json(spec)}\n"
+        f"{_materials_block(spec)}"
         f"节点 logic：{spec['node']['logic'] or '（无）'}\n"
         f"待审段落：\n<<<PARAGRAPH\n{gen_text}\nPARAGRAPH>>>"
     )
@@ -173,11 +222,12 @@ def recheck_prompt(spec: dict, text: str) -> str:
         "只输出 JSON {\"verdict\": \"pass\"} 或 "
         "{\"verdict\": \"fix\", \"paragraph\": \"修正后全文\"}。\n"
         f"{_CONSISTENCY_BASIS}\n"
-        "审查项与起草稿审查相同：内容与 uses 实体及节点 logic 一致"
-        "（不得引入两者之外的事实，不得改写数据与数值）；"
+        "审查项与起草稿审查相同：内容与 uses 实体、本章素材（若有）及节点 logic 一致"
+        "（不得引入三者之外的事实，不得改写数据与数值）；"
         "正文不得出现字面图表编号（Fig. 1a / Table 1 等由系统经占位符填充）；"
         "若段落忠实，判 pass；verdict=fix 时 paragraph 必须是完整的修正段落，不得留空。\n"
         f"uses（JSON）：\n{_uses_json(spec)}\n"
+        f"{_materials_block(spec)}"
         f"节点 logic：{spec['node']['logic'] or '（无）'}\n"
         f"当前工作文本：\n<<<PARAGRAPH\n{text}\nPARAGRAPH>>>"
     )

@@ -10,7 +10,7 @@ from weft.diagnostics import Diagnostic, Level
 from weft.graphgen.index import build_index
 from weft.models.bib import BIB_TYPES
 from weft.store.project import Project
-from weft.workflow import WORKFLOW_VOCAB
+from weft.workflow import WORKFLOW_VOCAB, normalize_chapter
 
 PURPOSE_VOCAB = {"describe", "interpret", "compare", "transition"}
 ROLE_VOCAB = {"evidence", "conclusion", "comparison", "background", "counterpoint"}
@@ -294,6 +294,31 @@ def _check_workflow(project: Project) -> list[Diagnostic]:
     return out
 
 
+_CARD_ATTRS = ("data_cards", "facts", "claims", "notes", "methods", "params")
+
+
+def _check_chapters(project: Project) -> list[Diagnostic]:
+    """章节标签软词表（card-chapters 设计 §3）：归一化后不匹配任何叙事章节
+    目录名 → W-CHAPTER-VOCAB 提醒（允许超集）。项目无任何章节时豁免
+    （先标后建章是正常工作流）；rejected 卡豁免全部提醒。"""
+    known = {normalize_chapter(c) for c in project.part_chapters.values()}
+    if not known:
+        return []
+    out: list[Diagnostic] = []
+    for attr in _CARD_ATTRS:
+        for cid, card in getattr(project, attr).items():
+            if card.status == "rejected":
+                continue
+            for tag in card.chapters:
+                if normalize_chapter(tag) not in known:
+                    out.append(Diagnostic(
+                        Level.WARNING, "W-CHAPTER-VOCAB",
+                        _card_rel(project, cid), "chapters",
+                        f"章节标签不匹配任何叙事章节：{tag}"
+                        f"（已知：{sorted(known)}）"))
+    return out
+
+
 def validate_project(project: Project) -> list[Diagnostic]:
     """交叉校验，返回错误在前（按路径/码排序）的全部诊断。"""
     diagnostics: list[Diagnostic] = []
@@ -311,6 +336,7 @@ def validate_project(project: Project) -> list[Diagnostic]:
     diagnostics += _check_note_cards_exist(project)
     diagnostics += _check_vocab(project)
     diagnostics += _check_workflow(project)
+    diagnostics += _check_chapters(project)
 
     order = {Level.ERROR: 0, Level.WARNING: 1}
     diagnostics.sort(key=lambda d: (order[d.level], d.path, d.code, d.field or ""))

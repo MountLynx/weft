@@ -73,6 +73,7 @@ export interface CardRow {
   id: string;
   status: string;
   key: string;
+  chapters: string[];
   rel: string;
 }
 
@@ -129,10 +130,22 @@ export interface PanelNode {
   uses: UseItemJson[];
 }
 
+/** 本章标签卡（card-chapters 设计 §5.1）：chapters 匹配本 part 章节的卡片。 */
+export interface ChapterCard {
+  id: string;
+  kind: string;
+  status: string;
+  key: string;
+  used: boolean;
+}
+
 export interface PanelPayload {
   ok: boolean;
   part: {id: string; workflow: string | null};
   workflow_vocab: string[];
+  chapter: string;
+  chapter_norm: string;
+  chapter_cards: ChapterCard[];
   nodes: PanelNode[];
   use_labels: Record<string, string>;
   draft_text: string | null;

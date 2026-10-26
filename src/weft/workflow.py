@@ -68,11 +68,20 @@ WORKFLOW_SPECS: dict[str, dict] = {
 }
 
 
+def normalize_chapter(name: str) -> str:
+    """章节名归一化（card-chapters 设计 §2）：剥数字前缀 + strip + lower。
+
+    `01-introduction` / `Introduction` / `introduction` 归一化后相等；
+    校验（W-CHAPTER-VOCAB）、素材匹配、面板载荷三方共用。
+    """
+    return _NUM_PREFIX.sub("", name).strip().lower()
+
+
 def resolve_workflow(part: NarrativePart, chapter_dir: str) -> str:
     """显式字段 → 目录名前缀匹配 → results 兜底（§4.3）。"""
     if part.workflow:
         return part.workflow
-    name = _NUM_PREFIX.sub("", chapter_dir).lower()
+    name = normalize_chapter(chapter_dir)
     for workflow in WORKFLOW_VOCAB:
         if name.startswith(workflow):
             return workflow

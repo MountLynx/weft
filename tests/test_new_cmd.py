@@ -18,6 +18,8 @@ _INIT_PART_GOLDEN = """\
 id: sec-01
 section: Introduction
 # 节点 = 审阅单位；status 改 approved 后 `weft draft sec-01` 生成草稿。
+# 提示：给卡片 frontmatter 标章节标签（chapters: [本章节名]，如 introduction），
+# 生成时同章已批卡自动并入「本章素材」，节点 uses 只需列主干实体。
 # nodes 示例（uses 引用元数据卡 id，role 常用 evidence / conclusion）：
 # nodes:
 # - id: para-01-01

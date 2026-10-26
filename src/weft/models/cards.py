@@ -9,13 +9,18 @@ ReviewStatus = Literal["draft", "approved", "rejected"]
 
 
 class _Card(BaseModel):
-    """卡片公共字段。未知键一律报错：防 schema 漂移与字段拼写错误。"""
+    """卡片公共字段。未知键一律报错：防 schema 漂移与字段拼写错误。
+
+    chapters（v1 加性扩展，card-chapters 设计 §2）：章节标签，多值可选；
+    旧卡缺键即默认 []（无迁移）。标签原文保留，归一化只在匹配时做。
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     id: str
     status: ReviewStatus
     comment: str = ""
+    chapters: list[str] = []
 
 
 class DataCard(_Card):

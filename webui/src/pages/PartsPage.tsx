@@ -5,6 +5,7 @@ import {api, ApiError} from "../api/client";
 import type {PartsList, PanelPayload} from "../api/types";
 import {useApi} from "../hooks/useApi";
 import {Icon} from "../components/Icon";
+import {kindIcon} from "../components/kinds";
 import {RunConsole} from "../components/RunConsole";
 import {StatusBadge} from "../components/StatusBadge";
 import {toast} from "../state/toast";
@@ -157,6 +158,29 @@ export function PartsPage() {
             </div>
           ))}
         </div>
+        {(panel?.chapter_cards ?? []).length > 0 && (
+          <div>
+            <h3 style={{margin: "6px 0", fontSize: "var(--fs-base)", color: "var(--text-heading)"}}>
+              本章标签卡（{panel?.chapter}）
+            </h3>
+            <div className="row-list">
+              {(panel?.chapter_cards ?? []).map((c) => (
+                <Link key={`${c.kind}-${c.id}`} className="row-item"
+                      title={c.used ? "已被本 part 节点 uses 引用" : "未被 uses 引用：生成时作为本章素材自动并入"}
+                      to={`/p/${encodeURIComponent(pid)}/cards/${encodeURIComponent(c.kind)}/${encodeURIComponent(c.id)}`}>
+                  <Icon name={kindIcon(c.kind)} size={15} />
+                  <div className="main">
+                    <span className="title truncate">
+                      {c.id}{c.used && <span className="text-xs text-muted"> · 已在 uses</span>}
+                    </span>
+                    {c.key && <span className="meta text-muted truncate">{c.key}</span>}
+                  </div>
+                  <span className="end"><StatusBadge status={c.status} /></span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
         {runId && <RunConsole pid={pid} runId={runId} onFinished={reload} />}
         {panel?.draft_text && (
           <div>

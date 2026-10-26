@@ -11,6 +11,7 @@ from pathlib import Path
 from weft.engine.draft_rules import DraftError, DraftRuleError
 from weft.engine.drafts import render_draft_markdown, write_draft
 from weft.engine.run import run_draft
+from weft.engine.spec_build import collect_chapter_materials
 from weft.models.narrative import NarrativePart
 from weft.store.project import Project
 from weft.workflow import resolve_workflow
@@ -47,7 +48,10 @@ def run_part_draft(project: Project, part: NarrativePart, *, client,
 
     overview_path = project.root / "overview.md"
     overview = overview_path.read_text(encoding="utf-8") if overview_path.exists() else ""
-    workflow = resolve_workflow(part, project.part_chapters[part.id])
+    chapter = project.part_chapters[part.id]
+    workflow = resolve_workflow(part, chapter)
+    # 本章素材全集（card-chapters 设计 §4.1）；run_draft 内按节点剔除 uses 已含项
+    materials = collect_chapter_materials(project, chapter)
     emit("run_started", message=f"{part.id}（workflow={workflow}，{len(approved)} 节点）")
 
     paragraphs: dict[str, str] = {}
@@ -71,7 +75,7 @@ def run_part_draft(project: Project, part: NarrativePart, *, client,
                                    workflow=workflow, overview=overview,
                                    prior_paragraphs=[paragraphs[n.id] for n in approved
                                                      if n.id in paragraphs],
-                                   prev_tail=tail)
+                                   prev_tail=tail, materials=materials)
             except (DraftRuleError, DraftError) as exc:
                 emit("node_failed", node.id, str(exc))
                 raise

@@ -82,7 +82,8 @@ def _register_harnesses(reg, workflow_spec: dict) -> None:
     ))
 
 
-def _make_fill_script(node: Node, part_id: str, project: Project):
+def _make_fill_script(node: Node, part_id: str, project: Project,
+                      material_ids: frozenset[str]):
     """f 脚本：覆盖链合成有效文本 → 占位符确定性填充（唯一落盘前置闸门）。"""
 
     def fill(view):
@@ -98,7 +99,8 @@ def _make_fill_script(node: Node, part_id: str, project: Project):
         if err:
             raise DraftRuleError(_diag(
                 "E-DRAFT-SHAPE", node.id, part_id, "output", err))
-        paragraph, reminders = fill_placeholders(text, node, part_id, project)
+        paragraph, reminders = fill_placeholders(text, node, part_id, project,
+                                                 material_ids=material_ids)
         return {"paragraph": paragraph, "reminders": reminders}
 
     return fill
@@ -108,10 +110,26 @@ def run_draft(project: Project, part: NarrativePart, node: Node, *, client,
               workflow: str = "results", overview: str = "",
               prior_paragraphs: list[str] | None = None,
               prev_tail: str | None = None,
-              next_head: str | None = None) -> DraftResult:
-    """同步入口；一次只生成一个段落（节点）。内部自持事件循环。"""
+              next_head: str | None = None,
+              materials: dict | None = None) -> DraftResult:
+    """同步入口；一次只生成一个段落（节点）。内部自持事件循环。
+
+    materials（本章素材全集，card-chapters 设计 §4.1）按节点过滤：
+    剔除 uses 已含的 claim id——uses 永远优先，素材是补充。
+    """
+    used_ids = {u.id for u in node.uses}
+    node_materials: dict | None = None
+    if materials:
+        claims = [c for c in materials.get("claims", [])
+                  if c["id"] not in used_ids]
+        notes = list(materials.get("notes", []))
+        if claims or notes:
+            node_materials = {"claims": claims, "notes": notes}
+    material_ids = frozenset(c["id"] for c in (node_materials or {}).get(
+        "claims", []))
+
     workflow_spec = WORKFLOW_SPECS[workflow]
-    node_spec = build_node_spec(project, node)
+    node_spec = build_node_spec(project, node, materials=node_materials)
     run_id = uuid.uuid4().hex[:8]
     context = {"prior": list(prior_paragraphs or []),
                "prev_tail": prev_tail, "next_head": next_head,
@@ -123,7 +141,7 @@ def run_draft(project: Project, part: NarrativePart, node: Node, *, client,
     reg = HarnessRegistry(llm_client=client, event_bus=bus)
     _register_harnesses(reg, workflow_spec)
     reg.script("weft_fill_placeholders")(
-        _make_fill_script(node, part.id, project))
+        _make_fill_script(node, part.id, project, material_ids))
 
     module = Module(
         spec={"task_nodes": {t: t for t in ("g", "c1", "l", "p", "c2")}},

@@ -88,10 +88,16 @@ def _label_to_text(label: str, project: Project) -> str:
 
 
 def fill_placeholders(text: str, node: Node, part_id: str,
-                      project: Project) -> tuple[str, list[str]]:
-    """占位符确定性替换为图表字面编号 / [@cites]；返回 (文本, 软提醒)。"""
+                      project: Project,
+                      material_ids: frozenset[str] = frozenset()
+                      ) -> tuple[str, list[str]]:
+    """占位符确定性替换为图表字面编号 / [@cites]；返回 (文本, 软提醒)。
+
+    合法目标集 = node.uses ∪ 本章素材 claims（card-chapters 设计 §4.3）：
+    E-DRAFT-USES 语义不变，合法集合从节点级人工枚举放宽到「+ 同章已批标签卡」。
+    """
     reminders: list[str] = []
-    used = {u.id for u in node.uses}
+    used = {u.id for u in node.uses} | set(material_ids)
     seen: set[str] = set()
 
     def _sub(m: re.Match) -> str:
@@ -100,7 +106,7 @@ def fill_placeholders(text: str, node: Node, part_id: str,
         if target not in used:
             raise DraftRuleError(_diag(
                 "E-DRAFT-USES", node.id, part_id, "paragraph",
-                f"占位符 {token} 越界：不属于本节点 uses"))
+                f"占位符 {token} 越界：不属于本节点 uses 或本章素材"))
         if token in seen:
             # 同段重复占位符只保留首次出现（模型惯于写两遍，e2e 实测）
             return ""

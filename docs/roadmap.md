@@ -50,6 +50,7 @@
 - 溯源注释完善与用户文档。
 - bib 自动生成（bibgen）✅（2026-09-29）：`weft bib sync`；managed 模式以已批准文献卡为真源（note 卡 entry 书目字段，spec 2026-09-29-weft-bibgen），WebUI 批准/编辑即同步，AI 提案与 parse 文献模式两条草案入口。
 - 项目注册表（projects registry）✅（2026-09-29）：全局注册表（`$WEFT_HOME/projects.json`）让项目散落磁盘任意位置；`weft projects add/new/list/remove/root` 命令组 + `weft serve` 双模式（无参 = 注册表模式，一个主程序多项目共存且相互隔离；带参 = 扫描模式现状不变）；WebUI 新建表单登记闭环、失联灰显、损坏横幅（E-REG-* fail-closed）；设计定案 `docs/superpowers/specs/2026-09-29-weft-projects-registry-design.md`（决策 R1–R12，测试 547 passed）。
+- 卡片章节标签与本章素材生成 ✅（2026-10-26）：`_Card.chapters` 章节标签（schema v1 加性扩展，无迁移）；生成时同章已批 claim/note 自动并入「本章素材」——claim 进占位符合法集（uses ∪ 素材），introduction 综述章的整章文献池从节点级人工枚举放宽到章节级打标；WebUI 卡片页章节筛选 chips、表单 tags 控件（datalist）、叙事面板「本章标签卡」区块、`weft new card --chapter`；W-CHAPTER-VOCAB 软词表。设计定案 `docs/superpowers/specs/2026-10-26-weft-card-chapters-design.md`（决策 H1–H10，pytest 832 / vitest 20）。
 
 ## 扩展场景（M4 后，架构已预留）
 

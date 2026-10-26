@@ -210,7 +210,8 @@ def show(
     rel = project.card_paths[card_id].as_posix()
     typer.echo(f"# {card_id}（{kind} 卡，{card.status}）— {rel}")
     for name, value in card.model_dump().items():
-        if name in ("id", "status") or (name == "comment" and not value):
+        if name in ("id", "status") or (name in ("comment", "chapters")
+                                        and not value):
             continue
         typer.echo(_format_field(name, value))
     refs = build_index(project)["entities"][card_id]["referenced_by"]
@@ -835,6 +836,8 @@ def new_part(
 def new_card(
     kind: _CardKind = typer.Argument(..., help="卡片种类"),
     card_id: str = typer.Argument(..., help="卡片 id（文件名 = id；note 卡 id = bib key）"),
+    chapter: list[str] = typer.Option(
+        [], "--chapter", help="章节标签（可多次；生成时同章已批卡并入本章素材）"),
     project_dir: Path = typer.Argument(Path("."), help="weft 项目根目录"),
 ) -> None:
     """按模板新建空白元数据卡片（status: draft，人填写后人审）。"""
@@ -851,7 +854,8 @@ def new_card(
             Level.ERROR, "E-NEW-COLLISION", exc.rel or ".", None, str(exc))])
         raise typer.Exit(code=1) from exc
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(render_card_template(kind.value, card_id), encoding="utf-8", newline="\n")
+    target.write_text(render_card_template(kind.value, card_id, chapters=list(chapter)),
+                      encoding="utf-8", newline="\n")
     typer.echo(f"已创建 {target.relative_to(project.root).as_posix()}")
     typer.echo("下一步：填写字段后 weft validate 检查，approved 进入生成闸门")
 
