@@ -1,5 +1,5 @@
 /** 卡片列表 + 右栏 inspector（详情/审阅/改名/一键修复/内联新建与编辑）。卡种导航只在侧栏，无页签。 */
-import {useEffect, useState} from "react";
+import {useEffect, useState, type ReactNode} from "react";
 import {Link, Navigate, useNavigate, useParams} from "react-router-dom";
 import {api, ApiError} from "../api/client";
 import type {CardDetail, CardsList, FormSpec} from "../api/types";
@@ -98,13 +98,27 @@ function CardInspector({pid, kind, cardId, onEdit, onChanged}: {
       </div>
       <div className="panel-body">
         <div className="field-table">
-          {Object.entries(card.fields).map(([k, v]) => {
+          {Object.entries(card.fields).flatMap(([k, v]): ReactNode[] => {
             const linkKind = FIELD_LINK_KINDS[kind]?.[k];
             const raw = v as unknown;
             const refs: string[] = linkKind
               ? (Array.isArray(raw) ? raw.map(String) : raw ? [String(raw)] : [])
               : [];
-            return (
+            // 对象值（param 的 values 字典）：摊平成 `字段.键` 行，避免把对象
+            // 直接作为 React 子元素（error #31）。
+            if (!linkKind && raw !== null && typeof raw === "object" && !Array.isArray(raw)) {
+              const entries = Object.entries(raw as Record<string, unknown>);
+              if (entries.length === 0) {
+                return [<div className="field" key={k}><span className="k">{k}</span><span className="v">—</span></div>];
+              }
+              return entries.map(([dk, dv]) => (
+                <div className="field" key={`${k}.${dk}`}>
+                  <span className="k">{k}.{dk}</span>
+                  <span className="v">{String(dv ?? "") || "—"}</span>
+                </div>
+              ));
+            }
+            return [
               <div className="field" key={k}>
                 <span className="k">{k}</span>
                 {linkKind ? (
@@ -125,8 +139,8 @@ function CardInspector({pid, kind, cardId, onEdit, onChanged}: {
                 ) : (
                   <span className={`v${k === "entry" ? " mono" : ""}`}>{v || "—"}</span>
                 )}
-              </div>
-            );
+              </div>,
+            ];
           })}
         </div>
         {card.fixable && (

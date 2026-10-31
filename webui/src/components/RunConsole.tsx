@@ -1,6 +1,7 @@
 /** 运行控制台：EventSource 消费 SSE 事件流（事件词表与旧 webui.js 一致）。
  * 终态后回调 onFinished（前端 refetch 面板，替代旧 htmx.ajax 刷新）。 */
 import {useEffect, useRef, useState} from "react";
+import {mountPrefix} from "../api/mount";
 
 export interface RunEventLine {
   kind: string;
@@ -24,7 +25,7 @@ export function RunConsole({pid, runId, onFinished}: {
     setLines([]);
     let cancelled = false;
     const url = `/api/projects/${encodeURIComponent(pid)}/runs/${encodeURIComponent(runId)}/events`;
-    const es = new EventSource(url);
+    const es = new EventSource(mountPrefix() + url);
     es.onmessage = (ev) => {
       try {
         const data = JSON.parse(ev.data) as RunEventLine;
