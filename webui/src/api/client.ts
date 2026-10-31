@@ -1,4 +1,5 @@
 /** API 客户端：fetch 封装，错误归一为 ApiError（设计 §6 数据流）。 */
+import {mountPrefix} from "./mount";
 
 export interface DiagJson {
   level: string;
@@ -38,7 +39,7 @@ async function parseError(resp: Response): Promise<ApiError> {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const resp = await fetch(path, init);
+  const resp = await fetch(mountPrefix() + path, init);
   if (!resp.ok) throw await parseError(resp);
   if (resp.status === 204) return undefined as T;
   return (await resp.json()) as T;

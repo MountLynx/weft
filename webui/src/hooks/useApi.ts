@@ -3,6 +3,7 @@
  * 同路径 reload 保留旧数据免闪。 */
 import {useCallback, useEffect, useRef, useState} from "react";
 import {ApiError} from "../api/client";
+import {mountPrefix} from "../api/mount";
 
 export function useApi<T>(path: string | null): {
   data: T | null;
@@ -32,7 +33,7 @@ export function useApi<T>(path: string | null): {
     }
     let alive = true;
     setLoading(true);
-    fetch(path).then(async (resp) => {
+    fetch(mountPrefix() + path).then(async (resp) => {
       if (!resp.ok) {
         let payload: Record<string, unknown> = {};
         try {
